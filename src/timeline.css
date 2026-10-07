@@ -1,0 +1,41 @@
+.food { background-color: #9b6fca; }
+
+.resource-chart { position: relative; cursor: crosshair; }
+
+.hover-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #fff;
+    box-shadow: 0 0 4px #fff;
+    pointer-events: none;
+}
+
+.limit-line {
+    position: absolute;
+    right: 0;
+    left: 0;
+    height: 1px;
+    background: #dfc3ff;
+    box-shadow: 0 0 3px #af82d9;
+    pointer-events: none;
+}
+
+.resource-tooltip {
+    position: absolute;
+    z-index: 2;
+    top: 100%;
+    margin-top: 4px;
+    padding: 3px 5px;
+    transform: translateX(4px);
+    white-space: nowrap;
+    color: #edf5ff;
+    background: #07111b;
+    border: 1px solid #759fc0;
+    font-size: .68rem;
+    pointer-events: none;
+}
+
+.resource-tooltip.align-right { transform: translateX(calc(-100% - 4px)); }
+.resource-row { grid-template-columns: 73px minmax(0, 1fr) 74px; }

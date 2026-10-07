@@ -1,0 +1,1045 @@
+# War Legends Game Model
+
+## 1. Overview
+
+The planner should model War Legends as an event-driven RTS economy and production system.
+
+The important distinction is between:
+
+- an **order** issued by the player;
+- the **actual start** of the action;
+- the **completion** of the action.
+
+For example:
+
+```text
+01:20  Player orders Barracks
+01:23  Worker reaches construction location
+01:23  Construction starts
+01:53  Construction completes
+```
+
+The planner must represent these as separate events.
+
+### Initial state (confirmed)
+
+At time 0 the Light faction has one completed Castle; the Dark faction has
+one completed Citadel. This initial building is available to produce workers
+immediately, without construction cost or delay.
+
+The default starting workforce is five Workers/Slaves: four assigned to gold
+and one to wood. Initial assignments remain editable; starting food usage is
+2 per worker (10 food for the default five).
+
+---
+
+## 2. Resources
+
+The current target resource model includes:
+
+- Gold
+- Wood
+- Food capacity
+
+The planner should track both the current amount of spendable resources and the parameters that determine future income/capacity.
+
+Unit/building costs are considered **fixed** and do not depend on account level.
+
+A resource state at time `t` should be derivable from:
+
+```text
+initial resources
++ completed gathering deliveries
+- completed expenditures
+```
+
+Food is different from Gold/Wood: it represents a population/capacity limit and is increased by building Farms.
+
+---
+
+## 3. Gold Gathering
+
+Gold gathering should be modeled as an explicit worker-to-mine cycle rather than a constant income rate.
+
+### Gold Mine Constraints
+
+A gold mine can contain:
+
+```text
+maximum 1 worker at a time
+```
+
+The mine therefore behaves like a single-server queue.
+
+Multiple workers can be assigned to the same mine, but only one can be actively mining at any given time. Other workers wait for the mining spot to become available or remain in transit.
+
+### Gold Yield
+
+Each completed mine trip provides:
+
+```text
+50–55 gold
+```
+
+The exact amount depends on **Castle level**.
+
+Example conceptual model:
+
+```text
+goldPerTrip = castleLevelTable[castleLevel]
+```
+
+The exact Castle-level table should be stored as game data.
+
+### Gold Mining Time
+
+Default time spent inside the mine:
+
+```text
+3 seconds
+```
+
+Worker items can reduce this time.
+
+Example:
+
+```text
+effectiveMiningTime =
+    baseGoldMiningTime * workerGoldMiningTimeMultiplier
+```
+
+The exact item modifiers should come from manually entered game data.
+
+### Travel Time
+
+The time from the Town Hall to the gold mine is a configurable parameter.
+
+Default:
+
+```text
+4 seconds
+```
+
+The return trip should also be configurable.
+
+Default:
+
+```text
+4 seconds
+```
+
+The simulator should therefore not hard-code a universal worker movement time.
+
+Suggested profile/configuration:
+
+```json
+{
+  "gold": {
+    "outboundTravelTime": 4.0,
+    "returnTravelTime": 4.0,
+    "baseMiningTime": 3.0
+  }
+}
+```
+
+### Gold Worker Cycle
+
+For a worker with no queue delay:
+
+```text
+4s travel to mine
+3s mine
+4s return
+----------------
+11s total
+```
+
+However, when multiple workers share one mine, queueing changes the effective cycle.
+
+### Three Workers
+
+With 3 workers assigned to the same mine:
+
+```text
+4s travel
+3s mining
+4s return
+= 11s per worker cycle
+```
+
+Three workers are not enough to keep the mine continuously occupied.
+
+In steady-state terms:
+
+```text
+3 workers × 3s mining = 9 worker-seconds of mining
+11-second cycle
+```
+
+so the mine has idle periods.
+
+A typical staggered schedule can look conceptually like:
+
+```text
+Worker 1:   [MINE 4–7]          [MINE 15–18] ...
+Worker 2:            [MINE 7–10]          [MINE 18–21] ...
+Worker 3:                    [MINE 10–13]          [MINE 21–24] ...
+Mine idle:                          [13–15]
+```
+
+Exact timing depends on initial worker positions and dispatch order.
+
+### Four Workers
+
+With 4 workers, the mine can remain continuously occupied.
+
+Each worker spends approximately:
+
+```text
+4s travel to mine
+1s average/steady-state queue wait
+3s mining
+4s return
+----------------
+12s effective cycle
+```
+
+The 1-second wait follows from the fact that the mine has one mining slot and the four workers collectively need to occupy that slot continuously:
+
+```text
+4 workers × 3s mining = 12s of mining demand
+```
+
+while the non-queue portion of an individual cycle is:
+
+```text
+4s + 3s + 4s = 11s
+```
+
+so roughly 1 additional second per worker is spent waiting in the mine queue in steady state.
+
+This should be treated as an emergent property of the event simulation rather than hard-coded as:
+
+```text
+4 workers => exactly 1 second wait
+```
+
+The simulator should calculate the actual queue time from worker arrival times and mine availability.
+
+### Gold Gathering State
+
+A gold worker can be in states such as:
+
+```text
+MOVING_TO_GOLD_MINE
+WAITING_FOR_MINE
+MINING_GOLD
+RETURNING_GOLD
+```
+
+When gold is delivered, the worker starts another trip unless reassigned.
+
+---
+
+## 4. Wood Gathering
+
+Wood gathering is similar to gold gathering but does **not** have the same single-worker mine constraint.
+
+There is effectively abundant access to trees for the workers:
+
+- multiple workers can harvest at the same time;
+- multiple workers can work on the same tree;
+- there is no `maximum 1 worker gathering simultaneously` constraint.
+
+Therefore, wood gathering can be modeled independently per worker without a shared single-server queue.
+
+### Wood Yield
+
+Each completed wood trip provides:
+
+```text
+50–55 wood
+```
+
+The exact amount depends on **Sawmill level**.
+
+Conceptual model:
+
+```text
+woodPerTrip = sawmillLevelTable[sawmillLevel]
+```
+
+The exact level table should be stored as game data.
+
+### Wood Mining/Chopping Time
+
+Default time spent gathering wood:
+
+```text
+12 seconds
+```
+
+Worker items can reduce this time.
+
+Example:
+
+```text
+effectiveWoodGatherTime =
+    baseWoodGatherTime * workerWoodGatherTimeMultiplier
+```
+
+### Travel Time
+
+The normal time between the Town Hall and the tree is configurable.
+
+Default:
+
+```text
+4 seconds
+```
+
+The return trip is also configurable.
+
+Default:
+
+```text
+4 seconds
+```
+
+Conceptual cycle:
+
+```text
+4s travel to tree
+12s gather wood
+4s return
+----------------
+20s total
+```
+
+The exact cycle should be calculated from the configured travel and item modifiers.
+
+### Nearby Sawmill
+
+A Sawmill can be built close to a trees.
+
+When a worker uses a nearby Sawmill as the return/deposit point, a different travel-time parameter applies.
+
+Default nearby distance:
+
+```text
+0.5 seconds
+```
+
+For example:
+
+```json
+{
+  "wood": {
+    "outboundTravelTime": 4.0,
+    "returnTravelTime": 4.0,
+    "nearbySawmillReturnTime": 0.5,
+    "baseGatherTime": 12.0
+  }
+}
+```
+
+The exact interpretation of the 0.5-second distance should follow the actual game behavior. It should remain configurable rather than being hard-coded into the simulator.
+
+### Wood Worker State
+
+A wood worker can be in:
+
+```text
+MOVING_TO_TREE
+GATHERING_WOOD
+RETURNING_WOOD
+```
+
+Multiple wood workers may gather in parallel with no resource-node capacity limit.
+
+---
+
+## 5. Worker Allocation and Economy
+
+Additional worker states (any other states can be added as needed):
+
+```text
+MOVING
+IDLE
+BUILDING
+UPGRADING
+```
+
+Because workers are individual simulation entities, changing worker allocation must change the future resource curve.
+
+Example:
+
+```text
+Worker 1 → Gold
+Worker 2 → Gold
+Worker 3 → Gold
+Worker 4 → Gold
+Worker 5 → Wood
+Worker 6 → Wood
+Worker 7 → Building
+```
+
+Worker #7 does not contribute to Gold or Wood income while constructing.
+
+This is a key difference from a simple fixed-income build-order calculator.
+
+The planner should allow the user to inspect:
+
+```text
+Gold workers
+Wood workers
+Building workers
+Idle workers
+```
+
+at any point in time.
+
+---
+
+## 6. Castle Level
+
+Castle level is a player-profile parameter.
+
+It affects the amount of gold obtained per completed mining trip.
+
+Conceptually:
+
+```text
+Castle Level
+    ↓
+Gold per trip
+    ↓
+Gold income
+    ↓
+Build-order timing
+```
+
+Example data structure:
+
+```json
+{
+  "castle": {
+    "goldPerTripByLevel": {
+      "1": 50,
+      "2": 51,
+      "3": 52
+    }
+  }
+}
+```
+
+The exact values should be populated manually from the game.
+
+---
+
+## 7. Sawmill Level
+
+Sawmill level is another player-profile parameter.
+
+It affects the amount of wood obtained per completed gathering trip.
+
+Example:
+
+```json
+{
+  "sawmill": {
+    "woodPerTripByLevel": {
+      "1": 50,
+      "2": 51,
+      "3": 52
+    }
+  }
+}
+```
+
+The exact values should be populated manually.
+
+---
+
+## 8. Worker Level
+
+Worker level affects construction and building-upgrade time.
+
+Known behavior:
+
+```text
+Worker level → approximately 1% to 5% construction-time reduction
+```
+
+The exact level-to-bonus mapping should be stored as data.
+
+For a base construction time:
+
+```text
+effectiveConstructionTime =
+    baseConstructionTime * (1 - workerConstructionBonus)
+```
+
+The planner should not assume the exact formula until it is confirmed from the game data.
+
+---
+
+## 9. Production Building Level
+
+Production-building level reduces unit training time.
+
+For example:
+
+```text
+baseTrainingTime = 20s
+productionBonus = 4%
+
+effectiveTrainingTime = 20 * (1 - 0.04)
+                      = 19.2s
+```
+
+The bonus belongs to the production building instance/profile, not to the unit itself.
+
+This allows:
+
+```text
+Barracks Lv.2 → Soldier = X seconds
+Barracks Lv.5 → Soldier = Y seconds
+```
+
+without duplicating the Soldier definition.
+
+---
+
+## 10. Food Capacity
+
+Food is modeled as a capacity rather than as a continuously gathered resource.
+
+There is a base food capacity.
+
+Default:
+
+```text
+20
+```
+
+Farms increase the available food capacity.
+
+Default contribution per completed Farm:
+
+```text
++20 food capacity
+```
+
+Conceptually:
+
+```text
+foodCapacity =
+    baseFoodCapacity
+    + sum(completedFarm.foodCapacityBonus)
+```
+
+Example:
+
+```text
+Base capacity: 20
+Farm #1:       +20
+Farm #2:       +20
+-------------------
+Total:          60
+```
+
+The exact terminology and population-consumption rules should be adapted to the actual War Legends mechanics.
+
+The important simulator requirement is that unit production must be checked against the current available food capacity.
+
+If unit production consumes population immediately, the simulator should model:
+
+```text
+currentFoodUsed
+currentFoodCapacity
+```
+
+and reject/delay production when:
+
+```text
+currentFoodUsed + unitFoodCost > currentFoodCapacity
+```
+
+If the game uses a different timing for population reservation, that rule should be encoded in `GameRules`.
+
+Farm construction itself is a normal building action and therefore can require a worker and a construction period.
+
+---
+
+## 11. Buildings
+
+Each building should contain at least:
+
+```text
+id
+name
+cost
+baseConstructionTime
+prerequisites
+productionCapabilities
+upgradeCapabilities
+```
+
+Example:
+
+```json
+{
+  "id": "barracks",
+  "name": "Barracks",
+  "cost": {
+    "gold": 150,
+    "wood": 100
+  },
+  "baseConstructionTime": 30,
+  "produces": ["soldier"]
+}
+```
+
+The actual War Legends values should be entered manually.
+
+---
+
+## 12. Units
+
+Each unit should contain at least:
+
+```text
+id
+name
+cost
+baseTrainingTime
+foodCost
+prerequisites
+producer
+```
+
+Example:
+
+```json
+{
+  "id": "soldier",
+  "name": "Soldier",
+  "cost": {
+    "gold": 80,
+    "wood": 20
+  },
+  "baseTrainingTime": 12,
+  "foodCost": 1,
+  "producer": "barracks"
+}
+```
+
+Costs are assumed to be constant across account progression unless the game proves otherwise.
+
+---
+
+## 13. Construction Delay
+
+A key War Legends-specific mechanic is that issuing a construction command does not necessarily mean construction starts immediately.
+
+The player normally has to get a worker to the construction location.
+
+Typical practical delay:
+
+```text
+2–4 seconds
+```
+
+The delay depends on execution skill and positioning.
+
+### Required planner feature
+
+Construction delay must be a configurable property.
+
+Suggested modes:
+
+```text
+NORMAL
+PRE_POSITIONED
+CUSTOM
+```
+
+### Normal
+
+Use a default delay representing typical execution.
+
+```text
+constructionStartDelay = configured normal delay
+```
+
+For example, the default can be set to:
+
+```text
+3 seconds
+```
+
+while keeping the value user-configurable.
+
+### Pre-positioned
+
+Assume the worker is already at the location.
+
+```text
+constructionStartDelay = 0
+```
+
+This is useful for important buildings where the player deliberately prepositions a worker.
+
+### Custom
+
+Allow the user to specify:
+
+```text
+constructionStartDelay = 1.5s
+```
+
+or another value.
+
+---
+
+## 14. Command Time vs. Start Time
+
+Every construction action should expose at least:
+
+```text
+commandTime
+startTime
+completionTime
+```
+
+Example:
+
+```text
+Barracks
+
+commandTime:    01:20
+startTime:      01:23
+completionTime: 01:53
+```
+
+This distinction is important for execution-oriented build orders.
+
+The planner should tell the player when to issue the command, not only when the building finishes.
+
+---
+
+## 15. Theoretical vs. Practical Build
+
+The planner should support two execution assumptions.
+
+### Theoretical
+
+Assume perfect positioning:
+
+```text
+constructionStartDelay = 0
+```
+
+This shows the mathematical optimum.
+
+### Practical
+
+Apply the configured construction delay.
+
+Example:
+
+```text
+                 Theoretical    Practical
+
+Barracks start     01:34.0       01:37.0
+Barracks finish    01:59.0       02:02.0
+```
+
+This makes the planner more useful for real gameplay.
+
+---
+
+## 16. Production Queues
+
+Production buildings should have explicit queues.
+
+Castle/Citadel produces Workers/Slaves, and Barracs produces Swordsmen/Goons.
+Each building instance can train only one unit at a time. Training requires a
+completed producer and waits for its slot, resources, and food capacity.
+For example, a Worker started at 17s finishes at 35s, so the next Worker from
+that Castle cannot start before 35s. A newly built producer becomes available
+only when its construction finishes. Additional producer instances have
+independent slots.
+
+Example:
+
+```text
+Barracks #1
+    Soldier
+    Soldier
+    Soldier
+
+Barracks #2
+    Soldier
+    Soldier
+
+Stable #1
+    Knight
+```
+
+Production on one building must not block production on another unless the game rules require it.
+
+The simulator should therefore track production per building instance.
+
+---
+
+## 17. Worker Construction and Gathering Interaction
+
+When a worker starts building or upgrading:
+
+```text
+worker leaves gathering
+worker becomes unavailable
+construction/upgrade proceeds
+worker becomes available again
+worker resumes or receives a new assignment
+```
+
+This should immediately affect the future resource curve.
+
+Example:
+
+```text
+02:00  Worker #4 is gathering gold
+02:10  Worker #4 receives construction order
+02:13  Worker #4 starts building Barracks
+02:43  Barracks completes
+02:43  Worker #4 is available again
+```
+
+There is no gold/wood income from Worker #4 while it is:
+
+```text
+moving to construction
+building
+```
+
+---
+
+## 18. Event Model
+
+A useful internal event model is:
+
+```text
+ResourceGatheringStarted
+ResourceArrived
+WorkerArrived
+GoldMineSpotFreed
+GoldMineSpotOccupied
+BuildingConstructionOrdered
+BuildingConstructionStarted
+BuildingConstructionFinished
+BuildingUpgradeStarted
+BuildingUpgradeFinished
+UnitTrainingStarted
+UnitTrainingFinished
+WorkerAssigned
+WorkerFreed
+FarmCompleted
+FoodCapacityChanged
+```
+
+The exact implementation can differ, but the simulator should preserve the distinction between scheduled actions and their actual state transitions.
+
+---
+
+## 19. Player Profile
+
+A build should be evaluated against a player profile.
+
+Example:
+
+```json
+{
+  "castleLevel": 8,
+  "sawmillLevel": 6,
+  "workerLevel": 4,
+  "productionBuildingLevels": {
+    "barracks": 5,
+    "stable": 3
+  },
+  "workerEquipment": {
+    "goldMiningTimeMultiplier": 0.98,
+    "woodGatherTimeMultiplier": 0.96
+  },
+  "travelTimes": {
+    "goldOutbound": 4.0,
+    "goldReturn": 4.0,
+    "woodOutbound": 4.0,
+    "woodReturn": 4.0,
+    "nearbySawmillReturn": 0.5
+  },
+  "baseFoodCapacity": 20,
+  "farmFoodBonus": 20,
+  "initialResources": {
+    "gold": 100,
+    "wood": 100
+  }
+}
+```
+
+This allows the same build order to be tested for different account progression levels.
+
+---
+
+## 20. Game Data vs. Player Data
+
+Do not mix these two categories.
+
+### Game data
+
+Static definitions:
+
+```text
+unit costs
+unit base training times
+unit food costs
+building costs
+building base construction times
+prerequisites
+Castle-level gold yield table
+Sawmill-level wood yield table
+Worker-level construction modifiers
+Production-building-level training modifiers
+Worker-item gathering modifiers
+default travel times
+default nearby-Sawmill travel time
+base food capacity
+Farm food-capacity bonus
+```
+
+### Player data
+
+Current configuration:
+
+```text
+Castle level
+Sawmill level
+Worker level
+Production building levels
+Worker equipment
+Initial resources
+Initial workers
+Travel-time overrides
+Construction-delay settings
+```
+
+This separation is essential because account progression changes simulation results without changing the underlying unit/building definitions.
+
+---
+
+## 21. Manual Data Entry
+
+The game exposes the relevant unit/building parameters in its UI, but does not necessarily provide them as a convenient public table.
+
+Therefore, the initial dataset should be manually transcribed into structured files.
+
+No measurement system is required for the first version.
+
+Recommended structure:
+
+```text
+src/game/
+  data/
+    units.json
+    buildings.json
+    upgrades.json
+    progression.json
+    modifiers.json
+    economy.json
+```
+
+The data should be easy to update when the game changes.
+
+---
+
+## 22. Validation
+
+The simulator should detect at least:
+
+- insufficient resources;
+- missing prerequisites;
+- unavailable production building;
+- unavailable worker;
+- food/population capacity exceeded;
+- invalid upgrade level;
+- duplicate or impossible actions;
+- production queue conflicts;
+- invalid or unreachable worker assignments.
+
+The UI should clearly distinguish:
+
+```text
+Valid
+Warning
+Impossible
+```
+
+---
+
+## 23. Example Economy Timeline
+
+A useful visualization should expose the separate components of a worker's economy cycle.
+
+### Gold
+
+```text
+Worker #1
+
+0:00         0:04      0:07          0:11      0:15
+|------------|---------|-------------|---------|
+Town Hall    Arrive    Mine          Return    Arrive again
+             at mine   3s            4s        at mine
+
+                [waiting is inserted here when the mine is occupied]
+```
+
+With four workers, the mine can be continuously active:
+
+```text
+Mine:
+W1 [====] W2 [====] W3 [====] W4 [====] W1 [====] ...
+     3s       3s       3s       3s       3s
+
+Worker cycle is approximately 12s in steady state:
+4s outbound + ~1s queue + 3s mining + 4s return.
+```
+
+With three workers, the mine is not continuously active:
+
+```text
+Mine:
+W1 [====] W2 [====] W3 [====] ..idle.. W1 [====] ...
+     3s       3s       3s       2s
+```
+
+The exact schedule should always be generated by the simulator, including worker starting positions and event order.
+
+---
+
+## 24. Future Extensions
+
+Potential future features:
+
+- import/export player profiles;
+- saved build orders;
+- build-order comparison;
+- theoretical vs. practical comparison;
+- configurable construction delays per building;
+- optimized worker allocation;
+- automatic search for earlier completion;
+- automatic worker reassignment;
+- gold-mine queue visualization;
+- shareable build-order URLs;
+- patch/versioned game data.
