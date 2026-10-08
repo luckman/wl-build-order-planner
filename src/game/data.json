@@ -10,6 +10,7 @@
           "id": "castle",
           "name": "Castle",
           "kind": "building",
+          "type": "Economic",
           "cost": {
             "gold": 500,
             "wood": 500,
@@ -28,6 +29,7 @@
           "id": "castle-lvl-2",
           "name": "Castle lvl 2",
           "kind": "upgrade",
+          "type": "Economic",
           "cost": {
             "gold": 200,
             "wood": 200,
@@ -35,9 +37,88 @@
           },
           "seconds": 45,
           "requires": [
-            "castle",
-            "barracks",
-            "farm"
+            {
+              "item": "castle",
+              "count": 1
+            },
+            {
+              "item": "barracks",
+              "count": 1
+            },
+            {
+              "item": "farm",
+              "count": 1
+            }
+          ],
+          "icon": "lightCastle",
+          "upgrades": [
+            "castle-lvl-3"
+          ]
+        },
+        {
+          "id": "castle-lvl-3",
+          "name": "Castle lvl 3",
+          "kind": "upgrade",
+          "type": "Economic",
+          "cost": {
+            "gold": 400,
+            "wood": 400,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "farm",
+              "count": 2
+            },
+            {
+              "item": "tower-of-mana",
+              "count": 1
+            },
+            {
+              "item": "barracks",
+              "count": 1
+            }
+          ],
+          "upgrades": [
+            "castle-lvl-4"
+          ],
+          "icon": "lightCastle"
+        },
+        {
+          "id": "castle-lvl-4",
+          "name": "Castle lvl 4",
+          "kind": "upgrade",
+          "type": "Economic",
+          "cost": {
+            "gold": 600,
+            "wood": 600,
+            "food": 0
+          },
+          "seconds": 55,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            },
+            {
+              "item": "farm",
+              "count": 3
+            },
+            {
+              "item": "tower-of-mana",
+              "count": 2
+            },
+            {
+              "item": "barracks",
+              "count": 1
+            }
           ],
           "icon": "lightCastle"
         },
@@ -45,30 +126,75 @@
           "id": "sawmill",
           "name": "Sawmill",
           "kind": "building",
+          "type": "Economic",
           "cost": {
             "gold": 200,
             "wood": 100,
             "food": 0
           },
           "seconds": 20,
-          "icon": "lightSawmill"
+          "icon": "lightSawmill",
+          "limit": {
+            "basedOn": "castle",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
+              },
+              {
+                "minLevel": 4,
+                "max": 4
+              }
+            ]
+          }
         },
         {
           "id": "farm",
           "name": "Farm",
           "kind": "building",
+          "type": "Economic",
           "cost": {
             "gold": 150,
             "wood": 200,
             "food": 0
           },
           "seconds": 25,
-          "icon": "lightFarm"
+          "icon": "lightFarm",
+          "limit": {
+            "basedOn": "castle",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
+              },
+              {
+                "minLevel": 4,
+                "max": 4
+              }
+            ]
+          }
         },
         {
           "id": "barracks",
           "name": "Barracks",
           "kind": "building",
+          "type": "Production",
           "cost": {
             "gold": 200,
             "wood": 150,
@@ -76,9 +202,97 @@
           },
           "seconds": 30,
           "produces": [
-            "swordsman"
+            "swordsman",
+            "archer"
           ],
-          "icon": "lightBarracks"
+          "icon": "lightBarracks",
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 1
+            }
+          ]
+        },
+        {
+          "id": "tower-of-mana",
+          "name": "Tower of Mana",
+          "kind": "building",
+          "type": "Economic",
+          "cost": {
+            "gold": 200,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 40,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "limit": {
+            "basedOn": "castle",
+            "byHighestLevel": [
+              {
+                "minLevel": 2,
+                "max": 1
+              },
+              {
+                "minLevel": 3,
+                "max": 2
+              },
+              {
+                "minLevel": 4,
+                "max": 3
+              }
+            ]
+          },
+          "icon": "lightTowerOfMana"
+        },
+        {
+          "id": "elven-tree",
+          "name": "Elven Tree",
+          "kind": "building",
+          "type": "Racial",
+          "cost": {
+            "gold": 200,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "lightElvenTree"
+        },
+        {
+          "id": "altar-of-heroes",
+          "name": "Altar of Heroes",
+          "kind": "building",
+          "type": "Production",
+          "cost": {
+            "gold": 150,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "lightAltarOfHeroes",
+          "produces": [
+            "miriel"
+          ]
         },
         {
           "id": "worker",
@@ -103,9 +317,55 @@
           },
           "seconds": 21,
           "requires": [
-            "barracks"
+            {
+              "item": "barracks",
+              "count": 1
+            }
           ],
           "icon": "lightSwordsman"
+        },
+        {
+          "id": "archer",
+          "name": "Archer",
+          "kind": "unit",
+          "cost": {
+            "gold": 150,
+            "wood": 150,
+            "food": 4
+          },
+          "seconds": 24,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "elven-tree",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightArcher"
+        },
+        {
+          "id": "miriel",
+          "name": "Miriel",
+          "kind": "hero",
+          "cost": {
+            "gold": 650,
+            "wood": 250,
+            "food": 10
+          },
+          "seconds": 45,
+          "maxCount": 1,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1
+            }
+          ],
+          "icon": "lightMiriel"
         }
       ]
     },
@@ -119,6 +379,7 @@
           "id": "citadel",
           "name": "Citadel",
           "kind": "building",
+          "type": "Economic",
           "cost": {
             "gold": 500,
             "wood": 500,
@@ -137,6 +398,7 @@
           "id": "citadel-lvl-2",
           "name": "Citadel lvl 2",
           "kind": "upgrade",
+          "type": "Economic",
           "cost": {
             "gold": 200,
             "wood": 200,
@@ -144,9 +406,88 @@
           },
           "seconds": 45,
           "requires": [
-            "citadel",
-            "barracks",
-            "pigsty"
+            {
+              "item": "citadel",
+              "count": 1
+            },
+            {
+              "item": "barracks",
+              "count": 1
+            },
+            {
+              "item": "pigsty",
+              "count": 1
+            }
+          ],
+          "icon": "darkCitadel",
+          "upgrades": [
+            "citadel-lvl-3"
+          ]
+        },
+        {
+          "id": "citadel-lvl-3",
+          "name": "Citadel lvl 3",
+          "kind": "upgrade",
+          "type": "Economic",
+          "cost": {
+            "gold": 400,
+            "wood": 400,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "pigsty",
+              "count": 2
+            },
+            {
+              "item": "tower-of-mana",
+              "count": 1
+            },
+            {
+              "item": "barracks",
+              "count": 1
+            }
+          ],
+          "upgrades": [
+            "citadel-lvl-4"
+          ],
+          "icon": "darkCitadel"
+        },
+        {
+          "id": "citadel-lvl-4",
+          "name": "Citadel lvl 4",
+          "kind": "upgrade",
+          "type": "Economic",
+          "cost": {
+            "gold": 600,
+            "wood": 600,
+            "food": 0
+          },
+          "seconds": 55,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            },
+            {
+              "item": "pigsty",
+              "count": 3
+            },
+            {
+              "item": "tower-of-mana",
+              "count": 2
+            },
+            {
+              "item": "barracks",
+              "count": 1
+            }
           ],
           "icon": "darkCitadel"
         },
@@ -154,30 +495,75 @@
           "id": "sawmill",
           "name": "Sawmill",
           "kind": "building",
+          "type": "Economic",
           "cost": {
             "gold": 200,
             "wood": 100,
             "food": 0
           },
           "seconds": 20,
-          "icon": "darkSawmill"
+          "icon": "darkSawmill",
+          "limit": {
+            "basedOn": "citadel",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
+              },
+              {
+                "minLevel": 4,
+                "max": 4
+              }
+            ]
+          }
         },
         {
           "id": "pigsty",
           "name": "Pigsty",
           "kind": "building",
+          "type": "Economic",
           "cost": {
             "gold": 150,
             "wood": 200,
             "food": 0
           },
           "seconds": 25,
-          "icon": "darkPigsty"
+          "icon": "darkPigsty",
+          "limit": {
+            "basedOn": "citadel",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
+              },
+              {
+                "minLevel": 4,
+                "max": 4
+              }
+            ]
+          }
         },
         {
           "id": "barracks",
           "name": "Barracks",
           "kind": "building",
+          "type": "Production",
           "cost": {
             "gold": 200,
             "wood": 150,
@@ -187,7 +573,51 @@
           "produces": [
             "goon"
           ],
-          "icon": "darkBarracks"
+          "icon": "darkBarracks",
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 1
+            }
+          ]
+        },
+        {
+          "id": "tower-of-mana",
+          "name": "Tower of Mana",
+          "kind": "building",
+          "type": "Economic",
+          "cost": {
+            "gold": 200,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 40,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "limit": {
+            "basedOn": "citadel",
+            "byHighestLevel": [
+              {
+                "minLevel": 2,
+                "max": 1
+              },
+              {
+                "minLevel": 3,
+                "max": 2
+              },
+              {
+                "minLevel": 4,
+                "max": 3
+              }
+            ]
+          },
+          "icon": "darkTowerOfMana"
         },
         {
           "id": "slave",
@@ -212,7 +642,10 @@
           },
           "seconds": 27,
           "requires": [
-            "barracks"
+            {
+              "item": "barracks",
+              "count": 1
+            }
           ],
           "icon": "darkGoon"
         }

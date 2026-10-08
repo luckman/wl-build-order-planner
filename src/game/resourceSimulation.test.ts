@@ -27,11 +27,17 @@ function requireBuilder(simulation: WorkerEconomy) {
 
 test("gold mine serializes workers that arrive at the same time", () => {
     expect(createDeliveries(settings, 20).map(({ time, gold }) => [time, gold])).toEqual([
-        [11, 50],
-        [14, 50],
-        [17, 50],
-        [20, 50],
+        [10, 50],
+        [13, 50],
+        [16, 50],
+        [19, 50],
     ])
+})
+
+test("only initial gold miners receive the shorter opening trip to the mine", () => {
+    const deliveries = createDeliveries({ ...settings, workerCount: 1, goldWorkers: 1, goldGatherTime: 3.1 }, 22)
+
+    expect(deliveries.map(({ time }) => time)).toEqual([10.1, 21.2])
 })
 
 test("wood workers deliver independently", () => {
@@ -39,7 +45,15 @@ test("wood workers deliver independently", () => {
         createDeliveries({ ...settings, goldWorkers: 0, woodWorkers: 2 }, 40)
             .filter(({ wood }) => wood)
             .map(({ time }) => time),
-    ).toEqual([20, 20, 40, 40])
+    ).toEqual([20, 21, 40])
+})
+
+test("only the first initial wood gatherer receives its command immediately", () => {
+    expect(
+        createDeliveries({ ...settings, workerCount: 2, goldWorkers: 0, woodWorkers: 2 }, 25)
+            .filter(({ wood }) => wood)
+            .map(({ time }) => time),
+    ).toEqual([20, 21])
 })
 
 test("builders prefer idle workers, then wood, then eligible gold workers", () => {
@@ -85,9 +99,9 @@ test("taking a queued gold worker does not reserve or block the mine", () => {
     simulation.construct(requireBuilder(simulation), 30)
     simulation.advanceTo(20)
     expect(simulation.deliveries.map(({ time, worker }) => [time, worker])).toEqual([
-        [11, 0],
-        [14, 2],
-        [17, 3],
+        [10, 0],
+        [13, 2],
+        [16, 3],
     ])
 })
 

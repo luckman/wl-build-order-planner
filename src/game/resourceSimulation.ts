@@ -34,6 +34,9 @@ export type WorkerAllocation = {
     busyOrIdle: number
 }
 
+export const INITIAL_COMMAND_DELAY = 1
+export const INITIAL_GOLD_TRAVEL_REDUCTION = 1
+
 type WorkerStateAction = {
     item: { id: string; kind: string }
     commandTime: number | null
@@ -48,20 +51,24 @@ export class WorkerEconomy {
     deliveries: ResourceDelivery[] = []
     time = 0
     private mineWorker: number | null = null
+    private delayedInitialWoodWorkerIds: number[] = []
 
     constructor(private settings: EconomySettings) {
         for (let i = 0; i < settings.goldWorkers; i++) {
-            this.addWorker("gold")
+            this.addWorker("gold", true)
         }
         for (let i = 0; i < settings.woodWorkers; i++) {
-            this.addWorker("wood")
+            const worker = this.addWorker(i === 0 ? "wood" : "idle")
+            if (i > 0) {
+                this.delayedInitialWoodWorkerIds.push(worker.id)
+            }
         }
         for (let i = this.workers.length; i < settings.workerCount; i++) {
             this.addWorker("idle")
         }
     }
 
-    addWorker(assignment: GatheringWorker["assignment"]) {
+    addWorker(assignment: GatheringWorker["assignment"], isInitialGoldWorker = false) {
         const worker: GatheringWorker = {
             id: this.workers.length,
             assignment,
@@ -71,7 +78,11 @@ export class WorkerEconomy {
         }
         this.workers.push(worker)
         if (assignment !== "idle") {
-            this.transition(worker, "outbound", this.travel(assignment))
+            const outboundTravel =
+                assignment === "gold" && isInitialGoldWorker
+                    ? Math.max(0, this.settings.goldOutboundTravel - INITIAL_GOLD_TRAVEL_REDUCTION)
+                    : this.travel(assignment)
+            this.transition(worker, "outbound", outboundTravel)
         }
         return worker
     }
@@ -110,12 +121,23 @@ export class WorkerEconomy {
     }
 
     get nextEventTime() {
-        return Math.min(...this.workers.map((worker) => worker.nextAt))
+        return Math.min(
+            ...this.workers.map((worker) => worker.nextAt),
+            this.delayedInitialWoodWorkerIds.length ? INITIAL_COMMAND_DELAY : Infinity,
+        )
     }
 
     advanceTo(time: number) {
         while (this.nextEventTime <= time) {
             this.time = this.nextEventTime
+            if (this.delayedInitialWoodWorkerIds.length && this.time === INITIAL_COMMAND_DELAY) {
+                for (const workerId of this.delayedInitialWoodWorkerIds) {
+                    const worker = this.workers[workerId]
+                    worker.assignment = "wood"
+                    this.transition(worker, "outbound", this.travel("wood"))
+                }
+                this.delayedInitialWoodWorkerIds = []
+            }
             // Process simultaneous arrivals/departures before assigning the mine slot.
             for (const worker of this.workers.filter((candidate) => candidate.nextAt === this.time)) {
                 if (worker.state === "outbound" || worker.state === "construction") {
@@ -236,7 +258,7 @@ export function workerAllocationAt(
                 events.push({ time: action.finishTime, type: "worker" })
             }
             if (
-                action.item.kind === "building" &&
+                (action.item.kind === "building" || action.item.kind === "upgrade") &&
                 action.commandTime !== null &&
                 action.workerReturnTime !== null &&
                 action.workerId !== null

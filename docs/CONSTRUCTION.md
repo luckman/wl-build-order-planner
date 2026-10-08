@@ -2,15 +2,21 @@
 
 Implemented on 2026-10-08 for Light Workers and Dark Slaves.
 
+The first build-order command is available at 1.0 seconds. Initial gold miners
+and the first initial wood gatherer receive their gathering orders at game
+start; any additional initial wood gatherers receive theirs at 1.0 seconds.
+
 The editable game profile contains one `constructionStartDelay`, defaulting to
-4 seconds. It applies to every building and both directions of builder travel.
+4 seconds. It applies to every building and building upgrade, and both directions
+of builder travel.
 There are no per-building overrides or positioning modes.
 
 For a command accepted at time `t`:
 
 - Costs are paid and the selected worker stops gathering at `t`.
 - Construction starts at `t + constructionStartDelay`.
-- The building completes after its `seconds` duration from `src/game/data.json`.
+- The building or building upgrade completes after its `seconds` duration from
+  `src/game/data.json`.
 - The worker returns to its resource after another `constructionStartDelay`.
 
 A 30-second Barracks ordered at 0s therefore starts at 4s, completes at 34s,
@@ -51,7 +57,7 @@ is charged on this first resumed trip. Subsequent trips use the normal resource
 outbound, gathering, and deposit travel times.
 
 Wood example: a worker interrupted at 5s for a 30-second building returns at
-43s, chops for 12s, then travels 4s to deposit 50 wood at 59s. Its originally
+43s, chops for 12.1s, then travels 4s to deposit 50 wood at 59.1s. Its originally
 scheduled delivery at 20s does not occur.
 
 Gathering and commands use the same chronological simulation, so lost deliveries
@@ -60,5 +66,7 @@ and newly trained workers use the delayed completion times. Command scheduling
 retains the existing 600-second planning horizon; resource simulation extends
 through the final scheduled completion/worker return when necessary.
 
-Building upgrades retain their existing producer-queue behavior. This change
-applies worker occupancy and travel to building construction only.
+Building upgrades retain their producer-queue behavior while also reserving a
+worker for outbound travel, construction, and the return trip. They appear in
+the construction timeline lane, including their start, completion, and worker
+return timestamps.

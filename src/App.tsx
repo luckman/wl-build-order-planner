@@ -5,6 +5,8 @@ import {
     type Faction,
     type FactionId,
     factions,
+    itemCost,
+    isRecruitable,
     type ItemKind,
     type PlannerItem,
 } from "./game/gameData"
@@ -19,18 +21,68 @@ const iconSources: Record<string, string> = {
     lightSawmill: require("./icons/buildings/light-sawmill.png"),
     lightFarm: require("./icons/buildings/light-farm.png"),
     lightBarracks: require("./icons/buildings/light-barracks.png"),
+    lightFactory: require("./icons/buildings/light-factory.png"),
+    lightSanctuary: require("./icons/buildings/light-sanctuary.png"),
+    lightShipyard: require("./icons/buildings/light-shipyard.png"),
+    lightDwarvenForge: require("./icons/buildings/light-dwarven-forge.png"),
+    lightHumanMonument: require("./icons/buildings/light-human-monument.png"),
+    lightElvenTree: require("./icons/buildings/light-elven-tree.png"),
+    lightAltarOfHeroes: require("./icons/buildings/light-altar-of-heroes.png"),
+    lightTowerOfLightMagic: require("./icons/buildings/light-tower-of-light-magic.png"),
+    lightCrossbowTower: require("./icons/buildings/light-crossbow-tower.png"),
+    lightArtilleryTower: require("./icons/buildings/light-artillery-tower.png"),
+    lightTowerOfMana: require("./icons/buildings/light-tower-of-mana.png"),
     lightWorker: require("./icons/units/light-worker.png"),
     lightSwordsman: require("./icons/units/light-swordsman.png"),
     lightWarsmith: require("./icons/units/light-warsmith.png"),
     lightArcher: require("./icons/units/light-archer.png"),
+    lightKnight: require("./icons/units/light-knight.png"),
+    lightCopter: require("./icons/units/light-copter.png"),
+    lightHealer: require("./icons/units/light-healer.png"),
+    lightGuardsman: require("./icons/units/light-guardsman.png"),
+    lightBallista: require("./icons/units/light-ballista.png"),
+    lightFoxRider: require("./icons/units/light-fox-rider.png"),
+    lightWindMage: require("./icons/units/light-wind-mage.png"),
+    lightBiker: require("./icons/units/light-biker.png"),
+    lightSniper: require("./icons/units/light-sniper.png"),
+    lightSloop: require("./icons/units/light-sloop.png"),
+    lightCaravel: require("./icons/units/light-caravel.png"),
+    lightGilbert: require("./icons/heroes/light-gilbert.png"),
+    lightBerin: require("./icons/heroes/light-berin.png"),
+    lightMiriel: require("./icons/heroes/light-miriel.png"),
     darkCitadel: require("./icons/buildings/dark-citadel.png"),
     darkSawmill: require("./icons/buildings/dark-sawmill.png"),
     darkPigsty: require("./icons/buildings/dark-pigsty.png"),
     darkBarracks: require("./icons/buildings/dark-barracks.png"),
+    darkWorkshop: require("./icons/buildings/dark-workshop.png"),
+    darkDarkGate: require("./icons/buildings/dark-dark-gate.png"),
+    darkShipyard: require("./icons/buildings/dark-shipyard.png"),
+    darkGoblinLab: require("./icons/buildings/dark-goblin-lab.png"),
+    darkTotemOfOrcs: require("./icons/buildings/dark-totem-of-orcs.png"),
+    darkUndeadObelisk: require("./icons/buildings/dark-undead-obelisk.png"),
+    darkAltarOfHeroes: require("./icons/buildings/dark-altar-of-heroes.png"),
+    darkTowerOfDarkMagic: require("./icons/buildings/dark-tower-of-dark-magic.png"),
+    darkSlingshotTower: require("./icons/buildings/dark-slingshot-tower.png"),
+    darkNapalmTower: require("./icons/buildings/dark-napalm-tower.png"),
+    darkTowerOfMana: require("./icons/buildings/dark-tower-of-mana.png"),
     darkSlave: require("./icons/units/dark-slave.png"),
     darkGoon: require("./icons/units/dark-goon.png"),
     darkSkeletonArcher: require("./icons/units/dark-skeleton-archer.png"),
     darkBomber: require("./icons/units/dark-bomber.png"),
+    darkWargRider: require("./icons/units/dark-warg-rider.png"),
+    darkAeronaut: require("./icons/units/dark-aeronaut.png"),
+    darkNecromancer: require("./icons/units/dark-necromancer.png"),
+    darkAxeMaster: require("./icons/units/dark-axe-master.png"),
+    darkCatapult: require("./icons/units/dark-catapult.png"),
+    darkZombie: require("./icons/units/dark-zombie.png"),
+    darkVenomspitter: require("./icons/units/dark-venomspitter.png"),
+    darkDrill: require("./icons/units/dark-drill.png"),
+    darkRocketeer: require("./icons/units/dark-rocketeer.png"),
+    darkSchooner: require("./icons/units/dark-schooner.png"),
+    darkGalleon: require("./icons/units/dark-galleon.png"),
+    darkGrokk: require("./icons/heroes/dark-grokk.png"),
+    darkJax: require("./icons/heroes/dark-jax.png"),
+    darkEater: require("./icons/heroes/dark-eater.png"),
 }
 const initialEconomy: EconomySettings = {
     startingGold: 150,
@@ -42,15 +94,19 @@ const initialEconomy: EconomySettings = {
     woodPerTrip: 50,
     goldOutboundTravel: 4,
     goldReturnTravel: 4,
-    goldGatherTime: 3,
+    goldGatherTime: 3.1,
     woodOutboundTravel: 4,
     woodReturnTravel: 4,
-    woodGatherTime: 12,
+    woodGatherTime: 12.1,
     constructionStartDelay: 4,
 }
 const formatTime = (seconds: number) => {
     const tenths = Math.round(seconds * 10)
     return `${Math.floor(tenths / 600)}:${String(Math.floor(tenths / 10) % 60).padStart(2, "0")}${tenths % 10 ? `.${tenths % 10}` : ""}`
+}
+const formatTimeWithTenths = (seconds: number) => {
+    const tenths = Math.round(seconds * 10)
+    return `${Math.floor(tenths / 600)}:${String(Math.floor(tenths / 10) % 60).padStart(2, "0")}.${tenths % 10}`
 }
 const numberInput = (value: number, onChange: (value: number) => void, min = 0, step = 1) => (
     <input
@@ -70,7 +126,7 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
         if (action.blocked || action.commandTime === null || action.finishTime === null) {
             return
         }
-        const group = action.item.kind === "building" ? "Construction" : action.item.producer
+        const group = isRecruitable(action.item) ? action.item.producer : "Construction"
         const lanes = availableLanes.get(group) ?? []
         let lane = lanes.find((candidate) => candidate.availableAt <= action.commandTime!)
         if (!lane) {
@@ -92,6 +148,7 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
 export default function App() {
     const [factionId, setFactionId] = useState<FactionId>("light")
     const [buildOrder, setBuildOrder] = useState<PlannerItem[]>([])
+    const [dependencyError, setDependencyError] = useState<string | null>(null)
     const [economy, setEconomy] = useState<EconomySettings>(initialEconomy)
     const faction = factions[factionId]
     const updateEconomy = (key: keyof EconomySettings, value: number) =>
@@ -121,8 +178,8 @@ export default function App() {
     )
     const deliveries = scheduled.deliveries
     const plan = scheduled.plan
-    const spending = plan.flatMap(({ item, commandTime }) =>
-        commandTime === null ? [] : [{ time: commandTime, gold: -item.gold, wood: -item.wood }],
+    const spending = plan.flatMap(({ cost, commandTime }) =>
+        commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
     )
     const lastCompletionTime = Math.max(0, ...plan.map(({ finishTime }) => finishTime ?? 0))
     const endTime = Math.max(90, lastCompletionTime + 30)
@@ -141,7 +198,7 @@ export default function App() {
                 const completed = plan.filter(({ item, finishTime }) => finishTime !== null && finishTime <= time)
                 const units = plan
                     .filter(
-                        ({ item, commandTime }) => item.kind === "unit" && commandTime !== null && commandTime <= time,
+                        ({ item, commandTime }) => isRecruitable(item) && commandTime !== null && commandTime <= time,
                     )
                     .reduce((total, { item }) => total + item.food, initialFoodUsed)
                 const farms = completed.filter(({ item }) => item.id === "farm" || item.id === "pigsty").length
@@ -160,7 +217,7 @@ export default function App() {
         initialFoodUsed +
         plan
             .filter(
-                ({ item, commandTime }) => item.kind === "unit" && commandTime !== null && commandTime <= inspectedTime,
+                ({ item, commandTime }) => isRecruitable(item) && commandTime !== null && commandTime <= inspectedTime,
             )
             .reduce((total, { item }) => total + item.food, 0)
     const inspectedLimit =
@@ -172,7 +229,7 @@ export default function App() {
             foodPerFarm
     const tooltip = (
         <>
-            <div>{inspectedTime.toFixed(1)}</div>
+            <div>{formatTimeWithTenths(inspectedTime)}</div>
             <div>Gold: {Math.round(inspectedResources.gold)}</div>
             <div>Wood: {Math.round(inspectedResources.wood)}</div>
             <div>
@@ -195,7 +252,7 @@ export default function App() {
               plan
                   .filter(
                       ({ item, commandTime }) =>
-                          item.kind === "unit" && commandTime !== null && commandTime <= latestCommandTime,
+                          isRecruitable(item) && commandTime !== null && commandTime <= latestCommandTime,
                   )
                   .reduce((total, { item }) => total + item.food, 0)
     const latestFoodLimit =
@@ -238,6 +295,7 @@ export default function App() {
                                 onClick={() => {
                                     setFactionId(entry.id)
                                     setBuildOrder([])
+                                    setDependencyError(null)
                                 }}
                             >
                                 {entry.name}
@@ -252,29 +310,36 @@ export default function App() {
                             <span>Click to add</span>
                         </div>
                         <div className="action-groups">
-                            {(["building", "unit", "upgrade"] as ItemKind[]).map((kind) => (
+                            {dependencyError && <p role="alert">{dependencyError}</p>}
+                            {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
                                 <section key={kind}>
-                                    <h3>{kind}s</h3>
+                                    <h3>{kind === "hero" ? "heroes" : `${kind}s`}</h3>
                                     <div className="action-grid">
                                         {faction.items
                                             .filter((item) => item.kind === kind)
-                                            .map((item) => (
-                                                <button
-                                                    className="action"
-                                                    key={item.id}
-                                                    onClick={() =>
-                                                        setBuildOrder((current) =>
-                                                            buildOrderWithDependencies(faction, current, item),
-                                                        )
-                                                    }
-                                                >
-                                                    <img src={iconSources[item.icon]} alt="" />
-                                                    <span>{item.name}</span>
-                                                    <small>
-                                                        {item.gold} gold · {item.wood} wood · {item.seconds}s
-                                                    </small>
-                                                </button>
-                                            ))}
+                                            .map((item) => {
+                                                const cost = itemCost(item, buildOrder, faction.startingTownHall)
+                                                return (
+                                                    <button
+                                                        className="action"
+                                                        key={item.id}
+                                                        onClick={() => {
+                                                            try {
+                                                                setBuildOrder(buildOrderWithDependencies(faction, buildOrder, item))
+                                                                setDependencyError(null)
+                                                            } catch (error) {
+                                                                setDependencyError((error as Error).message)
+                                                            }
+                                                        }}
+                                                    >
+                                                        <img src={iconSources[item.icon]} alt="" />
+                                                        <span>{item.name}</span>
+                                                        <small>
+                                                            {cost.gold} gold · {cost.wood} wood{isRecruitable(item) ? ` · ${item.food} food` : ""} · {item.seconds}s
+                                                        </small>
+                                                    </button>
+                                                )
+                                            })}
                                     </div>
                                 </section>
                             ))}
@@ -330,10 +395,12 @@ export default function App() {
                                 </div>
                             </div>
                             <p className="mechanics-note">
-                                Gold uses one shared mine slot (4s out, 3s mining, 4s return). New workers automatically
-                                mine gold until the calculated saturation of {maxGoldWorkers}, then gather wood. Wood
-                                trips run independently. Builders stop gathering during travel, construction, and
-                                return. The construction delay applies to travel in each direction.
+                                Gold uses one shared mine slot (4s out, 3.10s mining, 4s return). Initial gold miners
+                                reach the mine 1 second sooner on their opening trip only; every later trip uses the
+                                configured travel time. New workers automatically mine gold until the calculated
+                                saturation of {maxGoldWorkers}, then gather wood. Wood trips run independently.
+                                Builders stop gathering during travel, construction, and return. The construction delay
+                                applies to travel in each direction.
                             </p>
                         </section>
                         <section className="timeline panel">
@@ -404,7 +471,7 @@ export default function App() {
                                                             index,
                                                         }) => (
                                                             <button
-                                                                className={`event ${item.kind}`}
+                                                                className={`event ${item.kind}${item.kind === "hero" ? " unit" : ""}`}
                                                                 key={`${item.id}-${index}`}
                                                                 style={{
                                                                     left: `${(commandTime! / endTime) * 100}%`,
@@ -437,22 +504,22 @@ export default function App() {
                                     {timelineLanes.map((lane) => <div className="queue-value" key={lane.label} />)}
                                 </div>
                             </div>
-                            {blockedActions.map(({ item, index }) => (
+                            {blockedActions.map(({ item, index, blockedReason }) => (
                                 <div className="blocked-event" key={`${item.id}-${index}`}>
-                                    {item.name} — waiting for resources, food, producer, or worker
+                                    {item.name} — {blockedReason}
                                 </div>
                             ))}
                             <p className="timeline-help">
                                 Hover a resource graph for its exact time and amount. Food shows used capacity and its
                                 limit. Production rows are individual queues. Construction includes outbound travel;
-                                hover a building to see its start, completion, and worker return times.
+                                hover a construction or upgrade to see its start, completion, and worker return times.
                             </p>
                         </section>
                     </section>
                     <aside className="order panel">
                         <div className="panel-title">
                             <h2>Build order</h2>
-                            <button className="clear" onClick={() => setBuildOrder([])} disabled={!buildOrder.length}>
+                            <button className="clear" onClick={() => { setBuildOrder([]); setDependencyError(null) }} disabled={!buildOrder.length}>
                                 Clear
                             </button>
                         </div>
@@ -460,7 +527,7 @@ export default function App() {
                             <p className="empty">Choose actions from the left.</p>
                         ) : (
                             <ol>
-                                {plan.map(({ item, commandTime, blocked }, index) => (
+                                {plan.map(({ item, commandTime, blocked, blockedReason }, index) => (
                                     <li key={`${item.id}-${index}`}>
                                         <span className="order-number">{index + 1}</span>
                                         <img src={iconSources[item.icon]} alt="" />
@@ -468,17 +535,18 @@ export default function App() {
                                             <b>{item.name}</b>
                                             <small>
                                                 {blocked || commandTime === null
-                                                    ? "Waiting for resources, food, producer, or worker"
+                                                    ? blockedReason
                                                     : `Command ${formatTime(commandTime)}`}
                                             </small>
                                         </div>
                                         <button
                                             aria-label={`Remove ${item.name}`}
-                                            onClick={() =>
+                                            onClick={() => {
+                                                setDependencyError(null)
                                                 setBuildOrder((current) =>
                                                     current.filter((_, position) => position !== index),
                                                 )
-                                            }
+                                            }}
                                         >
                                             ×
                                         </button>
