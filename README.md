@@ -13,12 +13,14 @@ A React starter for planning War Legends mobile RTS build orders. It was bootstr
 - Resource hover in 0.1-second increments, with a shared time marker and a tooltip showing gold, wood, and food used/limit together.
 - Initial assignments default to 4 gold miners and 1 wood gatherer; total starting workers and food usage are calculated from these assignments (2 food per worker).
 - Newly trained Workers/Slaves automatically join gold up to calculated mine saturation, then gather wood.
+- Construction start delay is editable in the game profile (default 4 seconds), and is also used for the builder's return trip. Builders gather nothing during either trip or construction.
+- Builders are selected automatically: idle workers, then wood gatherers carrying the least wood, then eligible gold workers carrying the least gold. Workers inside the mine cannot be selected. Interrupted cargo is discarded; returning workers restart gathering at their previous resource.
 - One completed Castle/Citadel is present initially. Each producer trains one unit at a time; additional Castles/Citadels and Barracks have independent queues available after construction completes.
 - Temporary source artwork: Terran icons for Light, Protoss icons for Dark.
 - Game content is declared in `src/game/data.json`. The app derives each item's producer and explicit prerequisite set in `src/game/gameData.ts`, so expanding the catalog does not require editing the planner UI.
 - Choosing an action automatically inserts any unmet prerequisites, in dependency order, before the selected action.
 
-Worker construction occupancy and additional game content will be added when their War Legends values are known. Starting state and yields remain user-editable rather than fixed game data. The food defaults described in the game-model document are editable in the UI. SC2-specific active logic (MULEs, larva, gas, and a third faction) is not used.
+Additional game content will be added when its War Legends values are known. Starting state and yields remain user-editable rather than fixed game data. The food defaults described in the game-model document are editable in the UI. SC2-specific active logic (MULEs, larva, gas, and a third faction) is not used. Construction timing and worker selection are detailed in `docs/CONSTRUCTION.md`.
 
 ## Run
 

@@ -1,19 +1,14 @@
 import { useMemo, useState } from "react"
+import { type ScheduledAction, simulateBuildOrder } from "./game/buildSimulation"
 import {
     buildOrderWithDependencies,
-    factions,
     type Faction,
     type FactionId,
+    factions,
     type ItemKind,
     type PlannerItem,
 } from "./game/gameData"
-import {
-    createDeliveries,
-    resourceAt,
-    type EconomySettings,
-    type ResourceDelivery,
-    type WorkerStart,
-} from "./game/resourceSimulation"
+import { type EconomySettings, resourceAt } from "./game/resourceSimulation"
 import "./index.css"
 import "./timeline.css"
 import "./parallel-timeline.css"
@@ -50,27 +45,30 @@ const initialEconomy: EconomySettings = {
     woodOutboundTravel: 4,
     woodReturnTravel: 4,
     woodGatherTime: 12,
+    constructionStartDelay: 4,
 }
-const formatTime = (seconds: number) =>
-    `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`
-const numberInput = (value: number, onChange: (value: number) => void, min = 0) => (
+const formatTime = (seconds: number) => {
+    const tenths = Math.round(seconds * 10)
+    return `${Math.floor(tenths / 600)}:${String(Math.floor(tenths / 10) % 60).padStart(2, "0")}${tenths % 10 ? `.${tenths % 10}` : ""}`
+}
+const numberInput = (value: number, onChange: (value: number) => void, min = 0, step = 1) => (
     <input
         type="number"
         min={min}
+        step={step}
         value={value}
         onChange={(event) => onChange(Math.max(min, Number(event.target.value) || 0))}
     />
 )
-type ScheduledAction = { item: PlannerItem; blocked: boolean; commandTime: number | null; finishTime: number | null }
 type TimelineEvent = ScheduledAction & { index: number }
 type TimelineLane = { label: string; events: TimelineEvent[] }
 
 function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
     const availableLanes = new Map<string, Array<{ availableAt: number; events: TimelineEvent[] }>>()
     plan.forEach((action, index) => {
-        if (action.blocked || action.commandTime === null || action.finishTime === null) return
-        // Buildings are shown as concurrent construction activity. Actual worker occupancy
-        // is intentionally not inferred until that game data is available.
+        if (action.blocked || action.commandTime === null || action.finishTime === null) {
+            return
+        }
         const group = action.item.kind === "building" ? "Construction" : action.item.producer
         const lanes = availableLanes.get(group) ?? []
         let lane = lanes.find((candidate) => candidate.availableAt <= action.commandTime!)
@@ -79,7 +77,7 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
             lanes.push(lane)
         }
         lane.events.push({ ...action, index })
-        lane.availableAt = action.finishTime
+        lane.availableAt = action.workerReturnTime ?? action.finishTime
         availableLanes.set(group, lanes)
     })
     return Array.from(availableLanes).flatMap(([group, lanes]) =>
@@ -88,83 +86,6 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
             events: lane.events,
         })),
     )
-}
-
-function scheduleBuildOrder(
-    buildOrder: PlannerItem[],
-    economy: EconomySettings,
-    deliveries: ResourceDelivery[],
-    initialFoodUsed: number,
-    baseFoodLimit: number,
-    foodPerFarm: number,
-    initialTownHall: string,
-): ScheduledAction[] {
-    const spending: Array<{ time: number; gold: number; wood: number }> = []
-    const scheduled: ScheduledAction[] = []
-    // Each completed production building has its own single training slot.
-    const producers: Array<{ name: string; availableAt: number }> = [{ name: initialTownHall, availableAt: 0 }]
-    let commandAfter = 0
-    buildOrder.forEach((item) => {
-        const needsProducer = item.kind === "unit" || item.kind === "upgrade"
-        const matchingProducers = producers.filter(({ name }) => name === item.producer)
-        const possibleTimes = [
-            commandAfter,
-            ...deliveries.map(({ time }) => time),
-            ...matchingProducers.map(({ availableAt }) => availableAt),
-            ...scheduled.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime])),
-        ]
-            .filter((time) => time >= commandAfter)
-            .sort((a, b) => a - b)
-        const commandTime = possibleTimes.find((time) => {
-            if (needsProducer && !matchingProducers.some(({ availableAt }) => availableAt <= time)) return false
-            const completedNames = new Set([
-                initialTownHall,
-                ...scheduled.flatMap(({ item: priorItem, finishTime }) =>
-                    finishTime !== null && finishTime <= time ? [priorItem.name] : [],
-                ),
-            ])
-            if (!item.prerequisites.every((prerequisite) => completedNames.has(prerequisite))) return false
-            const state = resourceAt(economy, deliveries, spending, time)
-            const foodUsed =
-                initialFoodUsed +
-                scheduled
-                    .filter(
-                        ({ item: priorItem, commandTime: priorCommand }) =>
-                            priorItem.kind === "unit" && priorCommand !== null && priorCommand <= time,
-                    )
-                    .reduce((total, { item: priorItem }) => total + priorItem.food, 0)
-            const foodLimit =
-                baseFoodLimit +
-                scheduled.filter(
-                    ({ item: priorItem, finishTime }) =>
-                        (priorItem.id === "farm" || priorItem.id === "pigsty") &&
-                        finishTime !== null &&
-                        finishTime <= time,
-                ).length *
-                    foodPerFarm
-            return (
-                state.gold >= item.gold &&
-                state.wood >= item.wood &&
-                (item.kind !== "unit" || foodUsed + item.food <= foodLimit)
-            )
-        })
-        if (commandTime === undefined) {
-            scheduled.push({ item, blocked: true, commandTime: null, finishTime: null })
-            return
-        }
-        spending.push({ time: commandTime, gold: -item.gold, wood: -item.wood })
-        commandAfter = commandTime
-        scheduled.push({ item, blocked: false, commandTime, finishTime: commandTime + item.seconds })
-        if (needsProducer) {
-            const producer = matchingProducers
-                .filter(({ availableAt }) => availableAt <= commandTime)
-                .sort((a, b) => a.availableAt - b.availableAt)[0]
-            producer.availableAt = commandTime + item.seconds
-        } else if (item.kind === "building") {
-            producers.push({ name: item.name, availableAt: commandTime + item.seconds })
-        }
-    })
-    return scheduled
 }
 
 export default function App() {
@@ -185,46 +106,24 @@ export default function App() {
             (economy.goldOutboundTravel + economy.goldGatherTime + economy.goldReturnTravel) / economy.goldGatherTime,
         ),
     )
-    const scheduled = useMemo(() => {
-        let starts: WorkerStart[] = []
-        let deliveries = createDeliveries(economy, 600, starts)
-        const initialTownHall = faction.startingTownHall
-        let plan = scheduleBuildOrder(
-            buildOrder,
-            economy,
-            deliveries,
-            initialFoodUsed,
-            baseFoodLimit,
-            foodPerFarm,
-            initialTownHall,
-        )
-        for (let pass = 0; pass < buildOrder.length; pass += 1) {
-            let assignedGold = economy.goldWorkers
-            starts = plan.flatMap(({ item, finishTime }) => {
-                if ((item.id !== "worker" && item.id !== "slave") || finishTime === null) return []
-                const assignment = assignedGold < maxGoldWorkers ? "gold" : "wood"
-                if (assignment === "gold") assignedGold += 1
-                return [{ time: finishTime, assignment }]
-            })
-            deliveries = createDeliveries(economy, 600, starts)
-            plan = scheduleBuildOrder(
+    const scheduled = useMemo(
+        () =>
+            simulateBuildOrder(
                 buildOrder,
                 economy,
-                deliveries,
                 initialFoodUsed,
                 baseFoodLimit,
                 foodPerFarm,
-                initialTownHall,
-            )
-        }
-        return { plan, deliveries }
-    }, [baseFoodLimit, buildOrder, economy, factionId, foodPerFarm, initialFoodUsed, maxGoldWorkers])
+                faction.startingTownHall,
+            ),
+        [baseFoodLimit, buildOrder, economy, faction.startingTownHall, foodPerFarm, initialFoodUsed],
+    )
     const deliveries = scheduled.deliveries
     const plan = scheduled.plan
     const spending = plan.flatMap(({ item, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -item.gold, wood: -item.wood }],
     )
-    const endTime = Math.max(60, ...plan.map(({ finishTime }) => finishTime ?? 0))
+    const endTime = Math.max(60, ...plan.map(({ finishTime, workerReturnTime }) => workerReturnTime ?? finishTime ?? 0))
     const samples = useMemo(
         () =>
             Array.from({ length: Math.ceil(endTime / 5) + 1 }, (_, index) =>
@@ -384,6 +283,15 @@ export default function App() {
                                 </label>
                                 <label>Base food limit{numberInput(baseFoodLimit, setBaseFoodLimit)}</label>
                                 <label>Food per Farm / Pigsty{numberInput(foodPerFarm, setFoodPerFarm)}</label>
+                                <label>
+                                    Construction start delay (seconds)
+                                    {numberInput(
+                                        economy.constructionStartDelay,
+                                        (v) => updateEconomy("constructionStartDelay", v),
+                                        0,
+                                        0.1,
+                                    )}
+                                </label>
                                 <div className="worker-state">
                                     <b>{initialWorkerCount}</b>
                                     <span>
@@ -394,7 +302,8 @@ export default function App() {
                             <p className="mechanics-note">
                                 Gold uses one shared mine slot (4s out, 3s mining, 4s return). New workers automatically
                                 mine gold until the calculated saturation of {maxGoldWorkers}, then gather wood. Wood
-                                trips run independently.
+                                trips run independently. Builders stop gathering during travel, construction, and
+                                return. The construction delay applies to travel in each direction.
                             </p>
                         </section>
                         <section className="selected-order panel">
@@ -482,25 +391,36 @@ export default function App() {
                                             <div className="queue-row" key={lane.label}>
                                                 <div className="queue-label">{lane.label}</div>
                                                 <div className="queue-track">
-                                                    {lane.events.map(({ item, commandTime, finishTime, index }) => (
-                                                        <button
-                                                            className={`event ${item.kind}`}
-                                                            key={`${item.id}-${index}`}
-                                                            style={{
-                                                                left: `${(commandTime! / endTime) * 100}%`,
-                                                                width: `${Math.max(4, ((finishTime! - commandTime!) / endTime) * 100)}%`,
-                                                            }}
-                                                            title={`Command ${formatTime(commandTime!)} · finish ${formatTime(finishTime!)}`}
-                                                            onClick={() =>
-                                                                setBuildOrder((current) =>
-                                                                    current.filter((_, position) => position !== index),
-                                                                )
-                                                            }
-                                                        >
-                                                            <img src={iconSources[item.icon]} alt="" />
-                                                            <span>{item.name}</span>
-                                                        </button>
-                                                    ))}
+                                                    {lane.events.map(
+                                                        ({
+                                                            item,
+                                                            commandTime,
+                                                            startTime,
+                                                            finishTime,
+                                                            workerReturnTime,
+                                                            index,
+                                                        }) => (
+                                                            <button
+                                                                className={`event ${item.kind}`}
+                                                                key={`${item.id}-${index}`}
+                                                                style={{
+                                                                    left: `${(commandTime! / endTime) * 100}%`,
+                                                                    width: `${Math.max(4, ((finishTime! - commandTime!) / endTime) * 100)}%`,
+                                                                }}
+                                                                title={`Command ${formatTime(commandTime!)} · start ${formatTime(startTime!)} · finish ${formatTime(finishTime!)}${workerReturnTime === null ? "" : ` · worker returns ${formatTime(workerReturnTime)}`}`}
+                                                                onClick={() =>
+                                                                    setBuildOrder((current) =>
+                                                                        current.filter(
+                                                                            (_, position) => position !== index,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                            >
+                                                                <img src={iconSources[item.icon]} alt="" />
+                                                                <span>{item.name}</span>
+                                                            </button>
+                                                        ),
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -509,13 +429,13 @@ export default function App() {
                             </div>
                             {blockedActions.map(({ item, index }) => (
                                 <div className="blocked-event" key={`${item.id}-${index}`}>
-                                    {item.name} — waiting for resources, food, or producer
+                                    {item.name} — waiting for resources, food, producer, or worker
                                 </div>
                             ))}
                             <p className="timeline-help">
                                 Hover a resource graph for its exact time and amount. Food shows used capacity and its
-                                limit. Production rows are individual queues; construction rows separate simultaneous
-                                activity without assuming worker occupancy.
+                                limit. Production rows are individual queues. Construction includes outbound travel;
+                                hover a building to see its start, completion, and worker return times.
                             </p>
                         </section>
                     </section>
@@ -538,7 +458,7 @@ export default function App() {
                                             <b>{item.name}</b>
                                             <small>
                                                 {blocked || commandTime === null
-                                                    ? "Waiting for resources, food, or producer"
+                                                    ? "Waiting for resources, food, producer, or worker"
                                                     : `Command ${formatTime(commandTime)}`}
                                             </small>
                                         </div>

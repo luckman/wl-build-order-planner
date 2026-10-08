@@ -647,65 +647,15 @@ Costs are assumed to be constant across account progression unless the game prov
 
 ## 13. Construction Delay
 
-A key War Legends-specific mechanic is that issuing a construction command does not necessarily mean construction starts immediately.
+The implemented profile has one configurable `constructionStartDelay`, default
+4 seconds, used for travel both to the building and back to the resource.
+Construction itself uses the building's `seconds` value from `data.json`.
+There are no custom per-action delays or positioning modes in the current UI.
 
-The player normally has to get a worker to the construction location.
-
-Typical practical delay:
-
-```text
-2–4 seconds
-```
-
-The delay depends on execution skill and positioning.
-
-### Required planner feature
-
-Construction delay must be a configurable property.
-
-Suggested modes:
-
-```text
-NORMAL
-PRE_POSITIONED
-CUSTOM
-```
-
-### Normal
-
-Use a default delay representing typical execution.
-
-```text
-constructionStartDelay = configured normal delay
-```
-
-For example, the default can be set to:
-
-```text
-3 seconds
-```
-
-while keeping the value user-configurable.
-
-### Pre-positioned
-
-Assume the worker is already at the location.
-
-```text
-constructionStartDelay = 0
-```
-
-This is useful for important buildings where the player deliberately prepositions a worker.
-
-### Custom
-
-Allow the user to specify:
-
-```text
-constructionStartDelay = 1.5s
-```
-
-or another value.
+The worker stops gathering at command acceptance and remains unavailable through
+travel, construction, and return. Building availability starts at completion,
+before the worker returns. See `CONSTRUCTION.md` for selection priorities and the
+documented decision to discard interrupted cargo and restart gathering from zero.
 
 ---
 
@@ -725,8 +675,9 @@ Example:
 Barracks
 
 commandTime:    01:20
-startTime:      01:23
-completionTime: 01:53
+startTime:      01:24
+completionTime: 01:54
+workerReturnTime: 01:58
 ```
 
 This distinction is important for execution-oriented build orders.
@@ -735,9 +686,10 @@ The planner should tell the player when to issue the command, not only when the 
 
 ---
 
-## 15. Theoretical vs. Practical Build
+## 15. Theoretical vs. Practical Build (future modes)
 
-The planner should support two execution assumptions.
+The following named modes are future design ideas. The current implementation
+uses only the shared profile delay; setting it to zero removes both travel legs.
 
 ### Theoretical
 
@@ -802,12 +754,13 @@ The simulator should therefore track production per building instance.
 
 ## 17. Worker Construction and Gathering Interaction
 
-When a worker starts building or upgrading:
+When a worker starts building (worker involvement in upgrades remains future work):
 
 ```text
 worker leaves gathering
 worker becomes unavailable
-construction/upgrade proceeds
+construction proceeds
+worker travels back to its resource
 worker becomes available again
 worker resumes or receives a new assignment
 ```
@@ -819,9 +772,9 @@ Example:
 ```text
 02:00  Worker #4 is gathering gold
 02:10  Worker #4 receives construction order
-02:13  Worker #4 starts building Barracks
-02:43  Barracks completes
-02:43  Worker #4 is available again
+02:14  Worker #4 starts building Barracks
+02:44  Barracks completes
+02:48  Worker #4 is available again at its resource
 ```
 
 There is no gold/wood income from Worker #4 while it is:
@@ -829,6 +782,7 @@ There is no gold/wood income from Worker #4 while it is:
 ```text
 moving to construction
 building
+returning to its resource
 ```
 
 ---

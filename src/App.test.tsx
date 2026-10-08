@@ -6,7 +6,9 @@ test.each([
     ["Dark", "Slave"],
 ])("%s town hall serializes worker training", (faction, worker) => {
     const { container } = render(<App />)
-    if (faction === "Dark") fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    if (faction === "Dark") {
+        fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    }
     const action = container.querySelector(".action-panel") as HTMLElement
     const addWorker = within(action).getByRole("button", { name: new RegExp(worker) })
     fireEvent.click(addWorker)
@@ -26,8 +28,8 @@ test("Barracks is added before its unit and its training slot is available only 
     fireEvent.click(within(action).getByRole("button", { name: /Swordsman/ }))
     expect(within(order).getByText("Barracks")).toBeTruthy()
     fireEvent.click(within(action).getByRole("button", { name: /Swordsman/ }))
-    expect(within(order).getByText("Command 0:30")).toBeTruthy()
-    expect(within(order).getByText("Command 0:51")).toBeTruthy()
+    expect(within(order).getByText("Command 0:34")).toBeTruthy()
+    expect(within(order).getByText("Command 0:55")).toBeTruthy()
 })
 
 test("two completed Barracks have independent training slots", () => {
@@ -39,7 +41,7 @@ test("two completed Barracks have independent training slots", () => {
         fireEvent.click(within(action).getByRole("button", { name }))
     }
     const order = container.querySelector(".order") as HTMLElement
-    expect(within(order).getAllByText("Command 0:30")).toHaveLength(2)
+    expect(within(order).getAllByText("Command 0:34")).toHaveLength(2)
 })
 
 test("initial allocations derive food, and hovering reads exact delivery boundaries", () => {
@@ -64,4 +66,18 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
     fireEvent.change(screen.getByLabelText("Initial wood gatherers"), { target: { value: "2" } })
     fireEvent.mouseMove(chart, { clientX: 0 })
     expect(within(screen.getByRole("tooltip")).getByText("Food: 12/20")).toBeTruthy()
+})
+
+test("the editable construction delay changes building and worker return times", () => {
+    const { container } = render(<App />)
+    const delay = screen.getByLabelText("Construction start delay (seconds)") as HTMLInputElement
+    expect(delay.value).toBe("4")
+    fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
+    fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
+    fireEvent.click(
+        within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /Barracks/ }),
+    )
+    expect(screen.getByTitle("Command 0:00 · start 0:04 · finish 0:34 · worker returns 0:38")).toBeTruthy()
+    fireEvent.change(delay, { target: { value: "2.5" } })
+    expect(screen.getByTitle("Command 0:00 · start 0:02.5 · finish 0:32.5 · worker returns 0:35")).toBeTruthy()
 })
