@@ -1,0 +1,41 @@
+.workspace {
+    grid-template-columns: 245px minmax(450px, 1fr) 255px;
+}
+
+.action {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-content: start;
+    column-gap: 6px;
+    min-height: 74px;
+    padding: 7px;
+}
+
+.action img {
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    float: none;
+}
+
+.action span {
+    align-self: center;
+    overflow: hidden;
+    font-size: .76rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.action small {
+    grid-column: 1 / -1;
+    padding-top: 5px;
+    color: #9bb4c9;
+    font-size: .66rem;
+    line-height: 1.2;
+}
+
+@media (max-width: 1050px) {
+    .workspace {
+        grid-template-columns: 245px 1fr;
+    }
+}

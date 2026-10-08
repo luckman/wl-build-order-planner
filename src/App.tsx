@@ -12,6 +12,7 @@ import { type EconomySettings, resourceAt, workerAllocationAt } from "./game/res
 import "./index.css"
 import "./timeline.css"
 import "./parallel-timeline.css"
+import "./layout-overrides.css"
 
 const iconSources: Record<string, string> = {
     lightCastle: require("./icons/buildings/light-castle.png"),
@@ -123,11 +124,12 @@ export default function App() {
     const spending = plan.flatMap(({ item, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -item.gold, wood: -item.wood }],
     )
-    const endTime = Math.max(60, ...plan.map(({ finishTime, workerReturnTime }) => workerReturnTime ?? finishTime ?? 0))
+    const lastCompletionTime = Math.max(0, ...plan.map(({ finishTime }) => finishTime ?? 0))
+    const endTime = Math.max(90, lastCompletionTime + 30)
     const samples = useMemo(
         () =>
             Array.from({ length: Math.ceil(endTime / 5) + 1 }, (_, index) =>
-                resourceAt(economy, deliveries, spending, index * 5),
+                resourceAt(economy, deliveries, spending, Math.min(endTime, index * 5)),
             ),
         [deliveries, economy, endTime, spending],
     )
@@ -181,6 +183,7 @@ export default function App() {
     const timelineLanes = useMemo(() => createTimelineLanes(plan), [plan])
     const blockedActions = plan.map((action, index) => ({ ...action, index })).filter(({ blocked }) => blocked)
     const timelineWidth = `${Math.max(100, (endTime / 90) * 100)}%`
+    const timelineTicks = Array.from({ length: Math.floor(endTime / 20) + 1 }, (_, index) => index * 20)
     const latestCommand = [...plan].reverse().find(({ commandTime }) => commandTime !== null)
     const latestCommandTime = latestCommand?.commandTime ?? null
     const latestResources =
@@ -357,6 +360,7 @@ export default function App() {
                                         tooltip={tooltip}
                                         tone="gold"
                                         maximum={totalGold}
+                                        sampleTimes={samples.map(({ time }) => time)}
                                         values={samples.map(({ gold }) => gold)}
                                     />
                                     <ResourceRow
@@ -366,6 +370,7 @@ export default function App() {
                                         tooltip={tooltip}
                                         tone="wood"
                                         maximum={totalWood}
+                                        sampleTimes={samples.map(({ time }) => time)}
                                         values={samples.map(({ wood }) => wood)}
                                     />
                                     <ResourceRow
@@ -375,13 +380,14 @@ export default function App() {
                                         tooltip={tooltip}
                                         tone="food"
                                         maximum={Math.max(...foodSamples.map(({ limit }) => limit), 1)}
+                                        sampleTimes={foodSamples.map(({ time }) => time)}
                                         values={foodSamples.map(({ used }) => used)}
                                         limitValues={foodSamples.map(({ limit }) => limit)}
                                     />
                                     <div className="time-scale">
-                                        {Array.from({ length: Math.ceil(endTime / 20) + 1 }, (_, index) => (
-                                            <span key={index} style={{ left: `${((index * 20) / endTime) * 100}%` }}>
-                                                {formatTime(index * 20)}
+                                        {timelineTicks.map((time) => (
+                                            <span key={time} style={{ left: `${(time / endTime) * 100}%` }}>
+                                                {formatTime(time)}
                                             </span>
                                         ))}
                                     </div>
@@ -510,6 +516,7 @@ export default function App() {
 type ResourceRowProps = {
     tone: string
     values: number[]
+    sampleTimes: number[]
     maximum: number
     limitValues?: number[]
     endTime: number
@@ -520,6 +527,7 @@ type ResourceRowProps = {
 function ResourceRow({
     tone,
     values,
+    sampleTimes,
     maximum,
     limitValues,
     endTime,
@@ -543,11 +551,14 @@ function ResourceRow({
                     setActive(false)
                 }}
             >
-                {values.map((entry, index) => (
+                {values.slice(0, -1).map((entry, index) => (
                     <span
                         key={index}
                         className={tone}
-                        style={{ height: `${Math.max(2, (entry / maximum) * 100)}%`, width: `${100 / values.length}%` }}
+                        style={{
+                            height: `${Math.max(2, (entry / maximum) * 100)}%`,
+                            width: `${((sampleTimes[index + 1] - sampleTimes[index]) / endTime) * 100}%`,
+                        }}
                     />
                 ))}
                 {limitValues && (
