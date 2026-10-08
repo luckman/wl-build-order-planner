@@ -603,6 +603,12 @@ Example:
 
 The actual War Legends values should be entered manually.
 
+The current starter catalog is stored in `src/game/data.json`. Buildings are
+always constructed by the faction's worker as a planner rule; unit and upgrade
+producers use `produces` and `upgrades` on the producing item, and targets use
+`requires`. `src/game/gameData.ts` derives the planner-facing producer and
+prerequisite information from those relationships.
+
 ---
 
 ## 12. Units
@@ -764,7 +770,7 @@ This makes the planner more useful for real gameplay.
 
 Production buildings should have explicit queues.
 
-Castle/Citadel produces Workers/Slaves, and Barracs produces Swordsmen/Goons.
+Castle/Citadel produces Workers/Slaves, and Barracks produces Swordsmen/Goons.
 Each building instance can train only one unit at a time. Training requires a
 completed producer and waits for its slot, resources, and food capacity.
 For example, a Worker started at 17s finishes at 35s, so the next Worker from

@@ -1,0 +1,222 @@
+{
+  "factions": [
+    {
+      "id": "light",
+      "name": "Light",
+      "workerName": "Worker",
+      "startingTownHall": "Castle",
+      "items": [
+        {
+          "id": "castle",
+          "name": "Castle",
+          "kind": "building",
+          "cost": {
+            "gold": 500,
+            "wood": 500,
+            "food": 0
+          },
+          "seconds": 60,
+          "produces": [
+            "worker"
+          ],
+          "upgrades": [
+            "castle-lvl-2"
+          ],
+          "icon": "lightCastle"
+        },
+        {
+          "id": "castle-lvl-2",
+          "name": "Castle lvl 2",
+          "kind": "upgrade",
+          "cost": {
+            "gold": 200,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 45,
+          "requires": [
+            "castle",
+            "barracks",
+            "farm"
+          ],
+          "icon": "lightCastle"
+        },
+        {
+          "id": "sawmill",
+          "name": "Sawmill",
+          "kind": "building",
+          "cost": {
+            "gold": 200,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 20,
+          "icon": "lightSawmill"
+        },
+        {
+          "id": "farm",
+          "name": "Farm",
+          "kind": "building",
+          "cost": {
+            "gold": 150,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 25,
+          "icon": "lightFarm"
+        },
+        {
+          "id": "barracks",
+          "name": "Barracks",
+          "kind": "building",
+          "cost": {
+            "gold": 200,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 30,
+          "produces": [
+            "swordsman"
+          ],
+          "icon": "lightBarracks"
+        },
+        {
+          "id": "worker",
+          "name": "Worker",
+          "kind": "unit",
+          "cost": {
+            "gold": 150,
+            "wood": 0,
+            "food": 2
+          },
+          "seconds": 18,
+          "icon": "lightWorker"
+        },
+        {
+          "id": "swordsman",
+          "name": "Swordsman",
+          "kind": "unit",
+          "cost": {
+            "gold": 150,
+            "wood": 0,
+            "food": 3
+          },
+          "seconds": 21,
+          "requires": [
+            "barracks"
+          ],
+          "icon": "lightSwordsman"
+        }
+      ]
+    },
+    {
+      "id": "dark",
+      "name": "Dark",
+      "workerName": "Slave",
+      "startingTownHall": "Citadel",
+      "items": [
+        {
+          "id": "citadel",
+          "name": "Citadel",
+          "kind": "building",
+          "cost": {
+            "gold": 500,
+            "wood": 500,
+            "food": 0
+          },
+          "seconds": 60,
+          "produces": [
+            "slave"
+          ],
+          "upgrades": [
+            "citadel-lvl-2"
+          ],
+          "icon": "darkCitadel"
+        },
+        {
+          "id": "citadel-lvl-2",
+          "name": "Citadel lvl 2",
+          "kind": "upgrade",
+          "cost": {
+            "gold": 200,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 45,
+          "requires": [
+            "citadel",
+            "barracks",
+            "pigsty"
+          ],
+          "icon": "darkCitadel"
+        },
+        {
+          "id": "sawmill",
+          "name": "Sawmill",
+          "kind": "building",
+          "cost": {
+            "gold": 200,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 20,
+          "icon": "darkSawmill"
+        },
+        {
+          "id": "pigsty",
+          "name": "Pigsty",
+          "kind": "building",
+          "cost": {
+            "gold": 150,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 25,
+          "icon": "darkPigsty"
+        },
+        {
+          "id": "barracks",
+          "name": "Barracks",
+          "kind": "building",
+          "cost": {
+            "gold": 200,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 30,
+          "produces": [
+            "goon"
+          ],
+          "icon": "darkBarracks"
+        },
+        {
+          "id": "slave",
+          "name": "Slave",
+          "kind": "unit",
+          "cost": {
+            "gold": 150,
+            "wood": 0,
+            "food": 2
+          },
+          "seconds": 18,
+          "icon": "darkSlave"
+        },
+        {
+          "id": "goon",
+          "name": "Goon",
+          "kind": "unit",
+          "cost": {
+            "gold": 200,
+            "wood": 0,
+            "food": 4
+          },
+          "seconds": 27,
+          "requires": [
+            "barracks"
+          ],
+          "icon": "darkGoon"
+        }
+      ]
+    }
+  ]
+}

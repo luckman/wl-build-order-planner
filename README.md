@@ -4,15 +4,19 @@ A React starter for planning War Legends mobile RTS build orders. It was bootstr
 
 ## Current scope
 
-- Light faction: Castle, Castle lvl 2, Sawmill, Farm, Barracs, Worker, and Swordsman.
-- Dark faction: Citadel, Citadel lvl 2, Sawmill, Pigsty, Barracs, Slave, and Goon.
+- Light faction: Castle, Castle lvl 2, Sawmill, Farm, Barracks, Worker, and Swordsman.
+- Dark faction: Citadel, Citadel lvl 2, Sawmill, Pigsty, Barracks, Slave, and Goon.
 - A trip-based gold and wood simulator: gold workers queue for one mine slot, while wood workers gather independently.
 - Editable starting gold/wood, worker allocation, and per-trip yield inputs, with a resource timeline that delays orders until deliveries cover their costs.
+- Starting gold defaults to 150 and remains editable in the Resource collection panel.
+- A shared, horizontally scrollable 90-second timeline viewport with resource graphs, one timestamp ruler, and non-overlapping parallel production/construction rows.
 - Resource hover in 0.1-second increments, with a shared time marker and a tooltip showing gold, wood, and food used/limit together.
 - Initial assignments default to 4 gold miners and 1 wood gatherer; total starting workers and food usage are calculated from these assignments (2 food per worker).
 - Newly trained Workers/Slaves automatically join gold up to calculated mine saturation, then gather wood.
-- One completed Castle/Citadel is present initially. Each producer trains one unit at a time; additional Castles/Citadels and Barracs have independent queues available after construction completes.
+- One completed Castle/Citadel is present initially. Each producer trains one unit at a time; additional Castles/Citadels and Barracks have independent queues available after construction completes.
 - Temporary source artwork: Terran icons for Light, Protoss icons for Dark.
+- Game content is declared in `src/game/data.json`. The app derives each item's producer and explicit prerequisite set in `src/game/gameData.ts`, so expanding the catalog does not require editing the planner UI.
+- Choosing an action automatically inserts any unmet prerequisites, in dependency order, before the selected action.
 
 Worker construction occupancy and additional game content will be added when their War Legends values are known. Starting state and yields remain user-editable rather than fixed game data. The food defaults described in the game-model document are editable in the UI. SC2-specific active logic (MULEs, larva, gas, and a third faction) is not used.
 

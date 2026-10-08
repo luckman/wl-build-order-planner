@@ -6,7 +6,7 @@
 - Renamed the package to `wl-build-order-planner`.
 - Replaced the application entry UI with a War Legends-only build-order catalogue and planner.
 - Added exactly two factions: Light and Dark.
-- Added the supplied starter definitions for Castle/Citadel, level-two town-hall upgrades, Sawmill, Farm/Pigsty, Barracs, Worker/Slave, and Swordsman/Goon.
+- Added the supplied starter definitions for Castle/Citadel, level-two town-hall upgrades, Sawmill, Farm/Pigsty, Barracks, Worker/Slave, and Swordsman/Goon.
 - Reused Terran artwork for Light and Protoss artwork for Dark as requested.
 - Removed SC2 mechanics from the active app: upgrades other than the supplied level-two town hall, MULEs, larva, gas/vespene, and the third faction are not reachable or modeled.
 - The build-order panel tracks selected items and total gold, wood, food consumption, and listed build time.
