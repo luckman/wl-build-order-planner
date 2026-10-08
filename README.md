@@ -10,6 +10,8 @@ A React starter for planning War Legends mobile RTS build orders. It was bootstr
 - Editable starting gold/wood, worker allocation, and per-trip yield inputs, with a resource timeline that delays orders until deliveries cover their costs.
 - Starting gold defaults to 150 and remains editable in the Resource collection panel.
 - A shared, horizontally scrollable 90-second timeline viewport with resource graphs, one timestamp ruler, and non-overlapping parallel production/construction rows.
+- Timeline labels, queue names, and resource amounts stay fixed while the time-based graph and queue content scroll together.
+- The Build order panel includes a latest-command state snapshot: timestamp, resources, food, total workers, and the gold/wood/busy-or-idle worker allocation.
 - Resource hover in 0.1-second increments, with a shared time marker and a tooltip showing gold, wood, and food used/limit together.
 - Initial assignments default to 4 gold miners and 1 wood gatherer; total starting workers and food usage are calculated from these assignments (2 food per worker).
 - Newly trained Workers/Slaves automatically join gold up to calculated mine saturation, then gather wood.

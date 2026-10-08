@@ -8,7 +8,7 @@ import {
     type ItemKind,
     type PlannerItem,
 } from "./game/gameData"
-import { type EconomySettings, resourceAt } from "./game/resourceSimulation"
+import { type EconomySettings, resourceAt, workerAllocationAt } from "./game/resourceSimulation"
 import "./index.css"
 import "./timeline.css"
 import "./parallel-timeline.css"
@@ -181,6 +181,33 @@ export default function App() {
     const timelineLanes = useMemo(() => createTimelineLanes(plan), [plan])
     const blockedActions = plan.map((action, index) => ({ ...action, index })).filter(({ blocked }) => blocked)
     const timelineWidth = `${Math.max(100, (endTime / 90) * 100)}%`
+    const latestCommand = [...plan].reverse().find(({ commandTime }) => commandTime !== null)
+    const latestCommandTime = latestCommand?.commandTime ?? null
+    const latestResources =
+        latestCommandTime === null ? null : resourceAt(economy, deliveries, spending, latestCommandTime)
+    const latestFoodUsed =
+        latestCommandTime === null
+            ? null
+            : initialFoodUsed +
+              plan
+                  .filter(
+                      ({ item, commandTime }) =>
+                          item.kind === "unit" && commandTime !== null && commandTime <= latestCommandTime,
+                  )
+                  .reduce((total, { item }) => total + item.food, 0)
+    const latestFoodLimit =
+        latestCommandTime === null
+            ? null
+            : baseFoodLimit +
+              plan.filter(
+                  ({ item, finishTime }) =>
+                      (item.id === "farm" || item.id === "pigsty") &&
+                      finishTime !== null &&
+                      finishTime <= latestCommandTime,
+              ).length *
+                  foodPerFarm
+    const latestWorkers =
+        latestCommandTime === null ? null : workerAllocationAt(economy, plan, latestCommandTime)
     return (
         <div className="sc2-shell">
             <header className="topbar">
@@ -306,51 +333,28 @@ export default function App() {
                                 return. The construction delay applies to travel in each direction.
                             </p>
                         </section>
-                        <section className="selected-order panel">
-                            <div className="panel-title">
-                                <h2>Selected commands</h2>
-                                <span>
-                                    {buildOrder.length ? "Click a command to remove it" : "Choose actions on the left"}
-                                </span>
-                            </div>
-                            <div className="selected-order-scroll">
-                                {buildOrder.map((item, index) => (
-                                    <button
-                                        className="selected-command"
-                                        key={`${item.id}-${index}`}
-                                        title={`Remove ${item.name}`}
-                                        onClick={() =>
-                                            setBuildOrder((current) =>
-                                                current.filter((_, position) => position !== index),
-                                            )
-                                        }
-                                    >
-                                        <span>{index + 1}</span>
-                                        <img src={iconSources[item.icon]} alt="" />
-                                        <b>{item.name}</b>
-                                    </button>
-                                ))}
-                                {!buildOrder.length && (
-                                    <p className="selected-order-empty">
-                                        Your selected actions will appear here in command order.
-                                    </p>
-                                )}
-                            </div>
-                        </section>
                         <section className="timeline panel">
                             <div className="panel-title">
                                 <h2>Timeline</h2>
                                 <span>{formatTime(endTime)} horizon · scrolls in 90-second views</span>
                             </div>
-                            <div className="timeline-scroll">
-                                <div className="timeline-canvas" style={{ width: timelineWidth }}>
+                            <div className="timeline-grid">
+                                <div className="timeline-fixed timeline-labels">
+                                    <ResourceLabel name="Gold" tone="gold" />
+                                    <ResourceLabel name="Wood" tone="wood" />
+                                    <ResourceLabel name="Food" tone="food" />
+                                    <div className="time-scale-spacer" />
+                                    {timelineLanes.map((lane) => (
+                                        <div className="queue-label" key={lane.label}>{lane.label}</div>
+                                    ))}
+                                </div>
+                                <div className="timeline-scroll">
+                                    <div className="timeline-canvas" style={{ width: timelineWidth }}>
                                     <ResourceRow
                                         endTime={endTime}
                                         hoverTime={hoverTime}
                                         onHover={setHoverTime}
                                         tooltip={tooltip}
-                                        inspectedValue={inspectedResources.gold}
-                                        name="Gold"
                                         tone="gold"
                                         maximum={totalGold}
                                         values={samples.map(({ gold }) => gold)}
@@ -360,8 +364,6 @@ export default function App() {
                                         hoverTime={hoverTime}
                                         onHover={setHoverTime}
                                         tooltip={tooltip}
-                                        inspectedValue={inspectedResources.wood}
-                                        name="Wood"
                                         tone="wood"
                                         maximum={totalWood}
                                         values={samples.map(({ wood }) => wood)}
@@ -371,9 +373,6 @@ export default function App() {
                                         hoverTime={hoverTime}
                                         onHover={setHoverTime}
                                         tooltip={tooltip}
-                                        inspectedValue={inspectedFood}
-                                        inspectedLimit={inspectedLimit}
-                                        name="Food"
                                         tone="food"
                                         maximum={Math.max(...foodSamples.map(({ limit }) => limit), 1)}
                                         values={foodSamples.map(({ used }) => used)}
@@ -388,9 +387,7 @@ export default function App() {
                                     </div>
                                     <div className="queue-lanes">
                                         {timelineLanes.map((lane) => (
-                                            <div className="queue-row" key={lane.label}>
-                                                <div className="queue-label">{lane.label}</div>
-                                                <div className="queue-track">
+                                            <div className="queue-track" key={lane.label}>
                                                     {lane.events.map(
                                                         ({
                                                             item,
@@ -421,10 +418,17 @@ export default function App() {
                                                             </button>
                                                         ),
                                                     )}
-                                                </div>
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+                                </div>
+                                <div className="timeline-fixed timeline-values">
+                                    <ResourceValue value={inspectedResources.gold} />
+                                    <ResourceValue value={inspectedResources.wood} />
+                                    <ResourceValue value={inspectedFood} limit={inspectedLimit} />
+                                    <div className="time-scale-spacer" />
+                                    {timelineLanes.map((lane) => <div className="queue-value" key={lane.label} />)}
                                 </div>
                             </div>
                             {blockedActions.map(({ item, index }) => (
@@ -477,15 +481,21 @@ export default function App() {
                             </ol>
                         )}
                         <div className="resource-summary">
-                            <span>
-                                Initial gold workers <b>{economy.goldWorkers}</b>
-                            </span>
-                            <span>
-                                Initial wood workers <b>{economy.woodWorkers}</b>
-                            </span>
-                            <span>
-                                Mine deliveries <b>{deliveries.filter(({ gold }) => gold).length}</b>
-                            </span>
+                            <h3>Latest order state</h3>
+                            {latestCommandTime === null || !latestResources || latestFoodUsed === null || latestFoodLimit === null || !latestWorkers ? (
+                                <span>No command has been sent yet.</span>
+                            ) : (
+                                <>
+                                    <span>Latest command <b>{formatTime(Math.ceil(latestCommandTime))}</b></span>
+                                    <span>Gold <b>{Math.round(latestResources.gold)}</b></span>
+                                    <span>Wood <b>{Math.round(latestResources.wood)}</b></span>
+                                    <span>Food <b>{latestFoodUsed} / {latestFoodLimit}</b></span>
+                                    <span>Total workers <b>{latestWorkers.total}</b></span>
+                                    <span>Gathering gold <b>{latestWorkers.gold}</b></span>
+                                    <span>Gathering wood <b>{latestWorkers.wood}</b></span>
+                                    <span>Building, travelling, or idle <b>{latestWorkers.busyOrIdle}</b></span>
+                                </>
+                            )}
                         </div>
                     </aside>
                 </div>
@@ -498,7 +508,6 @@ export default function App() {
     )
 }
 type ResourceRowProps = {
-    name: string
     tone: string
     values: number[]
     maximum: number
@@ -507,11 +516,8 @@ type ResourceRowProps = {
     hoverTime: number | null
     onHover: (time: number | null) => void
     tooltip: React.ReactNode
-    inspectedValue: number
-    inspectedLimit?: number
 }
 function ResourceRow({
-    name,
     tone,
     values,
     maximum,
@@ -520,19 +526,12 @@ function ResourceRow({
     hoverTime,
     onHover,
     tooltip,
-    inspectedValue,
-    inspectedLimit,
 }: ResourceRowProps) {
     const [active, setActive] = useState(false)
     const position = hoverTime === null ? 0 : (hoverTime / endTime) * 100
     return (
-        <div className="resource-row">
-            <div className="resource-label">
-                <i className={tone} />
-                {name}
-            </div>
-            <div
-                className="resource-chart"
+        <div
+            className="resource-chart"
                 onMouseMove={(event) => {
                     const box = event.currentTarget.getBoundingClientRect()
                     const time = Math.min(endTime, Math.max(0, ((event.clientX - box.left) / box.width) * endTime))
@@ -567,11 +566,14 @@ function ResourceRow({
                         {tooltip}
                     </div>
                 )}
-            </div>
-            <b>
-                {Math.round(inspectedValue)}
-                {inspectedLimit === undefined ? "" : ` / ${inspectedLimit}`}
-            </b>
         </div>
     )
+}
+
+function ResourceLabel({ name, tone }: { name: string; tone: string }) {
+    return <div className="resource-label"><i className={tone} />{name}</div>
+}
+
+function ResourceValue({ value, limit }: { value: number; limit?: number }) {
+    return <b className="resource-value">{Math.round(value)}{limit === undefined ? "" : ` / ${limit}`}</b>
 }

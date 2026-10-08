@@ -27,6 +27,21 @@ export type GatheringWorker = {
     nextAt: number
 }
 
+export type WorkerAllocation = {
+    total: number
+    gold: number
+    wood: number
+    busyOrIdle: number
+}
+
+type WorkerStateAction = {
+    item: { id: string; kind: string }
+    commandTime: number | null
+    finishTime: number | null
+    workerReturnTime: number | null
+    workerId: number | null
+}
+
 /** Chronological worker simulation shared by income previews and build scheduling. */
 export class WorkerEconomy {
     workers: GatheringWorker[] = []
@@ -193,4 +208,71 @@ export function resourceAt(
             { gold: settings.startingGold, wood: settings.startingWood },
         )
     return { time, ...resources }
+}
+
+/** Returns the worker allocation at a command timestamp, including builders in transit. */
+export function workerAllocationAt(
+    settings: EconomySettings,
+    actions: WorkerStateAction[],
+    time: number,
+): WorkerAllocation {
+    const simulation = new WorkerEconomy(settings)
+    const saturation = Math.max(
+        1,
+        Math.ceil(
+            (settings.goldOutboundTravel + settings.goldGatherTime + settings.goldReturnTravel) /
+                Math.max(0.001, settings.goldGatherTime),
+        ),
+    )
+    const events = actions
+        .flatMap((action) => {
+            const events: Array<{
+                time: number
+                type: "worker" | "construction"
+                workerId?: number
+                duration?: number
+            }> = []
+            if ((action.item.id === "worker" || action.item.id === "slave") && action.finishTime !== null) {
+                events.push({ time: action.finishTime, type: "worker" })
+            }
+            if (
+                action.item.kind === "building" &&
+                action.commandTime !== null &&
+                action.workerReturnTime !== null &&
+                action.workerId !== null
+            ) {
+                events.push({
+                    time: action.commandTime,
+                    type: "construction",
+                    workerId: action.workerId,
+                    duration: action.workerReturnTime - action.commandTime,
+                })
+            }
+            return events
+        })
+        .filter((event) => event.time <= time)
+        .sort((left, right) => left.time - right.time || (left.type === "worker" ? -1 : 1))
+
+    for (const event of events) {
+        simulation.advanceTo(event.time)
+        if (event.type === "worker") {
+            const goldWorkers = simulation.workers.filter(({ assignment }) => assignment === "gold").length
+            simulation.addWorker(goldWorkers < saturation ? "gold" : "wood")
+        } else {
+            const worker = simulation.workers[event.workerId!]
+            if (worker) {
+                simulation.construct(worker, Math.max(0, event.duration! - 2 * settings.constructionStartDelay))
+            }
+        }
+    }
+    simulation.advanceTo(time)
+    const busyOrIdle = simulation.workers.filter(
+        ({ assignment, state }) => assignment === "idle" || state === "construction" || state === "idle",
+    ).length
+    return {
+        total: simulation.workers.length,
+        gold: simulation.workers.filter(({ assignment, state }) => assignment === "gold" && state !== "construction").length,
+        wood: simulation.workers.filter(({ assignment, state }) => assignment === "wood" && state !== "construction").length,
+        busyOrIdle,
+    }
 }
