@@ -8,6 +8,7 @@ A React starter for planning War Legends mobile RTS build orders. It was bootstr
 - Dark faction: Citadel, Citadel lvl 2, Sawmill, Pigsty, Barracks, Slave, and Goon.
 - Castle/Citadel levels 3–4 and Tower of Mana are available for both factions. The planner enforces quantity and minimum-level prerequisites, per-building upgrade ownership, and highest-town-hall-level limits for Farm/Pigsty, Sawmill, and Tower of Mana. See `docs/CATALOG_DEPENDENCIES.md`.
 - A trip-based gold and wood simulator: gold workers queue for one mine slot, while wood workers gather independently.
+- Each completed Sawmill resets wood travel to 0.5 seconds each way. Travel increases by 0.5 seconds per full minute since the latest completion, capped at 4 seconds after 7 minutes. Travel already in progress finishes at its original duration; chopping time and gold travel are unchanged.
 - Editable starting gold/wood, worker allocation, and per-trip yield inputs, with a resource timeline that delays orders until deliveries cover their costs.
 - Starting gold defaults to 150 and remains editable in the Resource collection panel.
 - A shared, horizontally scrollable 90-second timeline viewport with resource graphs, one timestamp ruler, and non-overlapping parallel production/construction rows.

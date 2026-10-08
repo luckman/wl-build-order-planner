@@ -324,15 +324,25 @@ The exact cycle should be calculated from the configured travel and item modifie
 
 ### Nearby Sawmill
 
-A Sawmill can be built close to a trees.
-
-When a worker uses a nearby Sawmill as the return/deposit point, a different travel-time parameter applies.
-
-Default nearby distance:
+A completed Sawmill is treated as a nearby wood deposit point. Each newly completed Sawmill resets travel time for all wood gatherers to 0.5 seconds in each direction (outbound and return). Travel time then increases by 0.5 seconds per full minute since the most recent Sawmill completion, capped at 4 seconds:
 
 ```text
-0.5 seconds
+fullMinutes = floor((currentTime - latestSawmillCompletionTime) / 60)
+woodTravelTime = min(4, 0.5 + 0.5 * fullMinutes)
 ```
+
+| Time since latest Sawmill completion | Travel time each way |
+| --- | --- |
+| 0–59.999… seconds | 0.5 seconds |
+| 60–119.999… seconds | 1 second |
+| 120–179.999… seconds | 1.5 seconds |
+| 180–239.999… seconds | 2 seconds |
+| 240–299.999… seconds | 2.5 seconds |
+| 300–359.999… seconds | 3 seconds |
+| 360–419.999… seconds | 3.5 seconds |
+| 420 seconds onward | 4 seconds |
+
+Before any Sawmill completes, workers use the configured normal wood travel times (default 4 seconds each way). Only completed Sawmills reset the timer; queued or unfinished Sawmills have no effect. Each travel leg uses the duration calculated when that leg starts. A travel leg already in progress keeps its original duration across minute boundaries and Sawmill completions. Chopping time, wood per trip, gold travel, and construction travel are unchanged.
 
 For example:
 
@@ -341,13 +351,16 @@ For example:
   "wood": {
     "outboundTravelTime": 4.0,
     "returnTravelTime": 4.0,
+    "nearbySawmillOutboundTime": 0.5,
     "nearbySawmillReturnTime": 0.5,
+    "sawmillTravelIncreasePerMinute": 0.5,
+    "sawmillMaxTravelTime": 4.0,
     "baseGatherTime": 12.1
   }
 }
 ```
 
-The exact interpretation of the 0.5-second distance should follow the actual game behavior. It should remain configurable rather than being hard-coded into the simulator.
+The Sawmill timer rule applies to both Light and Dark factions.
 
 ### Wood Worker State
 

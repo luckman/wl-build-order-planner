@@ -399,6 +399,8 @@ export default function App() {
                                 reach the mine 1 second sooner on their opening trip only; every later trip uses the
                                 configured travel time. New workers automatically mine gold until the calculated
                                 saturation of {maxGoldWorkers}, then gather wood. Wood trips run independently.
+                                Each completed Sawmill resets wood travel to 0.5 seconds each way, increasing by
+                                0.5 seconds per full minute afterward, up to 4 seconds.
                                 Builders stop gathering during travel, construction, and return. The construction delay
                                 applies to travel in each direction.
                             </p>

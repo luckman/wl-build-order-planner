@@ -36,6 +36,8 @@ export type WorkerAllocation = {
 
 export const INITIAL_COMMAND_DELAY = 1
 export const INITIAL_GOLD_TRAVEL_REDUCTION = 1
+export const SAWMILL_WOOD_TRAVEL_TIME = 0.5
+export const MAX_SAWMILL_WOOD_TRAVEL_TIME = 4
 
 type WorkerStateAction = {
     item: { id: string; kind: string }
@@ -52,6 +54,7 @@ export class WorkerEconomy {
     time = 0
     private mineWorker: number | null = null
     private delayedInitialWoodWorkerIds: number[] = []
+    private sawmillCompletions: number[] = []
 
     constructor(private settings: EconomySettings) {
         for (let i = 0; i < settings.goldWorkers; i++) {
@@ -87,8 +90,21 @@ export class WorkerEconomy {
         return worker
     }
 
-    private travel(assignment: "gold" | "wood") {
-        return assignment === "gold" ? this.settings.goldOutboundTravel : this.settings.woodOutboundTravel
+    scheduleSawmill(finishTime: number) {
+        this.sawmillCompletions.push(finishTime)
+    }
+
+    private travel(assignment: "gold" | "wood", returning = false) {
+        if (assignment === "wood") {
+            const latestCompletion = Math.max(-Infinity, ...this.sawmillCompletions.filter(time => time <= this.time))
+            if (Number.isFinite(latestCompletion)) {
+                const fullMinutes = Math.floor((this.time - latestCompletion) / 60)
+                return Math.min(MAX_SAWMILL_WOOD_TRAVEL_TIME, SAWMILL_WOOD_TRAVEL_TIME * (1 + fullMinutes))
+            }
+        }
+        return assignment === "gold"
+            ? returning ? this.settings.goldReturnTravel : this.settings.goldOutboundTravel
+            : returning ? this.settings.woodReturnTravel : this.settings.woodOutboundTravel
     }
 
     private transition(worker: GatheringWorker, state: GatheringWorker["state"], duration: number) {
@@ -124,6 +140,7 @@ export class WorkerEconomy {
         return Math.min(
             ...this.workers.map((worker) => worker.nextAt),
             this.delayedInitialWoodWorkerIds.length ? INITIAL_COMMAND_DELAY : Infinity,
+            ...this.sawmillCompletions.filter(time => time > this.time),
         )
     }
 
@@ -149,7 +166,7 @@ export class WorkerEconomy {
                     this.transition(
                         worker,
                         "deposit",
-                        worker.assignment === "gold" ? this.settings.goldReturnTravel : this.settings.woodReturnTravel,
+                        this.travel(worker.assignment === "gold" ? "gold" : "wood", true),
                     )
                 } else if (worker.state === "deposit") {
                     this.deliveries.push({
@@ -239,6 +256,11 @@ export function workerAllocationAt(
     time: number,
 ): WorkerAllocation {
     const simulation = new WorkerEconomy(settings)
+    for (const action of actions) {
+        if (action.item.id === "sawmill" && action.finishTime !== null) {
+            simulation.scheduleSawmill(action.finishTime)
+        }
+    }
     const saturation = Math.max(
         1,
         Math.ceil(

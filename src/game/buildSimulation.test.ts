@@ -193,6 +193,29 @@ function required<T>(value: T | undefined): T {
     return value
 }
 
+test.each(["light", "dark"] as const)("%s completed Sawmill accelerates income and resource-dependent orders", (factionId) => {
+    const faction = factions[factionId]
+    const sawmill = required(faction.items.find(({ id }) => id === "sawmill"))
+    const barracks = required(faction.items.find(({ id }) => id === "barracks"))
+    const { plan, deliveries } = simulateBuildOrder(
+        [sawmill, barracks],
+        { ...economy, workerCount: 2, startingWood: 100 },
+        4, 100, 20, faction.startingTownHall, 110,
+    )
+    expect(plan[0]).toMatchObject({ commandTime: 1, finishTime: 25, workerReturnTime: 29 })
+    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 49.5 })
+    expect(deliveries.map(({ time }) => time)).toEqual([20, 36.5, 49.5, 62.5, 75.5, 89, 103])
+})
+
+test("a blocked Sawmill does not change wood travel", () => {
+    const sawmill = required(factions.light.items.find(({ id }) => id === "sawmill"))
+    const { plan, deliveries } = simulateBuildOrder(
+        [sawmill], { ...economy, startingGold: 0 }, 2, 100, 20, "Castle", 60,
+    )
+    expect(plan[0].blocked).toBe(true)
+    expect(deliveries.map(({ time }) => time)).toEqual([20, 40, 60])
+})
+
 test.each(["light", "dark"] as const)("%s buildings finish before the builder becomes available again", (factionId) => {
     const faction = factions[factionId]
     const barracks = required(faction.items.find(({ id }) => id === "barracks"))

@@ -130,6 +130,7 @@ export function simulateBuildOrder(
                 }
                 if (item.kind === "building") {
                     buildings.push(newBuilding(item, finishTime))
+                    if (item.id === "sawmill") simulation.scheduleSawmill(finishTime)
                 }
                 if (item.id === "worker" || item.id === "slave") {
                     workerCompletions.push(finishTime)
