@@ -4,6 +4,8 @@ A React starter for planning War Legends mobile RTS build orders. It was bootstr
 
 ## Current scope
 
+- The top Import / Export menu downloads and imports `.wl-build-order.json` files containing the faction, exact action order, and complete game profile. Export can optionally include calculated timings inside each action; import ignores those timings and recalculates using current rules. Different game-rules revisions produce a non-blocking warning. Import replaces the current order and profile only after validation succeeds. See `docs/BUILD_ORDER_FILES.md`.
+
 - Light faction: Castle, Castle lvl 2, Sawmill, Farm, Barracks, Elven Tree, Altar of Heroes, Worker, Swordsman, Archer, and the hero Miriel.
 - Dark faction: Citadel, Citadel lvl 2, Sawmill, Pigsty, Barracks, Slave, and Goon.
 - Castle/Citadel levels 3–4 and Tower of Mana are available for both factions. The planner enforces quantity and minimum-level prerequisites, per-building upgrade ownership, and highest-town-hall-level limits for Farm/Pigsty, Sawmill, and Tower of Mana. See `docs/CATALOG_DEPENDENCIES.md`.

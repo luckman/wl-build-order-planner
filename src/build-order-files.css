@@ -1,0 +1,18 @@
+.file-menu { position: relative; }
+.file-menu > summary { display: flex; align-items: center; height: 100%; padding: 0 1rem; border-left: 1px solid #263e55; color: #a9c5df; cursor: pointer; list-style: none; }
+.file-menu > summary::-webkit-details-marker { display: none; }
+.file-menu[open] > summary { color: #fff; background: #263d55; }
+.file-menu > summary:focus-visible { outline: 2px solid #e3b75e; outline-offset: -3px; }
+.build-order-files { position: absolute; right: 0; top: 100%; z-index: 20; width: min(320px, calc(100vw - 1.5rem)); display: grid; gap: .6rem; padding: .75rem; border: 1px solid #34536e; background: #101d2c; box-shadow: 0 4px 12px #0008; }
+.file-buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
+.file-buttons button { padding: .4rem .6rem; border: 1px solid #3d6383; background: #132333; color: #dce6f4; }
+.build-order-files label { display: flex; align-items: center; gap: .4rem; font-size: .76rem; }
+.build-order-files small { color: #a9c1d3; font-size: .72rem; line-height: 1.4; }
+.build-order-files p { margin: 0; font-size: .76rem; line-height: 1.4; overflow-wrap: anywhere; }
+.build-order-files [role="alert"] { color: #ffb5a9; }
+.build-order-files [role="status"] { color: #e1b55f; }
+@media (max-width: 700px) {
+    .topbar { height: auto; min-height: 54px; flex-wrap: wrap; padding: .5rem .75rem 0; gap: .5rem; }
+    .topbar nav { display: flex; height: 42px; margin-left: auto; }
+    .topbar nav > button { display: none; }
+}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import BuildOrderFiles from "./BuildOrderFiles"
 import { type ScheduledAction, simulateBuildOrder } from "./game/buildSimulation"
 import {
     buildOrderWithDependencies,
@@ -15,6 +16,7 @@ import "./index.css"
 import "./timeline.css"
 import "./parallel-timeline.css"
 import "./layout-overrides.css"
+import "./build-order-files.css"
 
 const iconSources: Record<string, string> = {
     lightCastle: require("./icons/buildings/light-castle.png"),
@@ -278,7 +280,18 @@ export default function App() {
                 <nav>
                     <button className="active">Planner</button>
                     <button disabled>Settings</button>
-                    <button disabled>Import / Export</button>
+                    <BuildOrderFiles faction={factionId} profile={{
+                        economy: (() => { const { workerCount, ...settings } = economy; return settings })(),
+                        baseFoodLimit, foodPerFarm,
+                    }} plan={plan} onImport={result => {
+                        setFactionId(result.faction)
+                        setBuildOrder(result.buildOrder)
+                        setEconomy(result.economy)
+                        setBaseFoodLimit(result.baseFoodLimit)
+                        setFoodPerFarm(result.foodPerFarm)
+                        setDependencyError(null)
+                        setHoverTime(null)
+                    }} />
                 </nav>
             </header>
             <main>
