@@ -152,7 +152,7 @@ test("Miriel inserts Altar prerequisites and cannot be queued twice across multi
     const miriel = faction.items.find(item => item.id === "miriel")!
     const altar = faction.items.find(item => item.id === "altar-of-heroes")!
     const order = buildOrderWithDependencies(faction, [], miriel)
-    expect(order.map(item => item.id)).toEqual(["barracks", "farm", "castle-lvl-2", "altar-of-heroes", "miriel"])
+    expect(order.map(item => item.id)).toEqual(["barracks", "farm", "castle-lvl-2", "altar-of-heroes", "elven-tree", "miriel"])
     const twoAltars = buildOrderWithDependencies(faction, order, altar)
     expect(() => buildOrderWithDependencies(faction, twoAltars, miriel)).toThrow("Miriel limit reached")
     expect(itemCost(altar, twoAltars, "Castle")).toEqual({ gold: 450, wood: 300 })

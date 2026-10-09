@@ -1,3 +1,4 @@
+import { initialPlayerLevels } from "./playerLevels"
 import { createDeliveries, WorkerEconomy } from "./resourceSimulation"
 
 const settings = {
@@ -6,6 +7,8 @@ const settings = {
     workerCount: 4,
     goldWorkers: 4,
     woodWorkers: 0,
+    ...initialPlayerLevels,
+    foodPerFarm: 20,
     goldPerTrip: 50,
     woodPerTrip: 50,
     goldTravelTime: 4,
@@ -13,7 +16,7 @@ const settings = {
     woodTravelTime: 4,
     woodGatherTime: 12,
     constructionStartDelay: 4,
-    initialOrderDelay: 1,
+    orderDelay: 1,
     sawmillWoodTravelTime: 0.5,
     initialGoldTravelReduction: 1,
 }
@@ -36,11 +39,11 @@ test("shared travel times apply to both legs of each resource trip", () => {
     expect(simulation.deliveries.filter(({ wood }) => wood).map(({ time }) => time)).toEqual([14.5, 29])
 })
 
-test.each([0, 2.5, 7])("initial order delay %ss controls all additional initial wood gatherers", initialOrderDelay => {
-    const simulation = new WorkerEconomy({ ...settings, workerCount: 3, goldWorkers: 0, woodWorkers: 3, initialOrderDelay })
+test.each([0, 2.5, 7])("initial order delay %ss controls all additional initial wood gatherers", orderDelay => {
+    const simulation = new WorkerEconomy({ ...settings, workerCount: 3, goldWorkers: 0, woodWorkers: 3, orderDelay })
     simulation.advanceTo(30)
     const firstTrips = simulation.deliveries.filter(({ wood }) => wood).slice(0, 3)
-    expect(firstTrips.map(({ time }) => time)).toEqual([20, 20 + initialOrderDelay, 20 + initialOrderDelay])
+    expect(firstTrips.map(({ time }) => time)).toEqual([20, 20 + orderDelay, 20 + orderDelay])
     expect(firstTrips.map(({ worker }) => worker)).toEqual([0, 1, 2])
 })
 

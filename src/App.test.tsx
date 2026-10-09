@@ -1,6 +1,43 @@
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
 
+test("player levels default to one and edits stay within integer levels 1–24", () => {
+    render(<App />)
+    for (const label of ["Castle level", "Sawmill level", "Farm level", "Barracks level", "Factory level", "Sanctuary level", "Worker level"]) {
+        const input = screen.getByLabelText(label) as HTMLInputElement
+        expect(input.value).toBe("1")
+        expect(input.min).toBe("1")
+        expect(input.max).toBe("24")
+        fireEvent.change(input, { target: { value: "25" } })
+        expect(input.value).toBe("24")
+        fireEvent.change(input, { target: { value: "5.8" } })
+        expect(input.value).toBe("5")
+        fireEvent.change(input, { target: { value: "0" } })
+        expect(input.value).toBe("1")
+    }
+    for (const label of ["Gold per trip", "Wood per trip", "Food per Farm"]) {
+        expect(screen.queryByLabelText(label)).toBeNull()
+    }
+    expect(screen.getByText("Gold per trip: 50 · Wood per trip: 50 · Food per Farm: 20")).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Castle level"), { target: { value: "21" } })
+    fireEvent.change(screen.getByLabelText("Sawmill level"), { target: { value: "9" } })
+    fireEvent.change(screen.getByLabelText("Farm level"), { target: { value: "5" } })
+    expect(screen.getByText("Gold per trip: 55 · Wood per trip: 52 · Food per Farm: 21")).toBeTruthy()
+    expect(screen.getByRole("button", { name: /Worker.*16.92s/ })).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Worker level"), { target: { value: "21" } })
+    expect(screen.getByRole("button", { name: /Barracks.*28.5s/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect((screen.getByLabelText("Citadel level") as HTMLInputElement).value).toBe("21")
+    expect((screen.getByLabelText("Pigsty level") as HTMLInputElement).value).toBe("5")
+    expect(screen.getByLabelText("Workshop level")).toBeTruthy()
+    expect(screen.getByLabelText("Dark Gate level")).toBeTruthy()
+    expect((screen.getByLabelText("Slave level") as HTMLInputElement).value).toBe("21")
+    expect(screen.getByText("Gold per trip: 55 · Wood per trip: 52 · Food per Pigsty: 21")).toBeTruthy()
+    expect(screen.queryByLabelText("Castle level")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
+    expect((screen.getByLabelText("Castle level") as HTMLInputElement).value).toBe("21")
+})
+
 test("resource collection follows the timeline and advanced settings retain edits when hidden", () => {
     const { container } = render(<App />)
     const panels = Array.from(container.querySelectorAll(".planner-area > section"))
@@ -11,7 +48,7 @@ test("resource collection follows the timeline and advanced settings retain edit
     expect(screen.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "3" } })
-    expect(screen.getByLabelText("Initial order delay (seconds)")).toBeTruthy()
+    expect(screen.getByLabelText("Order delay (seconds)")).toBeTruthy()
     expect(screen.queryByLabelText("Gold gathering time (seconds)")).toBeNull()
     expect(screen.queryByLabelText("Initial gold travel reduction (seconds)")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Hide advanced" }))
@@ -80,7 +117,7 @@ test("Barracks prices and resource totals update when orders are added or remove
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "0" } })
     fireEvent.change(screen.getByLabelText("Initial wood gatherers"), { target: { value: "3" } })
-    const button = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /Barracks/ })
+    const button = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ })
     fireEvent.click(button)
     expect(button.textContent).toContain("400 gold · 300 wood")
     fireEvent.click(button)
@@ -108,7 +145,7 @@ test.each([
     fireEvent.click(addWorker)
     const order = container.querySelector(".order") as HTMLElement
     expect(within(order).getByText("Command 0:01")).toBeTruthy()
-    expect(within(order).getByText("Command 0:19")).toBeTruthy()
+    expect(within(order).getByText("Command 0:18.8")).toBeTruthy()
     expect(within(order).queryByText("Command 0:27")).toBeNull()
 })
 
@@ -121,8 +158,8 @@ test("Barracks is added before its unit and its training slot is available only 
     fireEvent.click(within(action).getByRole("button", { name: /Swordsman/ }))
     expect(within(order).getByText("Barracks")).toBeTruthy()
     fireEvent.click(within(action).getByRole("button", { name: /Swordsman/ }))
-    expect(within(order).getByText("Command 0:35")).toBeTruthy()
-    expect(within(order).getByText("Command 0:56")).toBeTruthy()
+    expect(within(order).getByText("Command 0:36")).toBeTruthy()
+    expect(within(order).getByText("Command 0:56.8")).toBeTruthy()
 })
 
 test("two completed Barracks have independent training slots", () => {
@@ -130,11 +167,11 @@ test("two completed Barracks have independent training slots", () => {
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
     const action = container.querySelector(".action-panel") as HTMLElement
-    for (const name of [/Barracks/, /Barracks/, /Swordsman/, /Swordsman/]) {
+    for (const name of [/^Barracks \d/, /^Barracks \d/, /Swordsman/, /Swordsman/]) {
         fireEvent.click(within(action).getByRole("button", { name }))
     }
     const order = container.querySelector(".order") as HTMLElement
-    expect(within(order).getAllByText("Command 0:35")).toHaveLength(2)
+    expect(within(order).getAllByText("Command 0:36")).toHaveLength(2)
 })
 
 test("initial allocations derive food, and hovering reads exact delivery boundaries", () => {
@@ -170,7 +207,7 @@ test("the editable construction delay changes building and worker return times",
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
     fireEvent.click(
-        within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /Barracks/ }),
+        within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ }),
     )
     expect(screen.getByTitle("Command 0:01 · start 0:05 · finish 0:35 · worker returns 0:39")).toBeTruthy()
     fireEvent.change(delay, { target: { value: "2.5" } })
@@ -186,6 +223,6 @@ test("town hall upgrades show builder travel and return time in the construction
     )
 
     expect(container.querySelector(".event.upgrade")?.getAttribute("title")).toBe(
-        "Command 0:35 · start 0:39 · finish 1:24 · worker returns 1:28",
+        "Command 0:36 · start 0:40 · finish 1:25 · worker returns 1:29",
     )
 })

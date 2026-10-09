@@ -1,6 +1,7 @@
-import { factions, isRecruitable, itemCost, type PlannerItem } from "./gameData"
+import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
 import { type EconomySettings, resourceAt, WorkerEconomy } from "./resourceSimulation"
+import { actionDuration } from "./playerLevels"
 
 export type ScheduledAction = {
     item: PlannerItem
@@ -56,26 +57,47 @@ export function simulateBuildOrder(
         completeUpgrades(buildings, time)
     }
 
-    advanceTo(economy.initialOrderDelay)
+    advanceTo(economy.orderDelay)
+
+    // Evaluate technology and capacity at the time their order delay has elapsed.
+    // Replaying completed upgrades preserves the earlier levels of each instance.
+    const unlockedBuildingsAt = (time: number) => {
+        const unlocked = [newBuilding(initial, economy.orderDelay), ...plan.filter(action => action.item.kind === "building" && !action.blocked)
+            .map(action => newBuilding(action.item, action.finishTime! + economy.orderDelay))]
+        const upgrades = plan.filter(action => action.item.kind === "upgrade" && action.finishTime !== null && action.finishTime + economy.orderDelay <= time)
+            .sort((a, b) => a.finishTime! - b.finishTime!)
+        for (const action of upgrades) {
+            const building = unlocked[action.buildingInstanceId!]
+            building.itemId = action.item.id
+            building.level = action.item.level ?? building.level + 1
+            building.name = action.item.name
+        }
+        return unlocked
+    }
 
     for (const item of buildOrder) {
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)
         const needsProducer = item.kind !== "building"
+        const requiredAltarLevel = item.kind === "hero"
+            ? heroAltarLevel(plan.filter(action => !action.blocked).map(action => action.item)) : 1
         let scheduled = false
         let blockedReason = "Waiting for resources, food, producer, or worker"
         while (simulation.time <= until) {
             advanceTo(simulation.time)
             const time = simulation.time
+            const unlockedBuildings = unlockedBuildingsAt(time)
             if (item.maxCount !== undefined && plan.filter(action => !action.blocked && action.item.id === item.id).length >= item.maxCount) {
                 blockedReason = `${item.name} limit reached (maximum ${item.maxCount}, including queued recruitment)`
                 break
             }
             const completed = plan.filter(({ finishTime }) => finishTime !== null && finishTime <= time)
-            const completedNames = new Set([initialTownHall, ...completed.map(({ item }) => item.name)])
+            const completedNames = new Set([initialTownHall, ...completed.filter(action => action.finishTime! + economy.orderDelay <= time).map(({ item }) => item.name)])
             const matching = buildings.filter(building => item.kind === "upgrade"
                 ? (item.upgradeFrom ? building.itemId === item.upgradeFrom : building.name === item.producer) && !building.upgrade
                 : item.producerBuildingId ? building.buildingId === item.producerBuildingId : building.name === item.producer)
-            const producer = matching.find(building => building.readyAt <= time && building.availableAt <= time && !building.upgrade)
+            const producer = matching.find(building => building.readyAt + economy.orderDelay <= time && building.availableAt <= time && !building.upgrade)
+            const heroTierUnlocked = item.kind !== "hero" || requirementCount(unlockedBuildings,
+                { item: item.producerBuildingId!, count: 1, minLevel: requiredAltarLevel }, time) >= 1
             const builder = requiresConstructionWorker(item) ? simulation.selectBuilder() : undefined
             const state = resourceAt(economy, simulation.deliveries, spending, time)
             const foodUsed =
@@ -88,26 +110,30 @@ export function simulateBuildOrder(
                 baseFoodLimit +
                 completed.filter(({ item }) => item.id === "farm" || item.id === "pigsty").length * foodPerFarm
             const missingRequirement = item.requirements?.find(requirement =>
-                requirementCount(buildings, requirement, time) < requirement.count)
+                requirementCount(unlockedBuildings, requirement, time) < requirement.count)
             const withinLimit = item.kind !== "building" || buildings.filter(building =>
-                building.buildingId === (item.buildingId ?? item.id)).length < buildingLimit(item, buildings, time)
+                building.buildingId === (item.buildingId ?? item.id)).length < buildingLimit(item, unlockedBuildings, time)
             blockedReason = item.kind === "upgrade" && !matching.length
                 ? `Requires an available ${item.producer} to upgrade`
                 : missingRequirement
                     ? `Requires ${missingRequirement.count} × ${namesById.get(missingRequirement.item) ?? missingRequirement.item}${missingRequirement.minLevel ? ` at level ${missingRequirement.minLevel} or higher` : ""}`
-                    : !withinLimit ? `${item.name} limit reached at the current town-hall level`
+                    : !withinLimit ? `${item.name} limit reached at the current ${item.limit?.basedOn === initial.id
+                        ? "town-hall" : namesById.get(item.limit?.basedOn ?? "") ?? "prerequisite"} level`
+                    : !heroTierUnlocked
+                        ? `Requires at least one ${item.producer} at level ${requiredAltarLevel} or higher for hero ${requiredAltarLevel}`
                     : "Waiting for resources, food, producer, or worker"
             if (
                 (!needsProducer || producer) &&
                 (!requiresConstructionWorker(item) || builder) &&
                 item.prerequisites.every((name) => completedNames.has(name)) &&
-                !missingRequirement && withinLimit &&
+                !missingRequirement && withinLimit && heroTierUnlocked &&
                 state.gold >= cost.gold &&
                 state.wood >= cost.wood &&
                 (!isRecruitable(item) || foodUsed + item.food <= foodLimit)
             ) {
                 const startTime = time + (requiresConstructionWorker(item) ? economy.constructionStartDelay : 0)
-                const finishTime = startTime + item.seconds
+                const duration = actionDuration(item, economy)
+                const finishTime = startTime + duration
                 const workerReturnTime = builder ? finishTime + economy.constructionStartDelay : null
                 plan.push({
                     item,
@@ -122,7 +148,7 @@ export function simulateBuildOrder(
                 })
                 spending.push({ time, gold: -cost.gold, wood: -cost.wood })
                 if (builder) {
-                    simulation.construct(builder, item.seconds)
+                    simulation.construct(builder, duration)
                 }
                 if (producer) {
                     producer.availableAt = finishTime
@@ -144,6 +170,7 @@ export function simulateBuildOrder(
                     ...workerCompletions,
                     ...buildings.map(({ availableAt }) => availableAt),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime])),
+                    ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime + economy.orderDelay])),
                 ]
                     // Past events cannot unblock an action.
                     .filter((candidate) => candidate > time),

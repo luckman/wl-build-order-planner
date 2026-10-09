@@ -2,9 +2,22 @@
 
 Implemented on 2026-10-08 for Light Workers and Dark Slaves.
 
-The first build-order command is available at `gameProfile.delays.initialOrderDelay` (default 1.0 seconds). Initial gold miners
+The first build-order command is available at `gameProfile.delays.orderDelay` (default 1.0 seconds). Initial gold miners
 and the first initial wood gatherer receive their gathering orders at game
 start; any additional initial wood gatherers receive theirs at the configured initial order delay.
+
+The UI labels this setting **Order delay**, stored as
+`orderDelay`. Commands also wait this long after a recruitment building
+completes or their building prerequisites (including counted buildings, required
+levels, and capacity increases) become available. The delay runs from completion,
+so it can elapse while resources, workers, or the production queue are unavailable.
+Concurrent unlocks share the same waiting period. Subsequent recruitment from an
+available building starts when the previous recruit finishes, without another delay.
+
+For example, Castle level 2 completing at 01:10 unlocks an Altar command at
+01:11, with construction starting at 01:15 using the default four-second builder
+travel. An Elven Tree completing at 02:10 unlocks Archer recruitment at 02:11
+in an existing available Barracks.
 
 The editable game profile contains `delays.constructionStartDelay`, defaulting to
 4 seconds. It applies to every building and building upgrade, and both directions
@@ -15,15 +28,23 @@ For a command accepted at time `t`:
 
 - Costs are paid and the selected worker stops gathering at `t`.
 - Construction starts at `t + constructionStartDelay`.
-- The building or building upgrade completes after its `seconds` duration from
+- The building or building upgrade completes after its `seconds` duration multiplied by
+  `1 - floor((workerLevel - 1) / 4) / 100`, using the base duration from
   `src/game/data.json`.
 - The worker returns to its resource after another `constructionStartDelay`.
 
-A 30-second Barracks ordered at 0s therefore starts at 4s, completes at 34s,
+At worker level 1–4, a 30-second Barracks ordered at 0s therefore starts at 4s, completes at 34s,
 and releases its worker back to gathering at 38s. The Barracks can train units
-at 34s. The builder cannot gather or accept another construction command
+at 35s with the default one-second order delay. The builder cannot gather or accept another construction command
 before 38s. Multiple buildings can be constructed concurrently when enough
 eligible workers and resources are available.
+
+Player `workerLevel` defaults to 1 and is an integer from 1 to 24. The six tiers
+(1–4, 5–8, 9–12, 13–16, 17–20, 21–24) reduce construction and upgrade
+duration by 0%, 1%, 2%, 3%, 4%, and 5%. Builder travel in both directions,
+order delay, and unit recruitment are unaffected by worker level. For example,
+at level 21 a 30-second Barracks ordered at 0s starts at 4s, completes at
+32.5s, and releases its builder at 36.5s.
 
 ## Automatic worker selection
 

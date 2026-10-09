@@ -1,4 +1,6 @@
-export type EconomySettings = {
+import type { PlayerBuildingLevels } from "./playerLevels"
+
+export type EconomySettings = PlayerBuildingLevels & {
     startingGold: number
     startingWood: number
     workerCount: number
@@ -6,12 +8,13 @@ export type EconomySettings = {
     woodWorkers: number
     goldPerTrip: number
     woodPerTrip: number
+    foodPerFarm: number
     goldTravelTime: number
     goldGatherTime: number
     woodTravelTime: number
     woodGatherTime: number
     constructionStartDelay: number
-    initialOrderDelay: number
+    orderDelay: number
     sawmillWoodTravelTime: number
     initialGoldTravelReduction: number
 }
@@ -137,7 +140,7 @@ export class WorkerEconomy {
     get nextEventTime() {
         return Math.min(
             ...this.workers.map((worker) => worker.nextAt),
-            this.delayedInitialWoodWorkerIds.length ? this.settings.initialOrderDelay : Infinity,
+            this.delayedInitialWoodWorkerIds.length ? this.settings.orderDelay : Infinity,
             ...this.sawmillCompletions.filter(time => time > this.time),
         )
     }
@@ -145,7 +148,7 @@ export class WorkerEconomy {
     advanceTo(time: number) {
         while (this.nextEventTime <= time) {
             this.time = this.nextEventTime
-            if (this.delayedInitialWoodWorkerIds.length && this.time === this.settings.initialOrderDelay) {
+            if (this.delayedInitialWoodWorkerIds.length && this.time === this.settings.orderDelay) {
                 for (const workerId of this.delayedInitialWoodWorkerIds) {
                     const worker = this.workers[workerId]
                     worker.assignment = "wood"

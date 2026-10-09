@@ -10,14 +10,14 @@ The top Import / Export menu offers Export JSON, Import JSON, and the Include ca
 
 - `basic`: `goldGatherTime`, `woodGatherTime`, `initialGoldTravelReduction`.
 - `map`: `goldWorkers`, `woodWorkers`, `goldTravelTime`, `woodTravelTime`, `sawmillWoodTravelTime`.
-- `player`: `startingGold`, `startingWood`, `goldPerTrip`, `woodPerTrip`, `baseFoodLimit`, `foodPerFarm`.
-- `delays`: `constructionStartDelay`, `initialOrderDelay`.
+- `player`: `startingGold`, `startingWood`, `baseFoodLimit`, `townHallLevel`, `sawmillLevel`, `farmLevel`, `barracksLevel`, `industrialBuildingLevel`, `arcaneBuildingLevel`, `workerLevel`.
+- `delays`: `constructionStartDelay`, `orderDelay`.
 
-`goldTravelTime` and `woodTravelTime` each apply to both outbound and return trips (default 4 seconds each way). They replace the separate outbound/return fields. Initial gold travel reduction and Sawmill overrides still apply. Format and game-rules versions remain unchanged.
+`goldTravelTime` and `woodTravelTime` each apply to both outbound and return trips (default 4 seconds each way). They replace the separate outbound/return fields. Initial gold travel reduction and Sawmill overrides still apply. These travel fields retain their existing behavior.
 
-All durations are in seconds. `initialOrderDelay` defaults to 1 and controls the first build-order command and the gathering commands for the second and later initial wood workers. Initial gold workers and the first initial wood gatherer start immediately. `initialGoldTravelReduction` defaults to 1; it shortens only the initial gold workers' opening outbound trip, clamped at zero travel. `sawmillWoodTravelTime` defaults to 0.5 and resets wood travel in both directions when a Sawmill completes. Travel grows by a fixed 0.5 seconds per full minute afterward, capped at 4 seconds; travel underway is unchanged. These growth/cap mechanics remain current game rules rather than profile fields.
+All durations are in seconds. `orderDelay` defaults to 1 and controls the first build-order command and the gathering commands for the second and later initial wood workers. It also delays commands until that many seconds after their recruitment building, prerequisites, and required building capacity become available. These completion delays overlap, can elapse while other work continues, and do not repeat between recruits. Initial gold workers and the first initial wood gatherer start immediately. `initialGoldTravelReduction` defaults to 1; it shortens only the initial gold workers' opening outbound trip, clamped at zero travel. `sawmillWoodTravelTime` defaults to 0.5 and resets wood travel in both directions when a Sawmill completes. Travel grows by a fixed 0.5 seconds per full minute afterward, capped at 4 seconds; travel underway is unchanged. These growth/cap mechanics remain current game rules rather than profile fields.
 
-Total workers and initial food usage are derived from the map's assignments, rather than saved. Game-profile durations are simulation inputs and are always included. This refactor keeps format version 1 and game-rules revision `2026-10-09.1` as requested; files must use the new grouped shape. The previous flat economy shape is not migrated.
+Total workers and initial food usage are derived from the map's assignments, rather than saved. Game-profile durations are simulation inputs and are always included. The current profile uses format version 1 and game-rules revision `2026-10-10.6`; files must use the new grouped shape. The previous flat economy shape is not migrated.
 
 Example profile using the current defaults:
 
@@ -38,19 +38,27 @@ Example profile using the current defaults:
   "player": {
     "startingGold": 150,
     "startingWood": 50,
-    "goldPerTrip": 50,
-    "woodPerTrip": 50,
     "baseFoodLimit": 20,
-    "foodPerFarm": 20
+    "townHallLevel": 1,
+    "sawmillLevel": 1,
+    "farmLevel": 1,
+    "barracksLevel": 1,
+    "industrialBuildingLevel": 1,
+    "arcaneBuildingLevel": 1,
+    "workerLevel": 1
   },
   "delays": {
     "constructionStartDelay": 4,
-    "initialOrderDelay": 1
+    "orderDelay": 1
   }
 }
 ```
 
-Resource collection appears below the timeline. The UI shows only player fields initially, without a group heading. Advanced reveals map and delays fields, also without group headings; Hide advanced collapses them while retaining values. Basic fields have no UI controls, but are preserved through JSON import/export and used by simulation. Starting wood defaults to 50.
+All seven player levels default to 1 and must be integers from 1 to 24. Every four-level tier (1–4, 5–8, 9–12, 13–16, 17–20, 21–24) increases town-hall gold and Sawmill wood yields through 50/51/52/53/54/55, and Farm/Pigsty food through 20/21/22/23/24/25. Town halls, Barracks, industrial buildings, and arcane buildings reduce recruitment duration by 1%/2%/3%/4%/5%/6%. Worker level reduces construction and building-upgrade duration by 0%/1%/2%/3%/4%/5% across the same tiers, without changing builder travel; unrelated producers receive no bonus. Player progression is independent of in-match building upgrades.
+
+Gold/wood yields and food per Farm/Pigsty are derived runtime values, omitted from exported profiles. Imports require all seven levels; older profiles missing workerLevel or containing only direct yields must be updated. Obsolete yield fields are ignored when valid level fields are present. Factory/Workshop and Sanctuary/Dark Gate production mappings are ready for future catalog entries; their game stats remain unimplemented.
+
+Resource collection appears below the timeline. The UI shows only player fields initially, without a group heading, plus a read-only summary of derived gold/wood yields and Farm/Pigsty food. Action cards display effective recruitment, construction, and upgrade durations after applying the corresponding player bonus. Level labels and the derived food summary use the selected faction’s building names; persisted level field names stay faction-neutral. Advanced reveals map and delays fields, also without group headings; Hide advanced collapses them while retaining values. Basic fields have no UI controls, but are preserved through JSON import/export and used by simulation. Starting wood defaults to 50.
 
 `buildOrder` is an array of `{ "itemId": "worker" }` entries. Item IDs are resolved within the selected faction's current catalog. Unknown IDs reject the entire import; valid but unexecutable actions import unchanged and appear blocked. Import does not insert missing prerequisites or deduplicate actions.
 

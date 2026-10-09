@@ -15,6 +15,7 @@ import {
 } from "./game/gameData"
 import { resourceAt, workerAllocationAt } from "./game/resourceSimulation"
 import { economyFromProfile, initialGameProfile, type GameProfile } from "./game/gameProfile"
+import { actionDuration } from "./game/playerLevels"
 import "./index.css"
 import "./timeline.css"
 import "./parallel-timeline.css"
@@ -131,7 +132,8 @@ export default function App() {
     const [dependencyError, setDependencyError] = useState<string | null>(null)
     const [gameProfile, setGameProfile] = useState<GameProfile>(initialGameProfile)
     const economy = useMemo(() => economyFromProfile(gameProfile), [gameProfile])
-    const { baseFoodLimit, foodPerFarm } = gameProfile.player
+    const { baseFoodLimit } = gameProfile.player
+    const { foodPerFarm } = economy
     const faction = factions[factionId]
     const initialWorkerCount = economy.goldWorkers + economy.woodWorkers
     const initialFoodUsed = initialWorkerCount * 2
@@ -315,7 +317,7 @@ export default function App() {
                                                         <img src={iconSources[item.icon]} alt="" />
                                                         <span>{item.name}</span>
                                                         <small>
-                                                            {cost.gold} gold · {cost.wood} wood{isRecruitable(item) ? ` · ${item.food} food` : ""} · {item.seconds}s
+                                                            {cost.gold} gold · {cost.wood} wood{isRecruitable(item) ? ` · ${item.food} food` : ""} · {Number(actionDuration(item, economy).toFixed(2))}s
                                                         </small>
                                                     </button>
                                                 )
@@ -443,7 +445,7 @@ export default function App() {
                                 <h2>Resource collection</h2>
                                 <span>Editable game profile</span>
                             </div>
-                            <GameProfileEditor profile={gameProfile} onChange={setGameProfile}>
+                            <GameProfileEditor faction={factionId} profile={gameProfile} onChange={setGameProfile}>
                             <div className="economy-grid">
                                 <div className="worker-state">
                                     <b>{initialWorkerCount}</b>
@@ -460,7 +462,7 @@ export default function App() {
                                 Builders stop gathering during travel, construction, and return. The construction delay
                                 applies to travel in each direction.
                                 The first build-order command and the second and later initial wood gathering commands
-                                become available at {economy.initialOrderDelay} seconds. The first initial wood gatherer starts immediately.
+                                become available at {economy.orderDelay} seconds. The same delay applies after a recruitment building or prerequisites complete, before their first eligible command. Subsequent recruitment uses the normal queue. The first initial wood gatherer starts immediately.
                             </p>
                             </GameProfileEditor>
                         </section>

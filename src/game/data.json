@@ -203,7 +203,11 @@
           "seconds": 30,
           "produces": [
             "swordsman",
-            "archer"
+            "archer",
+            "warsmith",
+            "knight",
+            "guardsman",
+            "sniper"
           ],
           "icon": "lightBarracks",
           "requires": [
@@ -212,7 +216,350 @@
               "count": 1,
               "minLevel": 1
             }
+          ],
+          "upgrades": [
+            "barracks-lvl-2"
           ]
+        },
+        {
+          "id": "barracks-lvl-2",
+          "name": "Barracks lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 50,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 35,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "lightBarracks"
+        },
+        {
+          "id": "factory",
+          "name": "Factory",
+          "kind": "building",
+          "type": "Production",
+          "cost": {
+            "gold": 250,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 40,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "produces": [
+            "copter",
+            "ballista",
+            "biker"
+          ],
+          "icon": "lightFactory",
+          "upgrades": [
+            "factory-lvl-2"
+          ]
+        },
+        {
+          "id": "factory-lvl-2",
+          "name": "Factory lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 100,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 45,
+          "requires": [
+            {
+              "item": "factory",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "lightFactory"
+        },
+        {
+          "id": "sanctuary",
+          "name": "Sanctuary",
+          "kind": "building",
+          "type": "Production",
+          "cost": {
+            "gold": 300,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 35,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "produces": [
+            "healer",
+            "fox-rider",
+            "wind-mage"
+          ],
+          "icon": "lightSanctuary",
+          "upgrades": [
+            "sanctuary-lvl-2"
+          ]
+        },
+        {
+          "id": "sanctuary-lvl-2",
+          "name": "Sanctuary lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 150,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 40,
+          "requires": [
+            {
+              "item": "sanctuary",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "lightSanctuary"
+        },
+        {
+          "id": "shipyard",
+          "name": "Shipyard",
+          "kind": "building",
+          "type": "Production",
+          "cost": {
+            "gold": 150,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 35,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "lightShipyard",
+          "upgrades": [
+            "shipyard-lvl-2"
+          ],
+          "produces": [
+            "sloop",
+            "caravel"
+          ]
+        },
+        {
+          "id": "shipyard-lvl-2",
+          "name": "Shipyard lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 50,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 40,
+          "requires": [
+            {
+              "item": "shipyard",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "lightShipyard"
+        },
+        {
+          "id": "dwarven-forge",
+          "name": "Dwarven Forge",
+          "kind": "building",
+          "type": "Racial",
+          "cost": {
+            "gold": 250,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightDwarvenForge",
+          "upgrades": [
+            "dwarven-forge-lvl-2"
+          ]
+        },
+        {
+          "id": "dwarven-forge-lvl-2",
+          "name": "Dwarven Forge lvl 2",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 300,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 65,
+          "requires": [
+            {
+              "item": "dwarven-forge",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "lightDwarvenForge",
+          "upgrades": [
+            "dwarven-forge-lvl-3"
+          ]
+        },
+        {
+          "id": "dwarven-forge-lvl-3",
+          "name": "Dwarven Forge lvl 3",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 350,
+            "wood": 250,
+            "food": 0
+          },
+          "seconds": 80,
+          "requires": [
+            {
+              "item": "dwarven-forge",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 4
+            }
+          ],
+          "icon": "lightDwarvenForge"
+        },
+        {
+          "id": "human-monument",
+          "name": "Human Monument",
+          "kind": "building",
+          "type": "Racial",
+          "cost": {
+            "gold": 300,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "lightHumanMonument",
+          "upgrades": [
+            "human-monument-lvl-2"
+          ]
+        },
+        {
+          "id": "human-monument-lvl-2",
+          "name": "Human Monument lvl 2",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 350,
+            "wood": 250,
+            "food": 0
+          },
+          "seconds": 65,
+          "requires": [
+            {
+              "item": "human-monument",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "lightHumanMonument",
+          "upgrades": [
+            "human-monument-lvl-3"
+          ]
+        },
+        {
+          "id": "human-monument-lvl-3",
+          "name": "Human Monument lvl 3",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 400,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 80,
+          "requires": [
+            {
+              "item": "human-monument",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 4
+            }
+          ],
+          "icon": "lightHumanMonument"
         },
         {
           "id": "tower-of-mana",
@@ -269,6 +616,62 @@
               "minLevel": 2
             }
           ],
+          "icon": "lightElvenTree",
+          "upgrades": [
+            "elven-tree-lvl-2"
+          ]
+        },
+        {
+          "id": "elven-tree-lvl-2",
+          "name": "Elven Tree lvl 2",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 250,
+            "wood": 350,
+            "food": 0
+          },
+          "seconds": 65,
+          "requires": [
+            {
+              "item": "elven-tree",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "lightElvenTree",
+          "upgrades": [
+            "elven-tree-lvl-3"
+          ]
+        },
+        {
+          "id": "elven-tree-lvl-3",
+          "name": "Elven Tree lvl 3",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 300,
+            "wood": 400,
+            "food": 0
+          },
+          "seconds": 80,
+          "requires": [
+            {
+              "item": "elven-tree",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 4
+            }
+          ],
           "icon": "lightElvenTree"
         },
         {
@@ -291,8 +694,177 @@
           ],
           "icon": "lightAltarOfHeroes",
           "produces": [
-            "miriel"
+            "miriel",
+            "gilbert",
+            "berin"
+          ],
+          "upgrades": [
+            "altar-of-heroes-lvl-2"
           ]
+        },
+        {
+          "id": "altar-of-heroes-lvl-2",
+          "name": "Altar of Heroes lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 200,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 65,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "lightAltarOfHeroes",
+          "upgrades": [
+            "altar-of-heroes-lvl-3"
+          ]
+        },
+        {
+          "id": "altar-of-heroes-lvl-3",
+          "name": "Altar of Heroes lvl 3",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 250,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 80,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 4
+            }
+          ],
+          "icon": "lightAltarOfHeroes"
+        },
+        {
+          "id": "tower-of-light-magic",
+          "name": "Tower of Light Magic",
+          "kind": "building",
+          "type": "Defensive",
+          "cost": {
+            "gold": 250,
+            "wood": 350,
+            "food": 0
+          },
+          "seconds": 30,
+          "requires": [
+            {
+              "item": "elven-tree",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightTowerOfLightMagic",
+          "limit": {
+            "basedOn": "elven-tree",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
+              }
+            ]
+          }
+        },
+        {
+          "id": "crossbow-tower",
+          "name": "Crossbow Tower",
+          "kind": "building",
+          "type": "Defensive",
+          "cost": {
+            "gold": 150,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 25,
+          "requires": [
+            {
+              "item": "human-monument",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightCrossbowTower",
+          "limit": {
+            "basedOn": "human-monument",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
+              }
+            ]
+          }
+        },
+        {
+          "id": "artillery-tower",
+          "name": "Artillery Tower",
+          "kind": "building",
+          "type": "Defensive",
+          "cost": {
+            "gold": 200,
+            "wood": 400,
+            "food": 0
+          },
+          "seconds": 35,
+          "requires": [
+            {
+              "item": "dwarven-forge",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightArtilleryTower",
+          "limit": {
+            "basedOn": "dwarven-forge",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
+              }
+            ]
+          }
         },
         {
           "id": "worker",
@@ -349,6 +921,279 @@
           "icon": "lightArcher"
         },
         {
+          "id": "warsmith",
+          "name": "Warsmith",
+          "kind": "unit",
+          "cost": {
+            "gold": 175,
+            "wood": 175,
+            "food": 4
+          },
+          "seconds": 33,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "dwarven-forge",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightWarsmith"
+        },
+        {
+          "id": "knight",
+          "name": "Knight",
+          "kind": "unit",
+          "cost": {
+            "gold": 275,
+            "wood": 100,
+            "food": 6
+          },
+          "seconds": 42,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "human-monument",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightKnight"
+        },
+        {
+          "id": "copter",
+          "name": "Copter",
+          "kind": "unit",
+          "cost": {
+            "gold": 225,
+            "wood": 225,
+            "food": 5
+          },
+          "seconds": 27,
+          "requires": [
+            {
+              "item": "factory",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightCopter"
+        },
+        {
+          "id": "healer",
+          "name": "Healer",
+          "kind": "unit",
+          "cost": {
+            "gold": 175,
+            "wood": 100,
+            "food": 3
+          },
+          "seconds": 27,
+          "requires": [
+            {
+              "item": "sanctuary",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightHealer"
+        },
+        {
+          "id": "guardsman",
+          "name": "Guardsman",
+          "kind": "unit",
+          "cost": {
+            "gold": 225,
+            "wood": 150,
+            "food": 5
+          },
+          "seconds": 24,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "human-monument",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightGuardsman"
+        },
+        {
+          "id": "ballista",
+          "name": "Ballista",
+          "kind": "unit",
+          "cost": {
+            "gold": 250,
+            "wood": 175,
+            "food": 6
+          },
+          "seconds": 36,
+          "requires": [
+            {
+              "item": "factory",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "human-monument",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "lightBallista"
+        },
+        {
+          "id": "fox-rider",
+          "name": "Fox Rider",
+          "kind": "unit",
+          "cost": {
+            "gold": 350,
+            "wood": 225,
+            "food": 6
+          },
+          "seconds": 39,
+          "requires": [
+            {
+              "item": "sanctuary",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "elven-tree",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightFoxRider"
+        },
+        {
+          "id": "wind-mage",
+          "name": "Wind Mage",
+          "kind": "unit",
+          "cost": {
+            "gold": 450,
+            "wood": 150,
+            "food": 7
+          },
+          "seconds": 42,
+          "requires": [
+            {
+              "item": "sanctuary",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "elven-tree",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "lightWindMage"
+        },
+        {
+          "id": "biker",
+          "name": "Biker",
+          "kind": "unit",
+          "cost": {
+            "gold": 325,
+            "wood": 275,
+            "food": 7
+          },
+          "seconds": 39,
+          "requires": [
+            {
+              "item": "factory",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "dwarven-forge",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightBiker"
+        },
+        {
+          "id": "sniper",
+          "name": "Sniper",
+          "kind": "unit",
+          "cost": {
+            "gold": 275,
+            "wood": 350,
+            "food": 7
+          },
+          "seconds": 42,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "dwarven-forge",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "lightSniper"
+        },
+        {
+          "id": "sloop",
+          "name": "Sloop",
+          "kind": "unit",
+          "cost": {
+            "gold": 200,
+            "wood": 400,
+            "food": 4
+          },
+          "seconds": 42,
+          "requires": [
+            {
+              "item": "shipyard",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightSloop"
+        },
+        {
+          "id": "caravel",
+          "name": "Caravel",
+          "kind": "unit",
+          "cost": {
+            "gold": 400,
+            "wood": 650,
+            "food": 8
+          },
+          "seconds": 51,
+          "requires": [
+            {
+              "item": "shipyard",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "elven-tree",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightCaravel"
+        },
+        {
           "id": "miriel",
           "name": "Miriel",
           "kind": "hero",
@@ -363,9 +1208,64 @@
             {
               "item": "altar-of-heroes",
               "count": 1
+            },
+            {
+              "item": "elven-tree",
+              "count": 1,
+              "minLevel": 1
             }
           ],
           "icon": "lightMiriel"
+        },
+        {
+          "id": "gilbert",
+          "name": "Gilbert",
+          "kind": "hero",
+          "cost": {
+            "gold": 500,
+            "wood": 500,
+            "food": 8
+          },
+          "seconds": 45,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "human-monument",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightGilbert",
+          "maxCount": 1
+        },
+        {
+          "id": "berin",
+          "name": "Berin",
+          "kind": "hero",
+          "cost": {
+            "gold": 500,
+            "wood": 700,
+            "food": 9
+          },
+          "seconds": 45,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "dwarven-forge",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "lightBerin",
+          "maxCount": 1
         }
       ]
     },

@@ -2,10 +2,11 @@ import { factions, type FactionId, type PlannerItem } from "./gameData"
 import { type GameProfile } from "./gameProfile"
 export type { GameProfile } from "./gameProfile"
 import { type ScheduledAction } from "./buildSimulation"
+import { playerLevelFields, playerLevelTier } from "./playerLevels"
 
 export const FILE_VERSION = 1
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-09.1"
+export const GAME_RULES_VERSION = "2026-10-10.6"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -58,8 +59,8 @@ export function parseBuildOrder(text: string): {
     const fields: { [Block in keyof GameProfile]: Array<keyof GameProfile[Block]> } = {
         basic: ["goldGatherTime", "woodGatherTime", "initialGoldTravelReduction"],
         map: ["goldTravelTime", "woodTravelTime", "sawmillWoodTravelTime", "goldWorkers", "woodWorkers"],
-        player: ["startingGold", "startingWood", "goldPerTrip", "woodPerTrip", "baseFoodLimit", "foodPerFarm"],
-        delays: ["constructionStartDelay", "initialOrderDelay"],
+        player: ["startingGold", "startingWood", "baseFoodLimit", ...playerLevelFields],
+        delays: ["constructionStartDelay", "orderDelay"],
     }
     const parsed: Record<string, Record<string, number>> = {}
     for (const block of Object.keys(fields) as Array<keyof GameProfile>) {
@@ -68,6 +69,11 @@ export function parseBuildOrder(text: string): {
         for (const key of fields[block]) {
             parsed[block][key] = number(raw[key], `gameProfile.${block}.${key}`,
                 key === "goldGatherTime" || key === "woodGatherTime", key === "goldWorkers" || key === "woodWorkers")
+            if (block === "player" && playerLevelFields.some(field => field === key)) {
+                try { playerLevelTier(parsed[block][key]) } catch {
+                    throw new Error(`gameProfile.player.${key} must be an integer from 1 to 24.`)
+                }
+            }
         }
     }
     const gameProfile = parsed as unknown as GameProfile

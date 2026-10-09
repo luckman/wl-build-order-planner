@@ -1,3 +1,4 @@
+import { initialPlayerLevels } from "./game/playerLevels"
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import App from "./App"
 import { GAME_RULES_VERSION } from "./game/buildOrderFile"
@@ -10,7 +11,7 @@ import { economyFromProfile } from "./game/gameProfile"
 afterEach(() => window.history.replaceState(null, "", window.location.pathname))
 
 test("opening a shared link restores the plan and recalculates it; invalid hash changes keep it intact", () => {
-    const profile = { ...initialGameProfile, delays: { ...initialGameProfile.delays, initialOrderDelay: 2.5 } }
+    const profile = { ...initialGameProfile, delays: { ...initialGameProfile.delays, orderDelay: 2.5 } }
     const slave = factions.dark.items.find(item => item.id === "slave")!
     const plan = simulateBuildOrder([slave], economyFromProfile(profile), 10, 20, 20, "Citadel").plan
     const url = createShareableLink(window.location.href, "dark", profile, plan)
@@ -64,8 +65,8 @@ function documentText() {
         gameProfile: {
             basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1 },
             map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5, goldWorkers: 2, woodWorkers: 1 },
-            player: { startingGold: 2000, startingWood: 2000, goldPerTrip: 40, woodPerTrip: 30, baseFoodLimit: 30, foodPerFarm: 25 },
-            delays: { constructionStartDelay: 2, initialOrderDelay: 1 },
+            player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 30, ...initialPlayerLevels, townHallLevel: 9, farmLevel: 21 },
+            delays: { constructionStartDelay: 2, orderDelay: 1 },
         },
         buildOrder: [
             { itemId: "barracks", timings: { commandTime: 9999 } },
@@ -84,7 +85,7 @@ test("import replaces faction, profile and order, recalculates timings and prese
     const { container } = render(<App />)
     fireEvent.click(screen.getByText("Import / Export"))
     const doc = documentText()
-    doc.gameProfile.delays.initialOrderDelay = 2.5
+    doc.gameProfile.delays.orderDelay = 2.5
     doc.gameProfile.map.sawmillWoodTravelTime = 1.25
     doc.gameProfile.basic.initialGoldTravelReduction = 2
     doc.gameRulesVersion = "older-rules"
@@ -97,7 +98,7 @@ test("import replaces faction, profile and order, recalculates timings and prese
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
     expect((screen.getByLabelText("Base food limit") as HTMLInputElement).value).toBe("30")
     expect((screen.getByLabelText("Construction start delay (seconds)") as HTMLInputElement).value).toBe("2")
-    expect((screen.getByLabelText("Initial order delay (seconds)") as HTMLInputElement).value).toBe("2.5")
+    expect((screen.getByLabelText("Order delay (seconds)") as HTMLInputElement).value).toBe("2.5")
     expect((screen.getByLabelText("Sawmill wood travel time (seconds)") as HTMLInputElement).value).toBe("1.25")
     expect(screen.queryByLabelText("Initial gold travel reduction (seconds)")).toBeNull()
     const order = within(container.querySelector(".order") as HTMLElement)
@@ -128,7 +129,7 @@ test("export downloads JSON without timings by default and includes timings when
         upload(JSON.stringify(doc))
         await waitFor(() => expect(screen.getByRole("status")).toBeTruthy())
         fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
-        fireEvent.change(screen.getByLabelText("Initial order delay (seconds)"), { target: { value: "3.5" } })
+        fireEvent.change(screen.getByLabelText("Order delay (seconds)"), { target: { value: "3.5" } })
         fireEvent.change(screen.getByLabelText("Sawmill wood travel time (seconds)"), { target: { value: "1.25" } })
         fireEvent.change(screen.getByLabelText("Gold travel time (seconds each way)"), { target: { value: "2.5" } })
         fireEvent.change(screen.getByLabelText("Wood travel time (seconds each way)"), { target: { value: "1.5" } })
@@ -142,9 +143,10 @@ test("export downloads JSON without timings by default and includes timings when
         })
         const plain = JSON.parse(await readBlob(blobs[0]))
         expect(plain.faction).toBe("dark")
-        expect(plain.gameProfile.player.goldPerTrip).toBe(40)
+        expect(plain.gameProfile.player.townHallLevel).toBe(9)
+        expect(plain.gameProfile.player.goldPerTrip).toBeUndefined()
         expect(Object.keys(plain.gameProfile)).toEqual(["basic", "map", "player", "delays"])
-        expect(plain.gameProfile.delays.initialOrderDelay).toBe(3.5)
+        expect(plain.gameProfile.delays.orderDelay).toBe(3.5)
         expect(plain.gameProfile.map.sawmillWoodTravelTime).toBe(1.25)
         expect(plain.gameProfile.map.goldTravelTime).toBe(2.5)
         expect(plain.gameProfile.map.woodTravelTime).toBe(1.5)

@@ -1,28 +1,45 @@
 import type { GameProfile } from "./game/gameProfile"
 import { useState, type ReactNode } from "react"
+import { playerLevelFields, yieldsFromLevels } from "./game/playerLevels"
+import type { FactionId } from "./game/gameData"
 
-export default function GameProfileEditor({ profile, onChange, children }: {
-    profile: GameProfile; onChange: (profile: GameProfile) => void; children?: ReactNode
+const buildingNames = {
+    light: { townHall: "Castle", farm: "Farm", industrial: "Factory", arcane: "Sanctuary" },
+    dark: { townHall: "Citadel", farm: "Pigsty", industrial: "Workshop", arcane: "Dark Gate" },
+}
+
+export default function GameProfileEditor({ faction, profile, onChange, children }: {
+    faction: FactionId; profile: GameProfile; onChange: (profile: GameProfile) => void; children?: ReactNode
 }) {
     const [advanced, setAdvanced] = useState(false)
-    function field<Block extends keyof GameProfile>(block: Block, key: keyof GameProfile[Block], label: string, min = 0, step = 1) {
-        return <label key={String(key)}>{label}<input type="number" min={min} step={step} value={profile[block][key] as number}
+    const yields = yieldsFromLevels(profile.player)
+    const names = buildingNames[faction]
+    function field<Block extends keyof GameProfile>(block: Block, key: keyof GameProfile[Block], label: string, min = 0, step = 1, max?: number) {
+        const isLevel = playerLevelFields.some(level => level === key)
+        return <label key={String(key)}>{label}<input type="number" min={min} max={max} step={step} value={profile[block][key] as number}
             onChange={event => {
                 const value = event.target.valueAsNumber
                 if (!Number.isFinite(value)) return
-                const normalized = key === "goldWorkers" || key === "woodWorkers" ? Math.floor(value) : value
-                onChange({ ...profile, [block]: { ...profile[block], [key]: Math.max(min, normalized) } })
+                const normalized = isLevel || key === "goldWorkers" || key === "woodWorkers" ? Math.floor(value) : value
+                onChange({ ...profile, [block]: { ...profile[block], [key]: Math.min(max ?? Infinity, Math.max(min, normalized)) } })
             }} /></label>
     }
     return <div className="profile-blocks">
         <div className="economy-grid">
             {field("player", "startingGold", "Starting gold")}
             {field("player", "startingWood", "Starting wood")}
-            {field("player", "goldPerTrip", "Gold per trip")}
-            {field("player", "woodPerTrip", "Wood per trip")}
             {field("player", "baseFoodLimit", "Base food limit")}
-            {field("player", "foodPerFarm", "Food per Farm / Pigsty")}
+            {field("player", "townHallLevel", `${names.townHall} level`, 1, 1, 24)}
+            {field("player", "sawmillLevel", "Sawmill level", 1, 1, 24)}
+            {field("player", "farmLevel", `${names.farm} level`, 1, 1, 24)}
+            {field("player", "barracksLevel", "Barracks level", 1, 1, 24)}
+            {field("player", "industrialBuildingLevel", `${names.industrial} level`, 1, 1, 24)}
+            {field("player", "arcaneBuildingLevel", `${names.arcane} level`, 1, 1, 24)}
+            {field("player", "workerLevel", `${faction === "light" ? "Worker" : "Slave"} level`, 1, 1, 24)}
         </div>
+        <p className="initial-allocation">
+            Gold per trip: {yields.goldPerTrip} · Wood per trip: {yields.woodPerTrip} · Food per {names.farm}: {yields.foodPerFarm}
+        </p>
         {!advanced && <p className="initial-allocation">
             Initial gold miners: {profile.map.goldWorkers} · Initial wood gatherers: {profile.map.woodWorkers}
         </p>}
@@ -38,7 +55,7 @@ export default function GameProfileEditor({ profile, onChange, children }: {
         </div>
         <div className="economy-grid">
             {field("delays", "constructionStartDelay", "Construction start delay (seconds)", 0, 0.1)}
-            {field("delays", "initialOrderDelay", "Initial order delay (seconds)", 0, 0.1)}
+            {field("delays", "orderDelay", "Order delay (seconds)", 0, 0.1)}
         </div>
         {children}
         </div>}

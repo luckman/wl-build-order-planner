@@ -7,6 +7,10 @@ export function isRecruitable(item: { kind: ItemKind }) {
     return item.kind === "unit" || item.kind === "hero"
 }
 export type BuildingType = "Economic" | "Production" | "Racial" | "Defensive"
+/** Queued heroes reserve the next recruitment tier across all Altars. */
+export function heroAltarLevel(previousItems: PlannerItem[]) {
+    return 1 + previousItems.filter(item => item.kind === "hero").length
+}
 export type ItemRequirement = { item: string; count: number; minLevel?: number }
 export type BuildingLimit = {
     basedOn: string
@@ -277,6 +281,9 @@ export function buildOrderWithDependencies(
             add(source)
         }
         for (const requirement of item.requirements ?? []) ensureRequirement(requirement)
+        if (item.kind === "hero") {
+            ensureRequirement({ item: item.producerBuildingId!, count: 1, minLevel: heroAltarLevel(result) })
+        }
         if (item.kind === "building" && item.limit) {
             const count = buildings.filter(building => building.buildingId === (item.buildingId ?? item.id)).length
             if (count >= buildingLimit(item, buildings)) {

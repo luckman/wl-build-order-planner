@@ -16,7 +16,7 @@ test.each<FactionId>(["light", "dark"])("%s links preserve duplicate actions and
         ...initialGameProfile,
         basic: { ...initialGameProfile.basic, initialGoldTravelReduction: 2.5 },
         player: { ...initialGameProfile.player, startingGold: 2000, startingWood: 2000 },
-        delays: { ...initialGameProfile.delays, initialOrderDelay: 2.5 },
+        delays: { ...initialGameProfile.delays, orderDelay: 2.5 },
     }
     const worker = factions[faction].items.find(item => item.id === (faction === "light" ? "worker" : "slave"))!
     const plan = simulateBuildOrder([worker, worker], economyFromProfile(profile), 10, 20, 20, factions[faction].startingTownHall).plan

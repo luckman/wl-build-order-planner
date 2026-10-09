@@ -89,7 +89,7 @@ Example conceptual model:
 goldPerTrip = castleLevelTable[castleLevel]
 ```
 
-The exact Castle-level table should be stored as game data.
+The confirmed player-level tiers are implemented in `src/game/playerLevels.ts`; player progression is distinct from in-match Castle/Citadel upgrades.
 
 ### Gold Mining Time
 
@@ -420,7 +420,7 @@ at any point in time.
 
 ## 6. Castle Level
 
-Castle level is a player-profile parameter.
+Castle/Citadel player level is stored as `gameProfile.player.townHallLevel` (integer 1–24, default 1).
 
 It affects the amount of gold obtained per completed mining trip.
 
@@ -443,20 +443,20 @@ Example data structure:
   "castle": {
     "goldPerTripByLevel": {
       "1": 50,
-      "2": 51,
-      "3": 52
+      "5": 51,
+      "9": 52
     }
   }
 }
 ```
 
-The exact values should be populated manually from the game.
+Confirmed yields increase every four levels: gold/wood 50/51/52/53/54/55 and Farm/Pigsty food 20/21/22/23/24/25.
 
 ---
 
 ## 7. Sawmill Level
 
-Sawmill level is another player-profile parameter.
+Sawmill player level is stored as `gameProfile.player.sawmillLevel` (integer 1–24, default 1).
 
 It affects the amount of wood obtained per completed gathering trip.
 
@@ -485,10 +485,10 @@ Worker level affects construction and building-upgrade time.
 Known behavior:
 
 ```text
-Worker level → approximately 1% to 5% construction-time reduction
+Worker level 1/5/9/13/17/21 → 0%/1%/2%/3%/4%/5% construction-time reduction
 ```
 
-The exact level-to-bonus mapping should be stored as data.
+The confirmed `gameProfile.player.workerLevel` mapping is implemented in `src/game/playerLevels.ts`. The default is 1, maximum 24. It affects construction and building upgrades but leaves worker travel and unit production bonuses unchanged.
 
 For a base construction time:
 
@@ -497,13 +497,13 @@ effectiveConstructionTime =
     baseConstructionTime * (1 - workerConstructionBonus)
 ```
 
-The planner should not assume the exact formula until it is confirmed from the game data.
+The planner uses this duration-reduction formula, matching the existing production-bonus convention.
 
 ---
 
 ## 9. Production Building Level
 
-Production-building level reduces unit training time.
+Player production levels reduce unit training time by 1%/2%/3%/4%/5%/6% at levels 1/5/9/13/17/21 (maximum 24). The fields are `townHallLevel` for Workers/Slaves, `barracksLevel` for Barracks, `industrialBuildingLevel` for Factory/Workshop, and `arcaneBuildingLevel` for Sanctuary/Dark Gate. All default to 1; there is no zero-bonus tier. Production levels do not affect construction or building upgrades; those durations use workerLevel. Other producers, including Altar of Heroes, retain base recruitment times.
 
 For example:
 
@@ -835,33 +835,21 @@ The exact implementation can differ, but the simulator should preserve the disti
 
 A build should be evaluated against a player profile.
 
-Example:
+Example player block (see `BUILD_ORDER_FILES.md` for the complete persisted profile):
 
 ```json
 {
-  "castleLevel": 8,
-  "sawmillLevel": 6,
-  "workerLevel": 4,
-  "productionBuildingLevels": {
-    "barracks": 5,
-    "stable": 3
-  },
-  "workerEquipment": {
-    "goldMiningTimeMultiplier": 0.98,
-    "woodGatherTimeMultiplier": 0.96
-  },
-  "travelTimes": {
-    "goldOutbound": 4.0,
-    "goldReturn": 4.0,
-    "woodOutbound": 4.0,
-    "woodReturn": 4.0,
-    "nearbySawmillReturn": 0.5
-  },
-  "baseFoodCapacity": 20,
-  "farmFoodBonus": 20,
-  "initialResources": {
-    "gold": 100,
-    "wood": 100
+  "player": {
+    "startingGold": 150,
+    "startingWood": 50,
+    "baseFoodLimit": 20,
+    "townHallLevel": 8,
+    "sawmillLevel": 6,
+    "farmLevel": 1,
+    "barracksLevel": 5,
+    "industrialBuildingLevel": 1,
+    "arcaneBuildingLevel": 1,
+    "workerLevel": 1
   }
 }
 ```
