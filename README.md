@@ -10,7 +10,7 @@ A React starter for planning War Legends mobile RTS build orders. It was bootstr
 - Dark faction: Citadel, Citadel lvl 2, Sawmill, Pigsty, Barracks, Slave, and Goon.
 - Castle/Citadel levels 3–4 and Tower of Mana are available for both factions. The planner enforces quantity and minimum-level prerequisites, per-building upgrade ownership, and highest-town-hall-level limits for Farm/Pigsty, Sawmill, and Tower of Mana. See `docs/CATALOG_DEPENDENCIES.md`.
 - A trip-based gold and wood simulator: gold workers queue for one mine slot, while wood workers gather independently.
-- Each completed Sawmill resets wood travel to 0.5 seconds each way. Travel increases by 0.5 seconds per full minute since the latest completion, capped at 4 seconds after 7 minutes. Travel already in progress finishes at its original duration; chopping time and gold travel are unchanged.
+- Each completed Sawmill resets wood travel each way to the map profile's `sawmillWoodTravelTime` (default 0.5 seconds). Travel increases by 0.5 seconds per full minute since the latest completion, capped at 4 seconds. Travel already in progress finishes at its original duration; chopping time and gold travel are unchanged.
 - Editable starting gold/wood, worker allocation, and per-trip yield inputs, with a resource timeline that delays orders until deliveries cover their costs.
 - Starting gold defaults to 150 and remains editable in the Resource collection panel.
 - A shared, horizontally scrollable 90-second timeline viewport with resource graphs, one timestamp ruler, and non-overlapping parallel production/construction rows.
@@ -20,7 +20,14 @@ A React starter for planning War Legends mobile RTS build orders. It was bootstr
 - The Build order panel includes a latest-command state snapshot: timestamp, resources, food, total workers, and the gold/wood/busy-or-idle worker allocation.
 - Resource hover in 0.1-second increments, with a shared time marker and a tooltip showing gold, wood, and food used/limit together.
 - Initial assignments default to 4 gold miners and 1 wood gatherer; total starting workers and food usage are calculated from these assignments (2 food per worker).
-- The first build-order command is available at 1.0 seconds. Initial gold miners and the first wood gatherer start gathering immediately; additional initial wood gatherers receive their gathering commands at 1.0 seconds.
+- Resource collection sits below the timeline and shows starting resources, yields, and food settings by default. Advanced reveals worker allocation, travel, and delay inputs; Hide advanced collapses them without losing edits. Group names and Basic controls are not displayed. JSON import/export still preserves all four profile groups, including Basic.
+- Starting wood defaults to 50 and remains editable.
+- Export JSON opens the native Save As picker for folder and filename selection in supporting browsers (HTTPS or localhost). Unsupported browsers use their normal download flow; no custom filename dialog is shown.
+- Import / Export closes after a successful operation. Import messages, including rules-version warnings, remain visible in a dismissible notice; errors keep the menu open.
+- Save shareable link copies a compressed URL containing the full profile and exact action order, without calculated timings. Opening the link restores the plan and recalculates with current rules; rules mismatches warn as with JSON import. If clipboard access is unavailable, copy the displayed link manually. Oversized links suggest JSON export instead.
+- The collapsed Resource collection panel shows current initial gold/wood worker counts (default 4 miners and 1 gatherer); edit these assignments under Advanced.
+- Advanced uses one `goldTravelTime` and one `woodTravelTime` (default 4 seconds each), with each value applied to both outbound and return travel. Initial gold-trip reduction and Sawmill wood-travel rules still apply.
+- The delays profile's `initialOrderDelay` controls the first build-order command and additional initial wood gatherers' commands (default 1.0 seconds). Initial gold miners and the first wood gatherer start immediately. The basic profile's `initialGoldTravelReduction` shortens initial miners' opening outbound trip (default 1 second), clamped at zero travel; later trips and newly trained miners use full configured travel.
 - Newly trained Workers/Slaves automatically join gold up to calculated mine saturation, then gather wood.
 - Construction start delay is editable in the game profile (default 4 seconds), and is also used for the builder's return trip. Buildings and building upgrades reserve a builder for both trips and their construction time.
 - Builders are selected automatically: idle workers, then wood gatherers carrying the least wood, then eligible gold workers carrying the least gold. Workers inside the mine cannot be selected. Interrupted cargo is discarded; returning workers restart gathering at their previous resource.

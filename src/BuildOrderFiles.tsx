@@ -1,4 +1,6 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { createShareableLink, parseShareableLink } from "./game/shareableLink"
+import { saveJson } from "./saveJson"
 import { MAX_FILE_BYTES, parseBuildOrder, serializeBuildOrder, type GameProfile } from "./game/buildOrderFile"
 import { type FactionId } from "./game/gameData"
 import { type ScheduledAction } from "./game/buildSimulation"
@@ -12,25 +14,69 @@ type Props = {
 
 export default function BuildOrderFiles({ faction, profile, plan, onImport }: Props) {
     const input = useRef<HTMLInputElement>(null)
+    const menu = useRef<HTMLDetailsElement>(null)
+    const closeMenu = () => {
+        if (menu.current) {
+            menu.current.open = false
+            menu.current.querySelector("summary")?.focus()
+        }
+    }
     const [includeTimings, setIncludeTimings] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [message, setMessage] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
-    const exportFile = () => {
+    const [linkError, setLinkError] = useState<string | null>(null)
+    const [manualLink, setManualLink] = useState<string | null>(null)
+    useEffect(() => {
+        const loadLink = () => {
+            try {
+                const result = parseShareableLink(window.location.hash)
+                if (!result) return
+                onImport(result)
+                setLinkError(null)
+                setMessage(result.warning ?? "Shared build order and game profile loaded. Timings recalculated.")
+                if (menu.current) menu.current.open = false
+            } catch (reason) {
+                setMessage(null)
+                setLinkError(reason instanceof Error ? reason.message : "Could not open the shareable link.")
+            }
+        }
+        loadLink()
+        window.addEventListener("hashchange", loadLink)
+        return () => window.removeEventListener("hashchange", loadLink)
+    }, [onImport])
+    const shareLink = async () => {
+        setBusy(true)
+        setLinkError(null)
+        setError(null)
+        setMessage(null)
+        setManualLink(null)
         try {
-            const blob = new Blob([serializeBuildOrder(faction, profile, plan, includeTimings)], { type: "application/json" })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement("a")
-            link.href = url
-            link.download = `${faction}-build-order.wl-build-order.json`
-            document.body.appendChild(link)
-            link.click()
-            link.remove()
-            setTimeout(() => URL.revokeObjectURL(url), 1000)
-            setError(null)
-        } catch { setError("Could not export the build order. Please try again.") }
+            const link = createShareableLink(window.location.href, faction, profile, plan)
+            try {
+                await navigator.clipboard.writeText(link)
+                setMessage("Shareable link copied to clipboard.")
+                closeMenu()
+            } catch {
+                setManualLink(link)
+                setError("Could not copy automatically. Copy the link below.")
+            }
+        } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not create a shareable link.") }
+        finally { setBusy(false) }
     }
-    return <details className="file-menu" onKeyDown={event => {
+    const exportFile = async () => {
+        setBusy(true)
+        setLinkError(null)
+        setManualLink(null)
+        setError(null)
+        setMessage(null)
+        try {
+            const saved = await saveJson(serializeBuildOrder(faction, profile, plan, includeTimings), `${faction}-build-order.wl-build-order.json`)
+            if (saved) closeMenu()
+        } catch { setError("Could not save the build order. Please try again.") }
+        finally { setBusy(false) }
+    }
+    return <><details ref={menu} className="file-menu" onKeyDown={event => {
         if (event.key === "Escape") {
             event.currentTarget.open = false
             event.currentTarget.querySelector("summary")?.focus()
@@ -40,7 +86,8 @@ export default function BuildOrderFiles({ faction, profile, plan, onImport }: Pr
         <div className="build-order-files">
         <div className="file-buttons">
             <button type="button" onClick={exportFile} disabled={busy}>Export JSON</button>
-            <button type="button" onClick={() => input.current?.click()} disabled={busy}>{busy ? "Importing…" : "Import JSON"}</button>
+            <button type="button" onClick={shareLink} disabled={busy}>Save shareable link</button>
+            <button type="button" onClick={() => input.current?.click()} disabled={busy}>Import JSON</button>
         </div>
         <label><input type="checkbox" checked={includeTimings} onChange={event => setIncludeTimings(event.target.checked)} /> Include calculated timings</label>
         <small>Import replaces the build order and game profile. Timings are always recalculated.</small>
@@ -50,6 +97,8 @@ export default function BuildOrderFiles({ faction, profile, plan, onImport }: Pr
                 event.target.value = ""
                 if (!file) return
                 setBusy(true)
+                setLinkError(null)
+                setManualLink(null)
                 setError(null)
                 setMessage(null)
                 try {
@@ -57,12 +106,19 @@ export default function BuildOrderFiles({ faction, profile, plan, onImport }: Pr
                     const result = parseBuildOrder(await file.text())
                     onImport(result)
                     setMessage(result.warning ?? "Build order and game profile imported. Timings recalculated.")
+                    closeMenu()
                 } catch (reason) {
                     setError(reason instanceof Error ? reason.message : "Could not read the file.")
                 } finally { setBusy(false) }
             }} />
         {error && <p role="alert">{error}</p>}
-        {message && <p role="status">{message}</p>}
+        {manualLink && <label>Shareable link<input readOnly value={manualLink}
+            ref={element => { element?.focus(); element?.select() }} onFocus={event => event.target.select()} /></label>}
         </div>
     </details>
+    {(message || linkError) && <div className="file-notice" role={linkError ? "alert" : "status"}>
+        <span>{linkError ?? message}</span>
+        <button type="button" aria-label="Dismiss import message" onClick={() => { setMessage(null); setLinkError(null) }}>×</button>
+    </div>}
+    </>
 }

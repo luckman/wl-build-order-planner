@@ -6,13 +6,14 @@ export type EconomySettings = {
     woodWorkers: number
     goldPerTrip: number
     woodPerTrip: number
-    goldOutboundTravel: number
-    goldReturnTravel: number
+    goldTravelTime: number
     goldGatherTime: number
-    woodOutboundTravel: number
-    woodReturnTravel: number
+    woodTravelTime: number
     woodGatherTime: number
     constructionStartDelay: number
+    initialOrderDelay: number
+    sawmillWoodTravelTime: number
+    initialGoldTravelReduction: number
 }
 
 export type ResourceDelivery = { time: number; gold: number; wood: number; worker: number }
@@ -34,9 +35,7 @@ export type WorkerAllocation = {
     busyOrIdle: number
 }
 
-export const INITIAL_COMMAND_DELAY = 1
-export const INITIAL_GOLD_TRAVEL_REDUCTION = 1
-export const SAWMILL_WOOD_TRAVEL_TIME = 0.5
+export const SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE = 0.5
 export const MAX_SAWMILL_WOOD_TRAVEL_TIME = 4
 
 type WorkerStateAction = {
@@ -83,7 +82,7 @@ export class WorkerEconomy {
         if (assignment !== "idle") {
             const outboundTravel =
                 assignment === "gold" && isInitialGoldWorker
-                    ? Math.max(0, this.settings.goldOutboundTravel - INITIAL_GOLD_TRAVEL_REDUCTION)
+                    ? Math.max(0, this.settings.goldTravelTime - this.settings.initialGoldTravelReduction)
                     : this.travel(assignment)
             this.transition(worker, "outbound", outboundTravel)
         }
@@ -94,17 +93,16 @@ export class WorkerEconomy {
         this.sawmillCompletions.push(finishTime)
     }
 
-    private travel(assignment: "gold" | "wood", returning = false) {
+    private travel(assignment: "gold" | "wood") {
         if (assignment === "wood") {
             const latestCompletion = Math.max(-Infinity, ...this.sawmillCompletions.filter(time => time <= this.time))
             if (Number.isFinite(latestCompletion)) {
                 const fullMinutes = Math.floor((this.time - latestCompletion) / 60)
-                return Math.min(MAX_SAWMILL_WOOD_TRAVEL_TIME, SAWMILL_WOOD_TRAVEL_TIME * (1 + fullMinutes))
+                return Math.min(MAX_SAWMILL_WOOD_TRAVEL_TIME,
+                    this.settings.sawmillWoodTravelTime + SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE * fullMinutes)
             }
         }
-        return assignment === "gold"
-            ? returning ? this.settings.goldReturnTravel : this.settings.goldOutboundTravel
-            : returning ? this.settings.woodReturnTravel : this.settings.woodOutboundTravel
+        return assignment === "gold" ? this.settings.goldTravelTime : this.settings.woodTravelTime
     }
 
     private transition(worker: GatheringWorker, state: GatheringWorker["state"], duration: number) {
@@ -139,7 +137,7 @@ export class WorkerEconomy {
     get nextEventTime() {
         return Math.min(
             ...this.workers.map((worker) => worker.nextAt),
-            this.delayedInitialWoodWorkerIds.length ? INITIAL_COMMAND_DELAY : Infinity,
+            this.delayedInitialWoodWorkerIds.length ? this.settings.initialOrderDelay : Infinity,
             ...this.sawmillCompletions.filter(time => time > this.time),
         )
     }
@@ -147,7 +145,7 @@ export class WorkerEconomy {
     advanceTo(time: number) {
         while (this.nextEventTime <= time) {
             this.time = this.nextEventTime
-            if (this.delayedInitialWoodWorkerIds.length && this.time === INITIAL_COMMAND_DELAY) {
+            if (this.delayedInitialWoodWorkerIds.length && this.time === this.settings.initialOrderDelay) {
                 for (const workerId of this.delayedInitialWoodWorkerIds) {
                     const worker = this.workers[workerId]
                     worker.assignment = "wood"
@@ -166,7 +164,7 @@ export class WorkerEconomy {
                     this.transition(
                         worker,
                         "deposit",
-                        this.travel(worker.assignment === "gold" ? "gold" : "wood", true),
+                        this.travel(worker.assignment === "gold" ? "gold" : "wood"),
                     )
                 } else if (worker.state === "deposit") {
                     this.deliveries.push({
@@ -264,7 +262,7 @@ export function workerAllocationAt(
     const saturation = Math.max(
         1,
         Math.ceil(
-            (settings.goldOutboundTravel + settings.goldGatherTime + settings.goldReturnTravel) /
+            (2 * settings.goldTravelTime + settings.goldGatherTime) /
                 Math.max(0.001, settings.goldGatherTime),
         ),
     )

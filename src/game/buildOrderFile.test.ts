@@ -1,20 +1,19 @@
 import { GAME_RULES_VERSION, parseBuildOrder, serializeBuildOrder, type GameProfile } from "./buildOrderFile"
 import { simulateBuildOrder } from "./buildSimulation"
 import { factions, type FactionId } from "./gameData"
+import { economyFromProfile } from "./gameProfile"
 
 const profile: GameProfile = {
-    economy: {
-        startingGold: 2000, startingWood: 2000, goldWorkers: 4, woodWorkers: 1,
-        goldPerTrip: 50, woodPerTrip: 50, goldOutboundTravel: 4, goldReturnTravel: 4,
-        goldGatherTime: 3.1, woodOutboundTravel: 4, woodReturnTravel: 4, woodGatherTime: 12.1,
-        constructionStartDelay: 2.5,
-    }, baseFoodLimit: 24, foodPerFarm: 18,
+    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1 },
+    map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5, goldWorkers: 4, woodWorkers: 1 },
+    player: { startingGold: 2000, startingWood: 2000, goldPerTrip: 50, woodPerTrip: 50, baseFoodLimit: 24, foodPerFarm: 18 },
+    delays: { constructionStartDelay: 2.5, initialOrderDelay: 1 },
 }
 function sample(faction: FactionId = "light", timings = false) {
     const ids = faction === "light" ? ["barracks", "swordsman", "swordsman"] : ["barracks", "goon", "goon"]
     const order = ids.map(id => factions[faction].items.find(item => item.id === id)!)
-    const plan = simulateBuildOrder(order, { ...profile.economy, workerCount: 5 }, 10, profile.baseFoodLimit,
-        profile.foodPerFarm, factions[faction].startingTownHall).plan
+    const plan = simulateBuildOrder(order, economyFromProfile(profile), 10, profile.player.baseFoodLimit,
+        profile.player.foodPerFarm, factions[faction].startingTownHall).plan
     return serializeBuildOrder(faction, profile, plan, timings)
 }
 
@@ -22,14 +21,13 @@ test.each<FactionId>(["light", "dark"])("%s round trip preserves profile, order 
     const text = sample(faction)
     const result = parseBuildOrder(text)
     expect(result.faction).toBe(faction)
-    expect(result.economy).toEqual({ ...profile.economy, workerCount: 5 })
-    expect(result.baseFoodLimit).toBe(24)
-    expect(result.foodPerFarm).toBe(18)
+    expect(result.gameProfile).toEqual(profile)
     expect(result.warning).toBeNull()
-    expect(JSON.parse(text).gameProfile.economy.workerCount).toBeUndefined()
+    expect(Object.keys(JSON.parse(text).gameProfile)).toEqual(["basic", "map", "player", "delays"])
+    expect(JSON.parse(text).gameProfile.map.workerCount).toBeUndefined()
     expect(JSON.parse(text).buildOrder.every((action: object) => !("timings" in action))).toBe(true)
-    const plan = simulateBuildOrder(result.buildOrder, result.economy, 10, result.baseFoodLimit,
-        result.foodPerFarm, factions[faction].startingTownHall).plan
+    const plan = simulateBuildOrder(result.buildOrder, economyFromProfile(result.gameProfile), 10, result.gameProfile.player.baseFoodLimit,
+        result.gameProfile.player.foodPerFarm, factions[faction].startingTownHall).plan
     expect(serializeBuildOrder(faction, profile, plan, true)).toBe(sample(faction, true))
 })
 
@@ -56,7 +54,7 @@ test("blocked actions are preserved without adding prerequisites and export null
     doc.buildOrder = [{ itemId: "swordsman" }]
     const result = parseBuildOrder(JSON.stringify(doc))
     expect(result.buildOrder.map(item => item.id)).toEqual(["swordsman"])
-    const plan = simulateBuildOrder(result.buildOrder, result.economy, 10, 24, 18, "Castle").plan
+    const plan = simulateBuildOrder(result.buildOrder, economyFromProfile(result.gameProfile), 10, 24, 18, "Castle").plan
     expect(plan[0].blocked).toBe(true)
     expect(JSON.parse(serializeBuildOrder("light", profile, plan, true)).buildOrder[0].timings).toEqual({
         commandTime: null, startTime: null, finishTime: null, workerReturnTime: null,
@@ -66,9 +64,30 @@ test("blocked actions are preserved without adding prerequisites and export null
 test("empty orders import and derived worker counts cannot be overridden", () => {
     const doc = JSON.parse(sample())
     doc.buildOrder = []
-    doc.gameProfile.economy.workerCount = 999
-    expect(parseBuildOrder(JSON.stringify(doc)).economy.workerCount).toBe(5)
+    doc.gameProfile.map.workerCount = 999
+    expect(economyFromProfile(parseBuildOrder(JSON.stringify(doc)).gameProfile).workerCount).toBe(5)
     expect(parseBuildOrder(JSON.stringify(doc)).buildOrder).toEqual([])
+})
+
+test("custom values in every block round trip with unchanged format and rules versions", () => {
+    const doc = JSON.parse(sample())
+    doc.gameProfile.basic.initialGoldTravelReduction = 2.5
+    doc.gameProfile.map.sawmillWoodTravelTime = 1.25
+    doc.gameProfile.map.goldTravelTime = 2.5
+    doc.gameProfile.map.woodTravelTime = 1.5
+    doc.gameProfile.delays.initialOrderDelay = 3.5
+    const result = parseBuildOrder(JSON.stringify(doc))
+    const economy = economyFromProfile(result.gameProfile)
+    const plan = simulateBuildOrder(result.buildOrder, economy, 10, 24, 18, "Castle").plan
+    expect(plan[0].commandTime).toBe(3.5)
+    const exported = JSON.parse(serializeBuildOrder("light", result.gameProfile, plan))
+    expect(exported.gameProfile).toEqual(doc.gameProfile)
+    expect(exported.version).toBe(1)
+    expect(exported.gameRulesVersion).toBe("2026-10-09.1")
+    expect(economy.initialGoldTravelReduction).toBe(2.5)
+    expect(economy.sawmillWoodTravelTime).toBe(1.25)
+    expect(economy.goldTravelTime).toBe(2.5)
+    expect(economy.woodTravelTime).toBe(1.5)
 })
 
 test.each([
@@ -77,12 +96,26 @@ test.each([
     ["invalid faction", (doc: any) => { doc.faction = "other" }],
     ["unknown item", (doc: any) => { doc.buildOrder[1].itemId = "unknown" }],
     ["wrong faction item", (doc: any) => { doc.buildOrder[1].itemId = "goon" }],
-    ["negative resources", (doc: any) => { doc.gameProfile.economy.startingGold = -1 }],
-    ["fractional workers", (doc: any) => { doc.gameProfile.economy.goldWorkers = 1.5 }],
-    ["zero gathering duration", (doc: any) => { doc.gameProfile.economy.goldGatherTime = 0 }],
+    ["negative resources", (doc: any) => { doc.gameProfile.player.startingGold = -1 }],
+    ["fractional workers", (doc: any) => { doc.gameProfile.map.goldWorkers = 1.5 }],
+    ["zero gathering duration", (doc: any) => { doc.gameProfile.basic.goldGatherTime = 0 }],
     ["missing profile", (doc: any) => { delete doc.gameProfile }],
     ["missing rules version", (doc: any) => { delete doc.gameRulesVersion }],
-    ["oversized allocation", (doc: any) => { doc.gameProfile.economy.goldWorkers = 1001 }],
+    ["oversized allocation", (doc: any) => { doc.gameProfile.map.goldWorkers = 1001 }],
+    ["missing basic", (doc: any) => { delete doc.gameProfile.basic }],
+    ["missing map", (doc: any) => { delete doc.gameProfile.map }],
+    ["missing player", (doc: any) => { delete doc.gameProfile.player }],
+    ["missing delays", (doc: any) => { delete doc.gameProfile.delays }],
+    ["missing initial delay", (doc: any) => { delete doc.gameProfile.delays.initialOrderDelay }],
+    ["negative initial delay", (doc: any) => { doc.gameProfile.delays.initialOrderDelay = -1 }],
+    ["missing sawmill travel", (doc: any) => { delete doc.gameProfile.map.sawmillWoodTravelTime }],
+    ["negative sawmill travel", (doc: any) => { doc.gameProfile.map.sawmillWoodTravelTime = -1 }],
+    ["missing gold travel", (doc: any) => { delete doc.gameProfile.map.goldTravelTime }],
+    ["missing wood travel", (doc: any) => { delete doc.gameProfile.map.woodTravelTime }],
+    ["negative gold travel", (doc: any) => { doc.gameProfile.map.goldTravelTime = -1 }],
+    ["negative wood travel", (doc: any) => { doc.gameProfile.map.woodTravelTime = -1 }],
+    ["missing initial gold reduction", (doc: any) => { delete doc.gameProfile.basic.initialGoldTravelReduction }],
+    ["negative initial gold reduction", (doc: any) => { doc.gameProfile.basic.initialGoldTravelReduction = -1 }],
 ])("rejects %s", (_name, mutate) => {
     const doc = JSON.parse(sample())
     mutate(doc)

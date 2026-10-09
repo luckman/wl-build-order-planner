@@ -10,16 +10,23 @@ const economy: EconomySettings = {
     woodWorkers: 1,
     goldPerTrip: 50,
     woodPerTrip: 50,
-    goldOutboundTravel: 4,
-    goldReturnTravel: 4,
+    goldTravelTime: 4,
     goldGatherTime: 3,
-    woodOutboundTravel: 4,
-    woodReturnTravel: 4,
+    woodTravelTime: 4,
     woodGatherTime: 12,
     constructionStartDelay: 4,
+    initialOrderDelay: 1,
+    sawmillWoodTravelTime: 0.5,
+    initialGoldTravelReduction: 1,
 }
 
 const abundantEconomy = { ...economy, startingGold: 100000, startingWood: 100000, workerCount: 20, woodWorkers: 0 }
+
+test.each([0, 2.5, 8])("first recruitment command respects initial order delay %ss", initialOrderDelay => {
+    const worker = factions.light.items.find(item => item.id === "worker")!
+    const { plan } = simulateBuildOrder([worker, worker], { ...economy, initialOrderDelay }, 2, 20, 20, "Castle")
+    expect(plan.map(action => action.commandTime)).toEqual([initialOrderDelay, initialOrderDelay + worker.seconds])
+})
 
 test("Miriel waits for Altar completion, reserves ten food, and is unique across two Altars", () => {
     const faction = factions.light

@@ -1,6 +1,6 @@
 import { factions, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
-import { INITIAL_COMMAND_DELAY, type EconomySettings, resourceAt, WorkerEconomy } from "./resourceSimulation"
+import { type EconomySettings, resourceAt, WorkerEconomy } from "./resourceSimulation"
 
 export type ScheduledAction = {
     item: PlannerItem
@@ -39,7 +39,7 @@ export function simulateBuildOrder(
     const saturation = Math.max(
         1,
         Math.ceil(
-            (economy.goldOutboundTravel + economy.goldGatherTime + economy.goldReturnTravel) /
+            (2 * economy.goldTravelTime + economy.goldGatherTime) /
                 Math.max(0.001, economy.goldGatherTime),
         ),
     )
@@ -56,7 +56,7 @@ export function simulateBuildOrder(
         completeUpgrades(buildings, time)
     }
 
-    advanceTo(INITIAL_COMMAND_DELAY)
+    advanceTo(economy.initialOrderDelay)
 
     for (const item of buildOrder) {
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)

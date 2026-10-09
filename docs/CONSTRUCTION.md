@@ -2,11 +2,11 @@
 
 Implemented on 2026-10-08 for Light Workers and Dark Slaves.
 
-The first build-order command is available at 1.0 seconds. Initial gold miners
+The first build-order command is available at `gameProfile.delays.initialOrderDelay` (default 1.0 seconds). Initial gold miners
 and the first initial wood gatherer receive their gathering orders at game
-start; any additional initial wood gatherers receive theirs at 1.0 seconds.
+start; any additional initial wood gatherers receive theirs at the configured initial order delay.
 
-The editable game profile contains one `constructionStartDelay`, defaulting to
+The editable game profile contains `delays.constructionStartDelay`, defaulting to
 4 seconds. It applies to every building and building upgrade, and both directions
 of builder travel.
 There are no per-building overrides or positioning modes.

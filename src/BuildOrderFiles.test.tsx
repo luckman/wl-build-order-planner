@@ -1,17 +1,71 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import App from "./App"
 import { GAME_RULES_VERSION } from "./game/buildOrderFile"
+import { createShareableLink, parseShareableLink } from "./game/shareableLink"
+import { initialGameProfile } from "./game/gameProfile"
+import { factions } from "./game/gameData"
+import { simulateBuildOrder } from "./game/buildSimulation"
+import { economyFromProfile } from "./game/gameProfile"
+
+afterEach(() => window.history.replaceState(null, "", window.location.pathname))
+
+test("opening a shared link restores the plan and recalculates it; invalid hash changes keep it intact", () => {
+    const profile = { ...initialGameProfile, delays: { ...initialGameProfile.delays, initialOrderDelay: 2.5 } }
+    const slave = factions.dark.items.find(item => item.id === "slave")!
+    const plan = simulateBuildOrder([slave], economyFromProfile(profile), 10, 20, 20, "Citadel").plan
+    const url = createShareableLink(window.location.href, "dark", profile, plan)
+    window.history.replaceState(null, "", url)
+    render(<App />)
+    expect(screen.getByRole("heading", { name: "Dark build order" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
+    expect(screen.getByText("Command 0:02.5")).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "333" } })
+    expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("333")
+    window.history.replaceState(null, "", "#build=1.invalid!")
+    fireEvent(window, new Event("hashchange"))
+    expect(screen.getByRole("alert").textContent).toContain("invalid")
+    expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
+    window.history.replaceState(null, "", createShareableLink(window.location.href, "light", initialGameProfile, []))
+    fireEvent(window, new Event("hashchange"))
+    expect(screen.getByRole("heading", { name: "Light build order" })).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Remove Slave" })).toBeNull()
+    expect(screen.queryByRole("alert")).toBeNull()
+})
+
+test("Save shareable link copies the current profile without timings and closes the menu", async () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, "clipboard")
+    const writeText = jest.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
+    try {
+        render(<App />)
+        fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "777" } })
+        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByLabelText("Include calculated timings"))
+        fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
+        await waitFor(() => expect(screen.getByRole("status").textContent).toContain("copied"))
+        expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
+        const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
+        expect(result.gameProfile.player.startingGold).toBe(777)
+        writeText.mockRejectedValueOnce(new Error("Clipboard blocked"))
+        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
+        await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Copy the link below"))
+        expect((screen.getByLabelText("Shareable link") as HTMLInputElement).value).toBe(writeText.mock.calls[1][0])
+        expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(true)
+    } finally {
+        if (original) Object.defineProperty(navigator, "clipboard", original)
+        else delete (navigator as any).clipboard
+    }
+})
 
 function documentText() {
     return {
         format: "wl-build-order", version: 1, gameRulesVersion: GAME_RULES_VERSION, faction: "dark",
         gameProfile: {
-            economy: {
-                startingGold: 2000, startingWood: 2000, goldWorkers: 2, woodWorkers: 1,
-                goldPerTrip: 40, woodPerTrip: 30, goldOutboundTravel: 4, goldReturnTravel: 4,
-                goldGatherTime: 3.1, woodOutboundTravel: 4, woodReturnTravel: 4, woodGatherTime: 12.1,
-                constructionStartDelay: 2,
-            }, baseFoodLimit: 30, foodPerFarm: 25,
+            basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1 },
+            map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5, goldWorkers: 2, woodWorkers: 1 },
+            player: { startingGold: 2000, startingWood: 2000, goldPerTrip: 40, woodPerTrip: 30, baseFoodLimit: 30, foodPerFarm: 25 },
+            delays: { constructionStartDelay: 2, initialOrderDelay: 1 },
         },
         buildOrder: [
             { itemId: "barracks", timings: { commandTime: 9999 } },
@@ -30,20 +84,30 @@ test("import replaces faction, profile and order, recalculates timings and prese
     const { container } = render(<App />)
     fireEvent.click(screen.getByText("Import / Export"))
     const doc = documentText()
+    doc.gameProfile.delays.initialOrderDelay = 2.5
+    doc.gameProfile.map.sawmillWoodTravelTime = 1.25
+    doc.gameProfile.basic.initialGoldTravelReduction = 2
     doc.gameRulesVersion = "older-rules"
     upload(JSON.stringify(doc))
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("different game rules"))
+    expect((container.querySelector(".file-menu") as HTMLDetailsElement).open).toBe(false)
     expect(screen.getByRole("heading", { name: "Dark build order" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("2000")
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
     expect((screen.getByLabelText("Base food limit") as HTMLInputElement).value).toBe("30")
     expect((screen.getByLabelText("Construction start delay (seconds)") as HTMLInputElement).value).toBe("2")
+    expect((screen.getByLabelText("Initial order delay (seconds)") as HTMLInputElement).value).toBe("2.5")
+    expect((screen.getByLabelText("Sawmill wood travel time (seconds)") as HTMLInputElement).value).toBe("1.25")
+    expect(screen.queryByLabelText("Initial gold travel reduction (seconds)")).toBeNull()
     const order = within(container.querySelector(".order") as HTMLElement)
     expect(order.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
-    expect(order.getByText("Command 0:01")).toBeTruthy()
+    expect(order.getByText("Command 0:02.5")).toBeTruthy()
     expect(screen.queryByText("Command 166:39")).toBeNull()
+    fireEvent.click(screen.getByText("Import / Export"))
     upload("not json")
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("not valid JSON"))
+    expect((container.querySelector(".file-menu") as HTMLDetailsElement).open).toBe(true)
     expect(screen.getByRole("heading", { name: "Dark build order" })).toBeTruthy()
     expect(order.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
 })
@@ -59,8 +123,16 @@ test("export downloads JSON without timings by default and includes timings when
     try {
         render(<App />)
         fireEvent.click(screen.getByText("Import / Export"))
-        upload(JSON.stringify(documentText()))
+        const doc = documentText()
+        doc.gameProfile.basic.initialGoldTravelReduction = 2.5
+        upload(JSON.stringify(doc))
         await waitFor(() => expect(screen.getByRole("status")).toBeTruthy())
+        fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+        fireEvent.change(screen.getByLabelText("Initial order delay (seconds)"), { target: { value: "3.5" } })
+        fireEvent.change(screen.getByLabelText("Sawmill wood travel time (seconds)"), { target: { value: "1.25" } })
+        fireEvent.change(screen.getByLabelText("Gold travel time (seconds each way)"), { target: { value: "2.5" } })
+        fireEvent.change(screen.getByLabelText("Wood travel time (seconds each way)"), { target: { value: "1.5" } })
+        fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name: "Export JSON" }))
         const readBlob = (blob: Blob) => new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
@@ -70,14 +142,25 @@ test("export downloads JSON without timings by default and includes timings when
         })
         const plain = JSON.parse(await readBlob(blobs[0]))
         expect(plain.faction).toBe("dark")
-        expect(plain.gameProfile.economy.goldPerTrip).toBe(40)
+        expect(plain.gameProfile.player.goldPerTrip).toBe(40)
+        expect(Object.keys(plain.gameProfile)).toEqual(["basic", "map", "player", "delays"])
+        expect(plain.gameProfile.delays.initialOrderDelay).toBe(3.5)
+        expect(plain.gameProfile.map.sawmillWoodTravelTime).toBe(1.25)
+        expect(plain.gameProfile.map.goldTravelTime).toBe(2.5)
+        expect(plain.gameProfile.map.woodTravelTime).toBe(1.5)
+        expect(plain.gameProfile.basic.initialGoldTravelReduction).toBe(2.5)
         expect(plain.buildOrder[0]).toEqual({ itemId: "barracks" })
+        await waitFor(() => expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false))
+        fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByLabelText("Include calculated timings"))
         fireEvent.click(screen.getByRole("button", { name: "Export JSON" }))
+        await waitFor(() => expect(blobs).toHaveLength(2))
+        await waitFor(() => expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false))
         const timed = JSON.parse(await readBlob(blobs[1]))
-        expect(timed.buildOrder[0].timings.commandTime).toBe(1)
+        expect(timed.buildOrder[0].timings.commandTime).toBe(3.5)
         expect(click).toHaveBeenCalledTimes(2)
         expect(click.mock.instances[0].download).toBe("dark-build-order.wl-build-order.json")
+        expect(click.mock.instances[1].download).toBe("dark-build-order.wl-build-order.json")
     } finally {
         click.mockRestore()
         URL.createObjectURL = originalCreate

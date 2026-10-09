@@ -1,6 +1,27 @@
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
 
+test("resource collection follows the timeline and advanced settings retain edits when hidden", () => {
+    const { container } = render(<App />)
+    const panels = Array.from(container.querySelectorAll(".planner-area > section"))
+    expect(panels[0].classList.contains("timeline")).toBe(true)
+    expect(panels[1].classList.contains("economy")).toBe(true)
+    expect((screen.getByLabelText("Starting wood") as HTMLInputElement).value).toBe("50")
+    expect(screen.queryByLabelText("Initial gold miners")).toBeNull()
+    expect(screen.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+    fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "3" } })
+    expect(screen.getByLabelText("Initial order delay (seconds)")).toBeTruthy()
+    expect(screen.queryByLabelText("Gold gathering time (seconds)")).toBeNull()
+    expect(screen.queryByLabelText("Initial gold travel reduction (seconds)")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Hide advanced" }))
+    expect(screen.queryByLabelText("Initial gold miners")).toBeNull()
+    expect(screen.getByText("Initial gold miners: 3 · Initial wood gatherers: 1")).toBeTruthy()
+    expect(screen.getByLabelText("Starting gold")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+    expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("3")
+})
+
 test("Miriel appears under Heroes, consumes food, and removing her releases the recruitment limit", () => {
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "100000" } })
@@ -56,6 +77,7 @@ test("Barracks prices and resource totals update when orders are added or remove
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "0" } })
     fireEvent.change(screen.getByLabelText("Initial wood gatherers"), { target: { value: "3" } })
     const button = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /Barracks/ })
@@ -117,6 +139,7 @@ test("two completed Barracks have independent training slots", () => {
 
 test("initial allocations derive food, and hovering reads exact delivery boundaries", () => {
     const { container } = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("4")
     expect((screen.getByLabelText("Initial wood gatherers") as HTMLInputElement).value).toBe("1")
     expect(screen.queryByLabelText("Workers available")).toBeNull()
@@ -126,7 +149,7 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
     fireEvent.mouseMove(chart, { clientX: 100 })
     expect(within(screen.getByRole("tooltip")).getByText("0:10.0")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Gold: 150")).toBeTruthy()
-    expect(within(screen.getByRole("tooltip")).getByText("Wood: 0")).toBeTruthy()
+    expect(within(screen.getByRole("tooltip")).getByText("Wood: 50")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Food: 10/20")).toBeTruthy()
     fireEvent.mouseMove(chart, { clientX: 101 })
     expect(within(screen.getByRole("tooltip")).getByText("0:10.1")).toBeTruthy()
@@ -141,6 +164,7 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
 
 test("the editable construction delay changes building and worker return times", () => {
     const { container } = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     const delay = screen.getByLabelText("Construction start delay (seconds)") as HTMLInputElement
     expect(delay.value).toBe("4")
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })

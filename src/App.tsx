@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
+import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
+import GameProfileEditor from "./GameProfileEditor"
 import { type ScheduledAction, simulateBuildOrder } from "./game/buildSimulation"
 import {
     buildOrderWithDependencies,
@@ -11,7 +13,8 @@ import {
     type ItemKind,
     type PlannerItem,
 } from "./game/gameData"
-import { type EconomySettings, resourceAt, workerAllocationAt } from "./game/resourceSimulation"
+import { resourceAt, workerAllocationAt } from "./game/resourceSimulation"
+import { economyFromProfile, initialGameProfile, type GameProfile } from "./game/gameProfile"
 import "./index.css"
 import "./timeline.css"
 import "./parallel-timeline.css"
@@ -86,22 +89,6 @@ const iconSources: Record<string, string> = {
     darkJax: require("./icons/heroes/dark-jax.png"),
     darkEater: require("./icons/heroes/dark-eater.png"),
 }
-const initialEconomy: EconomySettings = {
-    startingGold: 150,
-    startingWood: 0,
-    workerCount: 5,
-    goldWorkers: 4,
-    woodWorkers: 1,
-    goldPerTrip: 50,
-    woodPerTrip: 50,
-    goldOutboundTravel: 4,
-    goldReturnTravel: 4,
-    goldGatherTime: 3.1,
-    woodOutboundTravel: 4,
-    woodReturnTravel: 4,
-    woodGatherTime: 12.1,
-    constructionStartDelay: 4,
-}
 const formatTime = (seconds: number) => {
     const tenths = Math.round(seconds * 10)
     return `${Math.floor(tenths / 600)}:${String(Math.floor(tenths / 10) % 60).padStart(2, "0")}${tenths % 10 ? `.${tenths % 10}` : ""}`
@@ -110,15 +97,6 @@ const formatTimeWithTenths = (seconds: number) => {
     const tenths = Math.round(seconds * 10)
     return `${Math.floor(tenths / 600)}:${String(Math.floor(tenths / 10) % 60).padStart(2, "0")}.${tenths % 10}`
 }
-const numberInput = (value: number, onChange: (value: number) => void, min = 0, step = 1) => (
-    <input
-        type="number"
-        min={min}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Math.max(min, Number(event.target.value) || 0))}
-    />
-)
 type TimelineEvent = ScheduledAction & { index: number }
 type TimelineLane = { label: string; events: TimelineEvent[] }
 
@@ -151,19 +129,24 @@ export default function App() {
     const [factionId, setFactionId] = useState<FactionId>("light")
     const [buildOrder, setBuildOrder] = useState<PlannerItem[]>([])
     const [dependencyError, setDependencyError] = useState<string | null>(null)
-    const [economy, setEconomy] = useState<EconomySettings>(initialEconomy)
+    const [gameProfile, setGameProfile] = useState<GameProfile>(initialGameProfile)
+    const economy = useMemo(() => economyFromProfile(gameProfile), [gameProfile])
+    const { baseFoodLimit, foodPerFarm } = gameProfile.player
     const faction = factions[factionId]
-    const updateEconomy = (key: keyof EconomySettings, value: number) =>
-        setEconomy((current) => ({ ...current, [key]: value }))
     const initialWorkerCount = economy.goldWorkers + economy.woodWorkers
     const initialFoodUsed = initialWorkerCount * 2
     const [hoverTime, setHoverTime] = useState<number | null>(null)
-    const [baseFoodLimit, setBaseFoodLimit] = useState(20)
-    const [foodPerFarm, setFoodPerFarm] = useState(20)
+    const applyImport = useCallback((result: ReturnType<typeof parseBuildOrder>) => {
+        setFactionId(result.faction)
+        setBuildOrder(result.buildOrder)
+        setGameProfile(result.gameProfile)
+        setDependencyError(null)
+        setHoverTime(null)
+    }, [])
     const maxGoldWorkers = Math.max(
         1,
         Math.ceil(
-            (economy.goldOutboundTravel + economy.goldGatherTime + economy.goldReturnTravel) / economy.goldGatherTime,
+            (2 * economy.goldTravelTime + economy.goldGatherTime) / economy.goldGatherTime,
         ),
     )
     const scheduled = useMemo(
@@ -208,11 +191,6 @@ export default function App() {
             }),
         [baseFoodLimit, foodPerFarm, initialFoodUsed, plan, samples],
     )
-    const allocation = (key: "goldWorkers" | "woodWorkers", value: number) =>
-        setEconomy((current) => {
-            const updated = { ...current, [key]: Math.floor(value) }
-            return { ...updated, workerCount: updated.goldWorkers + updated.woodWorkers }
-        })
     const inspectedTime = hoverTime ?? endTime
     const inspectedResources = resourceAt(economy, deliveries, spending, inspectedTime)
     const inspectedFood =
@@ -280,18 +258,7 @@ export default function App() {
                 <nav>
                     <button className="active">Planner</button>
                     <button disabled>Settings</button>
-                    <BuildOrderFiles faction={factionId} profile={{
-                        economy: (() => { const { workerCount, ...settings } = economy; return settings })(),
-                        baseFoodLimit, foodPerFarm,
-                    }} plan={plan} onImport={result => {
-                        setFactionId(result.faction)
-                        setBuildOrder(result.buildOrder)
-                        setEconomy(result.economy)
-                        setBaseFoodLimit(result.baseFoodLimit)
-                        setFoodPerFarm(result.foodPerFarm)
-                        setDependencyError(null)
-                        setHoverTime(null)
-                    }} />
+                    <BuildOrderFiles faction={factionId} profile={gameProfile} plan={plan} onImport={applyImport} />
                 </nav>
             </header>
             <main>
@@ -359,65 +326,6 @@ export default function App() {
                         </div>
                     </aside>
                     <section className="planner-area">
-                        <section className="economy panel">
-                            <div className="panel-title">
-                                <h2>Resource collection</h2>
-                                <span>Editable game profile</span>
-                            </div>
-                            <div className="economy-grid">
-                                <label>
-                                    Starting gold
-                                    {numberInput(economy.startingGold, (v) => updateEconomy("startingGold", v))}
-                                </label>
-                                <label>
-                                    Starting wood
-                                    {numberInput(economy.startingWood, (v) => updateEconomy("startingWood", v))}
-                                </label>
-                                <label>
-                                    Initial gold miners
-                                    {numberInput(economy.goldWorkers, (v) => allocation("goldWorkers", v))}
-                                </label>
-                                <label>
-                                    Initial wood gatherers
-                                    {numberInput(economy.woodWorkers, (v) => allocation("woodWorkers", v))}
-                                </label>
-                                <label>
-                                    Gold per trip
-                                    {numberInput(economy.goldPerTrip, (v) => updateEconomy("goldPerTrip", v))}
-                                </label>
-                                <label>
-                                    Wood per trip
-                                    {numberInput(economy.woodPerTrip, (v) => updateEconomy("woodPerTrip", v))}
-                                </label>
-                                <label>Base food limit{numberInput(baseFoodLimit, setBaseFoodLimit)}</label>
-                                <label>Food per Farm / Pigsty{numberInput(foodPerFarm, setFoodPerFarm)}</label>
-                                <label>
-                                    Construction start delay (seconds)
-                                    {numberInput(
-                                        economy.constructionStartDelay,
-                                        (v) => updateEconomy("constructionStartDelay", v),
-                                        0,
-                                        0.1,
-                                    )}
-                                </label>
-                                <div className="worker-state">
-                                    <b>{initialWorkerCount}</b>
-                                    <span>
-                                        initial workers · {initialFoodUsed} food · gold saturation {maxGoldWorkers}
-                                    </span>
-                                </div>
-                            </div>
-                            <p className="mechanics-note">
-                                Gold uses one shared mine slot (4s out, 3.10s mining, 4s return). Initial gold miners
-                                reach the mine 1 second sooner on their opening trip only; every later trip uses the
-                                configured travel time. New workers automatically mine gold until the calculated
-                                saturation of {maxGoldWorkers}, then gather wood. Wood trips run independently.
-                                Each completed Sawmill resets wood travel to 0.5 seconds each way, increasing by
-                                0.5 seconds per full minute afterward, up to 4 seconds.
-                                Builders stop gathering during travel, construction, and return. The construction delay
-                                applies to travel in each direction.
-                            </p>
-                        </section>
                         <section className="timeline panel">
                             <div className="panel-title">
                                 <h2>Timeline</h2>
@@ -529,6 +437,32 @@ export default function App() {
                                 limit. Production rows are individual queues. Construction includes outbound travel;
                                 hover a construction or upgrade to see its start, completion, and worker return times.
                             </p>
+                        </section>
+                        <section className="economy panel">
+                            <div className="panel-title">
+                                <h2>Resource collection</h2>
+                                <span>Editable game profile</span>
+                            </div>
+                            <GameProfileEditor profile={gameProfile} onChange={setGameProfile}>
+                            <div className="economy-grid">
+                                <div className="worker-state">
+                                    <b>{initialWorkerCount}</b>
+                                    <span>
+                                        initial workers · {initialFoodUsed} food · gold saturation {maxGoldWorkers}
+                                    </span>
+                                </div>
+                            </div>
+                            <p className="mechanics-note">
+                                New workers automatically mine gold until the calculated
+                                saturation of {maxGoldWorkers}, then gather wood. Wood trips run independently.
+                                Each completed Sawmill resets wood travel to {Math.min(4, economy.sawmillWoodTravelTime)} seconds each way, increasing by
+                                0.5 seconds per full minute afterward, up to 4 seconds.
+                                Builders stop gathering during travel, construction, and return. The construction delay
+                                applies to travel in each direction.
+                                The first build-order command and the second and later initial wood gathering commands
+                                become available at {economy.initialOrderDelay} seconds. The first initial wood gatherer starts immediately.
+                            </p>
+                            </GameProfileEditor>
                         </section>
                     </section>
                     <aside className="order panel">
