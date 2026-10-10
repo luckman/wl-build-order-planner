@@ -3,7 +3,7 @@ import type { FactionId } from "./gameData"
 import { initialGameProfile, type GameProfile } from "./gameProfile"
 
 export type FactionProfiles = Record<FactionId, GameProfile>
-export const profileStorageKey = (faction: FactionId) => `wl-resource-profile-v1-${faction}`
+export const profileStorageKey = (faction: FactionId) => `wl-resource-profile-v2-${faction}`
 
 function loadProfile(faction: FactionId): GameProfile {
     try {
@@ -12,7 +12,17 @@ function loadProfile(faction: FactionId): GameProfile {
             // Reuse import validation for every profile field, including hidden settings.
             return parseBuildOrder(JSON.stringify({
                 format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
-                faction, gameProfile: JSON.parse(text), buildOrder: [],
+                faction, gameProfile: JSON.parse(text), buildOrder: [{ type: "allocate-workers", goldWorkers: 0 }],
+            })).gameProfile
+        }
+        const legacyText = window.localStorage.getItem(`wl-resource-profile-v1-${faction}`)
+        if (legacyText) {
+            const legacy = JSON.parse(legacyText)
+            const { goldWorkers, woodWorkers, ...map } = legacy.map
+            return parseBuildOrder(JSON.stringify({
+                format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
+                faction, gameProfile: { ...legacy, map },
+                buildOrder: [{ type: "allocate-workers", goldWorkers }],
             })).gameProfile
         }
     } catch {

@@ -17,6 +17,7 @@ import {
 import { resourceAt, workerAllocationAt } from "./game/resourceSimulation"
 import { economyFromProfile, type GameProfile } from "./game/gameProfile"
 import { loadFactionProfiles, saveFactionProfiles } from "./game/profileStorage"
+import { loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
 import { actionDuration } from "./game/playerLevels"
 import "./index.css"
 import "./timeline.css"
@@ -138,26 +139,35 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
 
 export default function App() {
     const [factionId, setFactionId] = useState<FactionId>("light")
-    const [buildOrders, updateBuildOrders] = useState<Record<FactionId, Array<PlannerItem & { orderId: string }>>>({ light: [], dark: [] })
-    const buildOrder = buildOrders[factionId]
     const nextOrderId = useRef(0)
     const withOrderIds = useCallback((items: PlannerItem[]) => items.map(item => "orderId" in item
         ? item as PlannerItem & { orderId: string }
         : { ...item, orderId: `action-${nextOrderId.current++}` }), [])
+    const [gameProfiles, updateGameProfiles] = useState(loadFactionProfiles)
+    const [buildOrders, updateBuildOrders] = useState(() => {
+        const drafts = loadFactionDrafts(gameProfiles)
+        return { light: { ...drafts.light, items: withOrderIds(drafts.light.items) }, dark: { ...drafts.dark, items: withOrderIds(drafts.dark.items) } }
+    })
+    const buildOrder = buildOrders[factionId].items
+    const opening = buildOrders[factionId].opening
+    const setOpeningGoldWorkers = (goldWorkers: number) => {
+        updateBuildOrders(current => ({ ...current, [factionId]: { ...current[factionId], opening: { type: "allocate-workers", goldWorkers } } }))
+        setHoverTime(null)
+    }
+    useEffect(() => saveFactionDrafts(buildOrders), [buildOrders])
     const setBuildOrder = useCallback((update: SetStateAction<PlannerItem[]>) => {
         updateBuildOrders(current => {
-            const items = typeof update === "function" ? update(current[factionId]) : update
-            return { ...current, [factionId]: withOrderIds(items) }
+            const items = typeof update === "function" ? update(current[factionId].items) : update
+            return { ...current, [factionId]: { ...current[factionId], items: withOrderIds(items) } }
         })
     }, [factionId, withOrderIds])
     const [dependencyError, setDependencyError] = useState<string | null>(null)
-    const [gameProfiles, updateGameProfiles] = useState(loadFactionProfiles)
     const gameProfile = gameProfiles[factionId]
     const setGameProfile = useCallback((profile: GameProfile) => {
         updateGameProfiles(current => ({ ...current, [factionId]: profile }))
     }, [factionId])
     useEffect(() => saveFactionProfiles(gameProfiles), [gameProfiles])
-    const economy = useMemo(() => economyFromProfile(gameProfile), [gameProfile])
+    const economy = useMemo(() => economyFromProfile(gameProfile, opening), [gameProfile, opening])
     const { baseFoodLimit } = gameProfile.player
     const { foodPerFarm } = economy
     const faction = factions[factionId]
@@ -177,7 +187,7 @@ export default function App() {
     }
     const applyImport = useCallback((result: ReturnType<typeof parseBuildOrder>) => {
         setFactionId(result.faction)
-        updateBuildOrders(current => ({ ...current, [result.faction]: withOrderIds(result.buildOrder) }))
+        updateBuildOrders(current => ({ ...current, [result.faction]: { opening: result.opening, items: withOrderIds(result.buildOrder) } }))
         updateGameProfiles(current => ({ ...current, [result.faction]: result.gameProfile }))
         setDependencyError(null)
         setHoverTime(null)
@@ -297,7 +307,7 @@ export default function App() {
                 <nav>
                     <button className="active">Planner</button>
                     <button disabled>Settings</button>
-                    <BuildOrderFiles faction={factionId} profile={gameProfile} plan={plan} onImport={applyImport} />
+                    <BuildOrderFiles faction={factionId} profile={gameProfile} plan={plan} opening={opening} onImport={applyImport} />
                 </nav>
             </header>
             <main>
@@ -513,10 +523,23 @@ export default function App() {
                     <aside className="order panel">
                         <div className="panel-title">
                             <h2>Build order</h2>
-                            <button className="clear" onClick={() => { setBuildOrder([]); setDependencyError(null) }} disabled={!buildOrder.length}>
+                            <button className="clear" onClick={() => { setBuildOrder([]); setOpeningGoldWorkers(Math.min(4, initialWorkerCount)); setDependencyError(null) }} disabled={!buildOrder.length && opening.goldWorkers === Math.min(4, initialWorkerCount)}>
                                 Clear
                             </button>
                         </div>
+                        <section className="opening-action" aria-label="Opening worker allocation">
+                            <div className="worker-allocation">
+                                <label htmlFor="initial-worker-allocation">Initial worker allocation ({initialWorkerCount} workers)</label>
+                                <input id="initial-worker-allocation" type="range" min={0} max={initialWorkerCount} step={1}
+                                    aria-label="Initial gold miners"
+                                    aria-valuetext={`${economy.goldWorkers} gold miners, ${economy.woodWorkers} wood gatherers`}
+                                    value={economy.goldWorkers} onChange={event => {
+                                        const value = event.target.valueAsNumber
+                                        if (Number.isFinite(value)) setOpeningGoldWorkers(Math.min(initialWorkerCount, Math.max(0, Math.round(value))))
+                                    }} />
+                                <p className="initial-allocation">Initial gold miners: {economy.goldWorkers} · Initial wood gatherers: {economy.woodWorkers}</p>
+                            </div>
+                        </section>
                         {!buildOrder.length ? (
                             <p className="empty">Choose actions from the panel above the timeline.</p>
                         ) : (

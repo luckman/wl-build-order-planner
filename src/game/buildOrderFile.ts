@@ -1,12 +1,12 @@
 import { factions, type FactionId, type PlannerItem } from "./gameData"
-import { type GameProfile } from "./gameProfile"
+import { STARTING_WORKER_COUNT, initialOpeningAction, type OpeningAction, type GameProfile } from "./gameProfile"
 export type { GameProfile } from "./gameProfile"
 import { type ScheduledAction } from "./buildSimulation"
 import { playerLevelFields, playerLevelTier } from "./playerLevels"
 
-export const FILE_VERSION = 1
+export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-10.7"
+export const GAME_RULES_VERSION = "2026-10-10.8"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -14,20 +14,21 @@ export type BuildOrderDocument = {
     gameRulesVersion: string
     faction: FactionId
     gameProfile: GameProfile
-    buildOrder: Array<{
+    buildOrder: Array<OpeningAction | {
         itemId: string
         timings?: Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime">
     }>
 }
 
-export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile, actions: ScheduledAction[], includeTimings = false) {
+export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile, actions: ScheduledAction[], includeTimings = false,
+    opening: OpeningAction = initialOpeningAction) {
     const document: BuildOrderDocument = {
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
-        buildOrder: actions.map(({ item, commandTime, startTime, finishTime, workerReturnTime }) => ({
+        buildOrder: [opening, ...actions.map(({ item, commandTime, startTime, finishTime, workerReturnTime }) => ({
             itemId: item.id,
             ...(includeTimings ? { timings: { commandTime, startTime, finishTime, workerReturnTime } } : {}),
-        })),
+        }))],
     }
     return JSON.stringify(document, null, 2)
 }
@@ -46,7 +47,7 @@ function number(value: unknown, path: string, positive = false, integer = false)
 
 /** Transport-independent parsing for files and future shareable links. Timings are never read. */
 export function parseBuildOrder(text: string): {
-    faction: FactionId; buildOrder: PlannerItem[]; gameProfile: GameProfile; warning: string | null
+    faction: FactionId; buildOrder: PlannerItem[]; opening: OpeningAction; gameProfile: GameProfile; warning: string | null
 } {
     let value: unknown
     try { value = JSON.parse(text) } catch { throw new Error("The file is not valid JSON.") }
@@ -58,7 +59,7 @@ export function parseBuildOrder(text: string): {
     const profile = object(doc.gameProfile, "gameProfile")
     const fields: { [Block in keyof GameProfile]: Array<keyof GameProfile[Block]> } = {
         basic: ["goldGatherTime", "woodGatherTime", "initialGoldTravelReduction"],
-        map: ["goldTravelTime", "woodTravelTime", "sawmillWoodTravelTime", "goldWorkers", "woodWorkers"],
+        map: ["goldTravelTime", "woodTravelTime", "sawmillWoodTravelTime"],
         player: ["startingGold", "startingWood", "baseFoodLimit", ...playerLevelFields],
         delays: ["constructionStartDelay", "orderDelay"],
     }
@@ -68,7 +69,7 @@ export function parseBuildOrder(text: string): {
         parsed[block] = {}
         for (const key of fields[block]) {
             parsed[block][key] = number(raw[key], `gameProfile.${block}.${key}`,
-                key === "goldGatherTime" || key === "woodGatherTime", key === "goldWorkers" || key === "woodWorkers")
+                key === "goldGatherTime" || key === "woodGatherTime")
             if (block === "player" && playerLevelFields.some(field => field === key)) {
                 try { playerLevelTier(parsed[block][key]) } catch {
                     throw new Error(`gameProfile.player.${key} must be an integer from 1 to 24.`)
@@ -77,17 +78,22 @@ export function parseBuildOrder(text: string): {
         }
     }
     const gameProfile = parsed as unknown as GameProfile
-    if (gameProfile.map.goldWorkers + gameProfile.map.woodWorkers > 1000) throw new Error("A profile can contain at most 1,000 starting workers.")
-    if (!Array.isArray(doc.buildOrder) || doc.buildOrder.length > 1000) throw new Error("buildOrder must be an array of at most 1,000 actions.")
+    if (!Array.isArray(doc.buildOrder) || doc.buildOrder.length < 1 || doc.buildOrder.length > 1001) throw new Error("buildOrder must start with a worker allocation and contain at most 1,000 subsequent actions.")
+    const first = object(doc.buildOrder[0], "Opening action")
+    if (first.type !== "allocate-workers") throw new Error("The first action must allocate starting workers.")
+    const goldWorkers = number(first.goldWorkers, "Opening action.goldWorkers", false, true)
+    if (goldWorkers > STARTING_WORKER_COUNT) throw new Error("The opening allocation exceeds the starting worker count of five.")
+    const opening: OpeningAction = { type: "allocate-workers", goldWorkers }
     const catalog = new Map(factions[doc.faction].items.map(item => [item.id, item]))
-    const buildOrder = doc.buildOrder.map((entry: unknown, index: number) => {
+    const buildOrder = doc.buildOrder.slice(1).map((entry: unknown, index: number) => {
         const action = object(entry, `Action ${index + 1}`)
+        if ("type" in action) throw new Error("Worker allocation is only allowed as the opening action.")
         const item = typeof action.itemId === "string" ? catalog.get(action.itemId) : undefined
         if (!item) throw new Error(`Action ${index + 1}: unknown item ID ${String(action.itemId)} for ${doc.faction}.`)
         return item
     })
     return {
-        faction: doc.faction, buildOrder, gameProfile,
+        faction: doc.faction, buildOrder, opening, gameProfile,
         warning: doc.gameRulesVersion === GAME_RULES_VERSION ? null :
             "This build order was exported with different game rules. It has been recalculated using the current rules, so timings and action availability may differ.",
     }

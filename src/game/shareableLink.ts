@@ -1,19 +1,21 @@
 import { deflate, Inflate } from "pako"
 import { MAX_FILE_BYTES, parseBuildOrder, serializeBuildOrder, type GameProfile } from "./buildOrderFile"
 import type { FactionId } from "./gameData"
+import { initialOpeningAction, type OpeningAction } from "./gameProfile"
 import type { ScheduledAction } from "./buildSimulation"
 
 export const MAX_SHARE_LINK_LENGTH = 16000
 
-export function createShareableLink(baseUrl: string, faction: FactionId, profile: GameProfile, plan: ScheduledAction[]) {
+export function createShareableLink(baseUrl: string, faction: FactionId, profile: GameProfile, plan: ScheduledAction[],
+    opening: OpeningAction = initialOpeningAction) {
     // The JSON document is shared with files; links always omit derived timings.
-    const json = JSON.stringify(JSON.parse(serializeBuildOrder(faction, profile, plan)))
+    const json = JSON.stringify(JSON.parse(serializeBuildOrder(faction, profile, plan, false, opening)))
     const bytes = deflate(json)
     let binary = ""
     for (const byte of bytes) binary += String.fromCharCode(byte)
     const encoded = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
     const url = new URL(baseUrl)
-    url.hash = `build=1.${encoded}`
+    url.hash = `build=2.${encoded}`
     if (url.href.length > MAX_SHARE_LINK_LENGTH) throw new Error("This build order is too large for a shareable link. Use Export JSON instead.")
     return url.href
 }
@@ -22,7 +24,7 @@ export function parseShareableLink(hash: string): ReturnType<typeof parseBuildOr
     const encoded = new URLSearchParams(hash.replace(/^#/, "")).get("build")
     if (encoded === null) return null
     if (encoded.length > MAX_SHARE_LINK_LENGTH) throw new Error("This shareable link is too large. Use a JSON file instead.")
-    if (!encoded.startsWith("1.")) throw new Error("Unsupported shareable link version.")
+    if (!encoded.startsWith("2.")) throw new Error("Unsupported shareable link version.")
     const payload = encoded.slice(2)
     if (!payload || !/^[A-Za-z0-9_-]+$/.test(payload)) throw new Error("The shareable link is invalid or incomplete.")
     let bytes: Uint8Array

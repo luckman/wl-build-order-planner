@@ -29,21 +29,6 @@ export default function GameProfileEditor({ faction, profile, onChange, children
             {field("player", "startingGold", "Starting gold")}
             {field("player", "startingWood", "Starting wood")}
             {field("player", "baseFoodLimit", "Base food limit")}
-            <div className="worker-allocation">
-                <label htmlFor="initial-worker-allocation">Initial worker allocation ({profile.map.goldWorkers + profile.map.woodWorkers} workers)</label>
-                <input id="initial-worker-allocation" type="range" min={0} max={5} step={1}
-                    aria-label="Initial gold miners"
-                    aria-valuetext={`${profile.map.goldWorkers} gold miners, ${profile.map.woodWorkers} wood gatherers`}
-                    value={Math.min(5, profile.map.goldWorkers)}
-                    onChange={event => {
-                        const goldWorkers = Math.min(5, Math.max(0, Math.round(event.target.valueAsNumber)))
-                        if (!Number.isFinite(goldWorkers)) return
-                        onChange({ ...profile, map: { ...profile.map, goldWorkers, woodWorkers: 5 - goldWorkers } })
-                    }} />
-                <p className="initial-allocation">Initial gold miners: {profile.map.goldWorkers} · Initial wood gatherers: {profile.map.woodWorkers}</p>
-                {profile.map.goldWorkers + profile.map.woodWorkers !== 5 &&
-                    <p className="initial-allocation">Moving the slider uses 5 workers.</p>}
-            </div>
             {field("player", "townHallLevel", `${names.townHall} level`, 1, 1, 24)}
             {field("player", "sawmillLevel", "Sawmill level", 1, 1, 24)}
             {field("player", "farmLevel", `${names.farm} level`, 1, 1, 24)}

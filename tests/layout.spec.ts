@@ -142,12 +142,17 @@ test("120-second graph scale, hover boundaries, and fixed columns survive horizo
     await expect(page.getByRole("tooltip")).toHaveCount(0)
 })
 
-test("resource collection has four columns and a main five-worker slider with keyboard controls", async ({ page }) => {
+test("resource collection has four columns and the fixed opening action supports keyboard allocation and reload", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.goto("http://localhost:2987")
     const grid = page.locator(".profile-blocks > .economy-grid")
     expect(await grid.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length)).toBe(4)
     const slider = page.getByRole("slider", { name: "Initial gold miners" })
+    await expect(page.locator(".economy").getByRole("slider")).toHaveCount(0)
+    await expect(page.getByLabel("Starting workers", { exact: true })).toHaveCount(0)
+    await expect(slider).toHaveAttribute("max", "5")
+    await expect(page.locator(".order").getByRole("slider")).toHaveCount(1)
+    await expect(page.getByRole("region", { name: "Opening worker allocation" }).getByRole("button")).toHaveCount(0)
     await slider.scrollIntoViewIfNeeded()
     await expect(slider).toHaveValue("4")
     await expect(page.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeVisible()
@@ -167,6 +172,13 @@ test("resource collection has four columns and a main five-worker slider with ke
     await page.getByRole("button", { name: "Hide advanced" }).click()
     await expect(slider).toBeVisible()
     await expect(slider).toHaveValue("5")
+    await page.locator(".action-panel").getByRole("button", { name: /^Worker \d/ }).click()
+    await page.getByRole("button", { name: "Reset to defaults" }).click()
+    await expect(slider).toHaveValue("5")
+    await page.reload()
+    await expect(slider).toHaveValue("5")
+    await expect(page.getByRole("button", { name: "Remove Worker" })).toBeVisible()
+    await page.screenshot({ path: "test-results/opening-worker-allocation.png", fullPage: true })
 })
 
 test("Build order action hover details match timeline timing and update with construction delay", async ({ page }) => {

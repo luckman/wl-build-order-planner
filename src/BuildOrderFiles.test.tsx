@@ -24,7 +24,7 @@ test("opening a shared link restores the plan and recalculates it; invalid hash 
     expect(screen.getByText("Command 0:02.5")).toBeTruthy()
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "333" } })
     expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("333")
-    window.history.replaceState(null, "", "#build=1.invalid!")
+    window.history.replaceState(null, "", "#build=2.invalid!")
     fireEvent(window, new Event("hashchange"))
     expect(screen.getByRole("alert").textContent).toContain("invalid")
     expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
@@ -50,8 +50,8 @@ test("Save shareable link copies the current profile without timings and closes 
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
         const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
         expect(result.gameProfile.player.startingGold).toBe(777)
-        expect(result.gameProfile.map.goldWorkers).toBe(3)
-        expect(result.gameProfile.map.woodWorkers).toBe(2)
+        expect(result.opening.goldWorkers).toBe(3)
+        expect(5 - result.opening.goldWorkers).toBe(2)
         writeText.mockRejectedValueOnce(new Error("Clipboard blocked"))
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
@@ -66,14 +66,15 @@ test("Save shareable link copies the current profile without timings and closes 
 
 function documentText() {
     return {
-        format: "wl-build-order", version: 1, gameRulesVersion: GAME_RULES_VERSION, faction: "dark",
+        format: "wl-build-order", version: 2, gameRulesVersion: GAME_RULES_VERSION, faction: "dark",
         gameProfile: {
             basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1 },
-            map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5, goldWorkers: 2, woodWorkers: 1 },
+            map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
             player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 30, ...initialPlayerLevels, townHallLevel: 9, farmLevel: 21 },
             delays: { constructionStartDelay: 2, orderDelay: 1 },
         },
         buildOrder: [
+            { type: "allocate-workers", goldWorkers: 2 },
             { itemId: "barracks", timings: { commandTime: 9999 } },
             { itemId: "goon" }, { itemId: "goon" },
         ],
@@ -105,7 +106,7 @@ test("Reset to defaults restores every imported profile group while retaining fa
         expect(screen.queryByLabelText("Gold travel time (seconds each way)")).toBeNull()
         expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("150")
         expect((screen.getByLabelText("Starting wood") as HTMLInputElement).value).toBe("50")
-        expect(screen.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeTruthy()
+        expect(screen.getByText("Initial gold miners: 2 · Initial wood gatherers: 3")).toBeTruthy()
         expect(screen.getByRole("heading", { name: "Dark build order" })).toBeTruthy()
         expect(screen.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
         fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
@@ -145,8 +146,8 @@ test("import replaces faction, profile and order, recalculates timings and prese
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("2000")
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
-    expect(screen.getByText("Initial gold miners: 2 · Initial wood gatherers: 1")).toBeTruthy()
-    expect(screen.getByText("Moving the slider uses 5 workers.")).toBeTruthy()
+    expect(screen.getByText("Initial gold miners: 2 · Initial wood gatherers: 3")).toBeTruthy()
+    expect((screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement).max).toBe("5")
     expect((screen.getByLabelText("Base food limit") as HTMLInputElement).value).toBe("30")
     expect((screen.getByLabelText("Construction start delay (seconds)") as HTMLInputElement).value).toBe("2")
     expect((screen.getByLabelText("Order delay (seconds)") as HTMLInputElement).value).toBe("2.5")
@@ -161,6 +162,11 @@ test("import replaces faction, profile and order, recalculates timings and prese
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("not valid JSON"))
     expect((container.querySelector(".file-menu") as HTMLDetailsElement).open).toBe(true)
     expect(screen.getByRole("heading", { name: "Dark build order" })).toBeTruthy()
+    expect(order.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
+    const invalidOpening = { ...doc, buildOrder: [{ type: "allocate-workers", goldWorkers: 6 }, ...doc.buildOrder.slice(1)] }
+    upload(JSON.stringify(invalidOpening))
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("exceeds the starting worker count"))
+    expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
     expect(order.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
     fireEvent.change(screen.getByRole("slider", { name: "Initial gold miners" }), { target: { value: "3" } })
     expect(screen.getByText("Initial gold miners: 3 · Initial wood gatherers: 2")).toBeTruthy()
@@ -205,7 +211,8 @@ test("export downloads JSON without timings by default and includes timings when
         expect(plain.gameProfile.map.goldTravelTime).toBe(2.5)
         expect(plain.gameProfile.map.woodTravelTime).toBe(1.5)
         expect(plain.gameProfile.basic.initialGoldTravelReduction).toBe(2.5)
-        expect(plain.buildOrder[0]).toEqual({ itemId: "barracks" })
+        expect(plain.buildOrder[0]).toEqual({ type: "allocate-workers", goldWorkers: 2 })
+        expect(plain.buildOrder[1]).toEqual({ itemId: "barracks" })
         await waitFor(() => expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false))
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByLabelText("Include calculated timings"))
@@ -213,7 +220,8 @@ test("export downloads JSON without timings by default and includes timings when
         await waitFor(() => expect(blobs).toHaveLength(2))
         await waitFor(() => expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false))
         const timed = JSON.parse(await readBlob(blobs[1]))
-        expect(timed.buildOrder[0].timings.commandTime).toBe(3.5)
+        expect(timed.buildOrder[0]).toEqual({ type: "allocate-workers", goldWorkers: 2 })
+        expect(timed.buildOrder[1].timings.commandTime).toBe(3.5)
         expect(click).toHaveBeenCalledTimes(2)
         expect(click.mock.instances[0].download).toBe("dark-build-order.wl-build-order.json")
         expect(click.mock.instances[1].download).toBe("dark-build-order.wl-build-order.json")

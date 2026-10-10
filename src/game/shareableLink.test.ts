@@ -8,7 +8,7 @@ import { simulateBuildOrder } from "./buildSimulation"
 function encodeDocument(value: unknown) {
     let binary = ""
     for (const byte of deflate(JSON.stringify(value))) binary += String.fromCharCode(byte)
-    return `#build=1.${btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`
+    return `#build=2.${btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`
 }
 
 test.each<FactionId>(["light", "dark"])("%s links preserve duplicate actions and the complete customized profile", faction => {
@@ -24,7 +24,7 @@ test.each<FactionId>(["light", "dark"])("%s links preserve duplicate actions and
     const url = new URL(link)
     expect(url.pathname).toBe("/planner/")
     expect(url.search).toBe("?mode=test")
-    expect(url.hash).toMatch(/^#build=1\.[A-Za-z0-9_-]+$/)
+    expect(url.hash).toMatch(/^#build=2\.[A-Za-z0-9_-]+$/)
     const result = parseShareableLink(url.hash)!
     expect(result.faction).toBe(faction)
     expect(result.gameProfile).toEqual(profile)
@@ -38,28 +38,37 @@ test("empty order links support profile sharing", () => {
     expect(parseShareableLink(url.hash)!.buildOrder).toEqual([])
 })
 
+test.each([0, 2])("obsolete startingWorkers=%s cannot override the fixed five workers", startingWorkers => {
+    const profile = { ...initialGameProfile, player: { ...initialGameProfile.player, startingWorkers } }
+    const url = new URL(createShareableLink("https://example.com", "light", profile, []))
+    expect(parseShareableLink(url.hash)!.opening.goldWorkers).toBe(4)
+    const imported = parseShareableLink(url.hash)!
+    expect(imported.gameProfile.player).not.toHaveProperty("startingWorkers")
+    expect(economyFromProfile(imported.gameProfile, imported.opening).workerCount).toBe(5)
+})
+
 test("unrelated fragments do not import", () => {
     expect(parseShareableLink("")).toBeNull()
     expect(parseShareableLink("#section")).toBeNull()
 })
 
-test.each(["#build=2.test", "#build=1.", "#build=1.invalid!", "#build=1.abcd", "#build=1.eJyrVkr"]) ("rejects corrupt or unsupported link %s", hash => {
+test.each(["#build=1.test", "#build=2.", "#build=2.invalid!", "#build=2.abcd", "#build=2.eJyrVkr"]) ("rejects corrupt or unsupported link %s", hash => {
     expect(() => parseShareableLink(hash)).toThrow()
 })
 
 test("link documents reuse JSON validation, ignore timings, and warn on different rules", () => {
     const doc = {
-        format: "wl-build-order", version: 1, gameRulesVersion: "old-rules", faction: "light",
-        gameProfile: initialGameProfile, buildOrder: [{ itemId: "worker", timings: "ignored" }],
+        format: "wl-build-order", version: 2, gameRulesVersion: "old-rules", faction: "light",
+        gameProfile: initialGameProfile, buildOrder: [{ type: "allocate-workers", goldWorkers: 4 }, { itemId: "worker", timings: "ignored" }],
     }
     expect(parseShareableLink(encodeDocument(doc))!.warning).toContain("current rules")
-    doc.buildOrder[0].itemId = "unknown"
+    doc.buildOrder[1].itemId = "unknown"
     expect(() => parseShareableLink(encodeDocument(doc))).toThrow("unknown item ID")
     doc.gameRulesVersion = GAME_RULES_VERSION
 })
 
 test("oversized links and compressed documents are rejected", () => {
-    expect(() => parseShareableLink(`#build=1.${"A".repeat(MAX_SHARE_LINK_LENGTH)}`)).toThrow("too large")
+    expect(() => parseShareableLink(`#build=2.${"A".repeat(MAX_SHARE_LINK_LENGTH)}`)).toThrow("too large")
     expect(() => parseShareableLink(encodeDocument({ padding: "A".repeat(MAX_FILE_BYTES + 1) }))).toThrow("too large")
     expect(() => createShareableLink(`https://example.com/${"a".repeat(MAX_SHARE_LINK_LENGTH)}`, "light", initialGameProfile, [])).toThrow("Export JSON")
 })

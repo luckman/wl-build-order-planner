@@ -80,6 +80,11 @@
 .order-blocked b, .order-blocked .order-number { color: #ffe5e9; }
 .order-blocked small { color: #f6bcc5; }
 .order ol.sortable-order { display: block; }
+.opening-action { padding: .85rem; border-bottom: 1px solid #35516b; background: #152a3d; }
+.opening-action .worker-allocation { min-width: 0; }
+.opening-action label { display: block; color: #b7cfe2; font-size: .8rem; }
+.opening-action input[type="range"] { width: 100%; margin: .5rem 0; accent-color: #e1b55f; }
+.opening-action .initial-allocation { margin-bottom: 0; }
 .order .sortable-order li { grid-template-columns: 18px 22px 30px minmax(0, 1fr) 20px; gap: 4px; }
 .order .sortable-order li > div { min-width: 0; overflow-wrap: anywhere; }
 .order .order-drag-handle { cursor: grab; padding: 4px 0; touch-action: none; color: #a9c5df; }

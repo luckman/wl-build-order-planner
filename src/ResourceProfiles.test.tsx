@@ -86,7 +86,7 @@ test("malformed or invalid stored profiles fall back independently to defaults",
     saveFactionProfiles({ light: initialGameProfile, dark: {
         ...initialGameProfile, player: { ...initialGameProfile.player, startingGold: 888 },
     } })
-    for (const invalid of ["{invalid", JSON.stringify({ ...initialGameProfile, map: { ...initialGameProfile.map, goldWorkers: -1 } })]) {
+    for (const invalid of ["{invalid", JSON.stringify({ ...initialGameProfile, player: { ...initialGameProfile.player, startingGold: -1 } })]) {
         window.localStorage.setItem(profileStorageKey("light"), invalid)
         const profiles = loadFactionProfiles()
         expect(profiles.light).toEqual(initialGameProfile)
@@ -99,8 +99,10 @@ test("storage access failures allow editing and switching profiles in memory", (
     jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage full") })
     render(<App />)
     change("Starting gold", "777")
+    change("Initial gold miners", "2")
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     expect(value("Starting gold")).toBe("150")
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(value("Starting gold")).toBe("777")
+    expect(value("Initial gold miners")).toBe("2")
 })

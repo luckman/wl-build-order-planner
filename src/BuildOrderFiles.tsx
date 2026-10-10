@@ -5,14 +5,17 @@ import { MAX_FILE_BYTES, parseBuildOrder, serializeBuildOrder, type GameProfile 
 import { type FactionId } from "./game/gameData"
 import { type ScheduledAction } from "./game/buildSimulation"
 
+import type { OpeningAction } from "./game/gameProfile"
+
 type Props = {
+    opening: OpeningAction
     faction: FactionId
     profile: GameProfile
     plan: ScheduledAction[]
     onImport: (result: ReturnType<typeof parseBuildOrder>) => void
 }
 
-export default function BuildOrderFiles({ faction, profile, plan, onImport }: Props) {
+export default function BuildOrderFiles({ faction, profile, plan, opening, onImport }: Props) {
     const input = useRef<HTMLInputElement>(null)
     const menu = useRef<HTMLDetailsElement>(null)
     const closeMenu = () => {
@@ -52,7 +55,7 @@ export default function BuildOrderFiles({ faction, profile, plan, onImport }: Pr
         setMessage(null)
         setManualLink(null)
         try {
-            const link = createShareableLink(window.location.href, faction, profile, plan)
+            const link = createShareableLink(window.location.href, faction, profile, plan, opening)
             try {
                 await navigator.clipboard.writeText(link)
                 setMessage("Shareable link copied to clipboard.")
@@ -71,7 +74,7 @@ export default function BuildOrderFiles({ faction, profile, plan, onImport }: Pr
         setError(null)
         setMessage(null)
         try {
-            const saved = await saveJson(serializeBuildOrder(faction, profile, plan, includeTimings), `${faction}-build-order.wl-build-order.json`)
+            const saved = await saveJson(serializeBuildOrder(faction, profile, plan, includeTimings, opening), `${faction}-build-order.wl-build-order.json`)
             if (saved) closeMenu()
         } catch { setError("Could not save the build order. Please try again.") }
         finally { setBusy(false) }
