@@ -6,7 +6,7 @@ import { playerLevelFields, playerLevelTier } from "./playerLevels"
 
 export const FILE_VERSION = 1
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-10.6"
+export const GAME_RULES_VERSION = "2026-10-10.7"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"

@@ -25,6 +25,21 @@ const economy: EconomySettings = {
 
 const abundantEconomy = { ...economy, startingGold: 100000, startingWood: 100000, workerCount: 20, woodWorkers: 0 }
 
+test.each(["light", "dark"] as const)("%s reordered recruitment warns and does not prevent its later producer from building", factionId => {
+    const faction = factions[factionId]
+    const barracks = required(faction.items.find(item => item.id === "barracks"))
+    const unit = required(faction.items.find(item => item.id === (factionId === "light" ? "swordsman" : "goon")))
+    const simulate = (items: typeof faction.items) => simulateBuildOrder(items, abundantEconomy, 0, 100, 20, faction.startingTownHall).plan
+    const valid = simulate([barracks, unit])
+    const reordered = simulate([unit, barracks])
+    expect(reordered[0].blocked).toBe(true)
+    expect(reordered[0].blockedReason).toContain("Requires")
+    expect(reordered[0].finishTime).toBeNull()
+    expect(reordered[1].blocked).toBe(false)
+    expect(reordered[1].commandTime).toBe(valid[0].commandTime)
+    expect(simulate([barracks, unit])).toEqual(valid)
+})
+
 test.each([0, 0.1, 1, 2.5])("new recruitment buildings apply the %ss delay once per instance", orderDelay => {
     const barracks = required(factions.light.items.find(item => item.id === "barracks"))
     const soldier = required(factions.light.items.find(item => item.id === "swordsman"))

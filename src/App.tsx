@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState, type SetStateAction } from "react"
+import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd"
 import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
 import GameProfileEditor from "./GameProfileEditor"
@@ -136,7 +137,16 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
 
 export default function App() {
     const [factionId, setFactionId] = useState<FactionId>("light")
-    const [buildOrder, setBuildOrder] = useState<PlannerItem[]>([])
+    const [buildOrder, updateBuildOrder] = useState<Array<PlannerItem & { orderId: string }>>([])
+    const nextOrderId = useRef(0)
+    const setBuildOrder = useCallback((update: SetStateAction<PlannerItem[]>) => {
+        updateBuildOrder(current => {
+            const items = typeof update === "function" ? update(current) : update
+            return items.map(item => "orderId" in item
+                ? item as PlannerItem & { orderId: string }
+                : { ...item, orderId: `action-${nextOrderId.current++}` })
+        })
+    }, [])
     const [dependencyError, setDependencyError] = useState<string | null>(null)
     const [gameProfile, setGameProfile] = useState<GameProfile>(initialGameProfile)
     const economy = useMemo(() => economyFromProfile(gameProfile), [gameProfile])
@@ -146,6 +156,17 @@ export default function App() {
     const initialWorkerCount = economy.goldWorkers + economy.woodWorkers
     const initialFoodUsed = initialWorkerCount * 2
     const [hoverTime, setHoverTime] = useState<number | null>(null)
+    const reorderActions = ({ source, destination }: DropResult) => {
+        if (!destination || source.index === destination.index) return
+        setBuildOrder(current => {
+            const reordered = [...current]
+            const [moved] = reordered.splice(source.index, 1)
+            reordered.splice(destination.index, 0, moved)
+            return reordered
+        })
+        setDependencyError(null)
+        setHoverTime(null)
+    }
     const applyImport = useCallback((result: ReturnType<typeof parseBuildOrder>) => {
         setFactionId(result.faction)
         setBuildOrder(result.buildOrder)
@@ -436,11 +457,15 @@ export default function App() {
                                     {timelineLanes.map((lane) => <div className="queue-value" key={lane.label} />)}
                                 </div>
                             </div>
-                            {blockedActions.map(({ item, index, blockedReason }) => (
-                                <div className="blocked-event" key={`${item.id}-${index}`}>
-                                    {item.name} — {blockedReason}
-                                </div>
-                            ))}
+                            {blockedActions.length > 0 && <section className="blocked-actions" aria-label="Blocked actions">
+                                <h3>{blockedActions.length} blocked {blockedActions.length === 1 ? "action" : "actions"}</h3>
+                                {blockedActions.map(({ item, index, blockedReason }) => (
+                                    <div className="blocked-event" key={`${item.id}-${index}`}>
+                                        <img src={iconSources[item.icon]} alt="" />
+                                        <div><b>#{index + 1} {item.name} — Blocked</b><p>{blockedReason}</p></div>
+                                    </div>
+                                ))}
+                            </section>}
                             <p className="timeline-help">
                                 Hover a resource graph for its exact time and amount. Food shows used capacity and its
                                 limit. Production rows are individual queues. Construction includes outbound travel;
@@ -484,9 +509,13 @@ export default function App() {
                         {!buildOrder.length ? (
                             <p className="empty">Choose actions from the panel above the timeline.</p>
                         ) : (
-                            <ol>
+                            <DragDropContext onDragEnd={reorderActions}>
+                            <Droppable droppableId="build-order">
+                            {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
                                 {plan.map(({ item, commandTime, startTime, finishTime, workerReturnTime, blocked, blockedReason }, index) => (
-                                    <li key={`${item.id}-${index}`} title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })}>
+                                    <Draggable key={buildOrder[index].orderId} draggableId={buildOrder[index].orderId} index={index} disableInteractiveElementBlocking>
+                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })}>
+                                        <button className="order-drag-handle" {...drag.dragHandleProps} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>
                                         <span className="order-number">{index + 1}</span>
                                         <img src={iconSources[item.icon]} alt="" />
                                         <div>
@@ -508,9 +537,13 @@ export default function App() {
                                         >
                                             ×
                                         </button>
-                                    </li>
+                                    </li>}
+                                    </Draggable>
                                 ))}
-                            </ol>
+                                {provided.placeholder}
+                            </ol>}
+                            </Droppable>
+                            </DragDropContext>
                         )}
                         <div className="resource-summary">
                             <h3>Latest order state</h3>

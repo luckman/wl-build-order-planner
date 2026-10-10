@@ -82,7 +82,25 @@ export function simulateBuildOrder(
             ? heroAltarLevel(plan.filter(action => !action.blocked).map(action => action.item)) : 1
         let scheduled = false
         let blockedReason = "Waiting for resources, food, producer, or worker"
-        while (simulation.time <= until) {
+        // Only earlier successful orders can unlock this action. Detect impossible
+        // dependencies without spending the simulation horizon waiting for later rows.
+        const eventualBuildings = unlockedBuildingsAt(Infinity)
+        const missingEarlierRequirement = item.requirements?.find(requirement =>
+            requirementCount(eventualBuildings, requirement, Infinity) < requirement.count)
+        const eventualProducer = eventualBuildings.some(building => item.kind === "upgrade"
+            ? (item.upgradeFrom ? building.itemId === item.upgradeFrom : building.name === item.producer)
+            : item.producerBuildingId ? building.buildingId === item.producerBuildingId : building.name === item.producer)
+        const earlierNames = new Set([initialTownHall, ...plan.filter(action => !action.blocked).map(action => action.item.name)])
+        const missingEarlierName = item.prerequisites.find(name => !earlierNames.has(name))
+        const dependencyProblem = missingEarlierRequirement
+            ? `Requires ${missingEarlierRequirement.count} × ${namesById.get(missingEarlierRequirement.item) ?? missingEarlierRequirement.item}${missingEarlierRequirement.minLevel ? ` at level ${missingEarlierRequirement.minLevel} or higher` : ""}`
+            : item.kind === "upgrade" && !eventualProducer
+                ? `Requires an available ${item.producer} to upgrade`
+                : needsProducer && !eventualProducer
+                    ? `Requires ${item.producer} earlier in the build order`
+                    : missingEarlierName ? `Requires ${missingEarlierName} earlier in the build order` : null
+        if (dependencyProblem) blockedReason = dependencyProblem
+        while (!dependencyProblem && simulation.time <= until) {
             advanceTo(simulation.time)
             const time = simulation.time
             const unlockedBuildings = unlockedBuildingsAt(time)

@@ -1,6 +1,26 @@
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
 
+test("resource-blocked orders are highlighted in both panels and clear when resources are available", () => {
+    const { container } = render(<App />)
+    fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "0" } })
+    fireEvent.change(screen.getByRole("slider", { name: "Initial gold miners" }), { target: { value: "5" } })
+    fireEvent.click(within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ }))
+    const row = screen.getByRole("button", { name: "Remove Barracks" }).closest("li")!
+    expect(row.classList.contains("order-blocked")).toBe(true)
+    expect(within(row).queryByText("Blocked")).toBeNull()
+    const warning = screen.getByRole("region", { name: "Blocked actions" })
+    expect(within(warning).getByText("1 blocked action")).toBeTruthy()
+    expect(within(warning).getByText("#1 Barracks — Blocked")).toBeTruthy()
+    expect(within(warning).getByText("Waiting for resources, food, producer, or worker")).toBeTruthy()
+    expect(container.querySelector(".event.building")).toBeNull()
+    fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
+    expect(row.classList.contains("order-blocked")).toBe(false)
+    expect(within(row).queryByText("Blocked")).toBeNull()
+    expect(screen.queryByRole("region", { name: "Blocked actions" })).toBeNull()
+    expect(container.querySelector(".event.building")).toBeTruthy()
+})
+
 test("main worker slider selects every five-worker split and retains it across faction and advanced changes", () => {
     const { container } = render(<App />)
     const slider = screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement
@@ -179,6 +199,9 @@ test("adding a second Farm inserts the needed upgrade and removal explains block
     expect(within(order).getByText("Farm limit reached at the current town-hall level")).toBeTruthy()
     const blockedFarm = Array.from(order.querySelectorAll("li")).find(row => row.textContent?.includes("Farm limit reached"))!
     expect(blockedFarm.title).toBe("Farm limit reached at the current town-hall level")
+    expect(blockedFarm.classList.contains("order-blocked")).toBe(true)
+    expect(within(blockedFarm).queryByText("Blocked")).toBeNull()
+    expect(within(screen.getByRole("region", { name: "Blocked actions" })).getByText("Farm limit reached at the current town-hall level")).toBeTruthy()
 })
 
 test("Barracks prices and resource totals update when orders are added or removed", () => {

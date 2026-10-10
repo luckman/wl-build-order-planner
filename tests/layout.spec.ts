@@ -1,5 +1,31 @@
 import { expect, test } from "@playwright/test"
 
+test("blocked actions use red order rows and a prominent timeline warning, clearing when resolved", async ({ page }) => {
+    await page.goto("http://localhost:2987")
+    await page.getByLabel("Starting wood", { exact: true }).fill("0")
+    const slider = page.getByRole("slider", { name: "Initial gold miners" })
+    await slider.focus()
+    await slider.press("End")
+    await page.locator(".action-panel").getByRole("button", { name: /^Barracks \d/ }).click()
+    const row = page.locator(".order li").first()
+    await expect(row).toHaveClass("order-blocked")
+    await expect(row).toHaveCSS("background-color", "rgb(60, 24, 34)")
+    const warning = page.getByRole("region", { name: "Blocked actions" })
+    await expect(warning).toContainText("#1 Barracks — Blocked")
+    await expect(warning).toContainText("Waiting for resources, food, producer, or worker")
+    await expect(warning).toHaveCSS("background-color", "rgb(60, 24, 34)")
+    const graph = (await page.locator(".timeline-grid").boundingBox())!
+    const notice = (await warning.boundingBox())!
+    expect(notice.y).toBeGreaterThan(graph.y + graph.height)
+    const help = (await page.locator(".timeline-help").boundingBox())!
+    expect(notice.y + notice.height).toBeLessThanOrEqual(help.y)
+    await page.screenshot({ path: "test-results/blocked-actions.png", fullPage: true })
+    await page.getByLabel("Starting wood", { exact: true }).fill("2000")
+    await expect(row).not.toHaveClass("order-blocked")
+    await expect(warning).toHaveCount(0)
+    await expect(page.locator(".event.building")).toHaveCount(1)
+})
+
 for (const width of [1440, 1024, 390]) {
     test(`actions sit directly above the wider timeline at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 })
