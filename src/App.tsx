@@ -90,6 +90,8 @@ const iconSources: Record<string, string> = {
     darkJax: require("./icons/heroes/dark-jax.png"),
     darkEater: require("./icons/heroes/dark-eater.png"),
 }
+const TIMELINE_WINDOW_SECONDS = 120
+
 const formatTime = (seconds: number) => {
     const tenths = Math.round(seconds * 10)
     return `${Math.floor(tenths / 600)}:${String(Math.floor(tenths / 10) % 60).padStart(2, "0")}${tenths % 10 ? `.${tenths % 10}` : ""}`
@@ -100,6 +102,12 @@ const formatTimeWithTenths = (seconds: number) => {
 }
 type TimelineEvent = ScheduledAction & { index: number }
 type TimelineLane = { label: string; events: TimelineEvent[] }
+
+function actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason }:
+    Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime" | "blockedReason">) {
+    if (commandTime === null || startTime === null || finishTime === null) return blockedReason
+    return `Command ${formatTime(commandTime)} · start ${formatTime(startTime)} · finish ${formatTime(finishTime)}${workerReturnTime === null ? "" : ` · worker returns ${formatTime(workerReturnTime)}`}`
+}
 
 function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
     const availableLanes = new Map<string, Array<{ availableAt: number; events: TimelineEvent[] }>>()
@@ -169,7 +177,7 @@ export default function App() {
         commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
     )
     const lastCompletionTime = Math.max(0, ...plan.map(({ finishTime }) => finishTime ?? 0))
-    const endTime = Math.max(90, lastCompletionTime + 30)
+    const endTime = Math.max(TIMELINE_WINDOW_SECONDS, lastCompletionTime + 30)
     const samples = useMemo(
         () =>
             Array.from({ length: Math.ceil(endTime / 5) + 1 }, (_, index) =>
@@ -221,7 +229,7 @@ export default function App() {
     )
     const timelineLanes = useMemo(() => createTimelineLanes(plan), [plan])
     const blockedActions = plan.map((action, index) => ({ ...action, index })).filter(({ blocked }) => blocked)
-    const timelineWidth = `${Math.max(100, (endTime / 90) * 100)}%`
+    const timelineWidth = `${Math.max(100, (endTime / TIMELINE_WINDOW_SECONDS) * 100)}%`
     const timelineTicks = Array.from({ length: Math.floor(endTime / 20) + 1 }, (_, index) => index * 20)
     const latestCommand = [...plan].reverse().find(({ commandTime }) => commandTime !== null)
     const latestCommandTime = latestCommand?.commandTime ?? null
@@ -286,52 +294,51 @@ export default function App() {
                     </div>
                 </section>
                 <div className="workspace">
-                    <aside className="action-panel panel">
-                        <div className="panel-title">
-                            <h2>Actions</h2>
-                            <span>Click to add</span>
-                        </div>
-                        <div className="action-groups">
-                            {dependencyError && <p role="alert">{dependencyError}</p>}
-                            {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
-                                <section key={kind}>
-                                    <h3>{kind === "hero" ? "heroes" : `${kind}s`}</h3>
-                                    <div className="action-grid">
-                                        {faction.items
-                                            .filter((item) => item.kind === kind)
-                                            .map((item) => {
-                                                const cost = itemCost(item, buildOrder, faction.startingTownHall)
-                                                return (
-                                                    <button
-                                                        className="action"
-                                                        key={item.id}
-                                                        onClick={() => {
-                                                            try {
-                                                                setBuildOrder(buildOrderWithDependencies(faction, buildOrder, item))
-                                                                setDependencyError(null)
-                                                            } catch (error) {
-                                                                setDependencyError((error as Error).message)
-                                                            }
-                                                        }}
-                                                    >
-                                                        <img src={iconSources[item.icon]} alt="" />
-                                                        <span>{item.name}</span>
-                                                        <small>
-                                                            {cost.gold} gold · {cost.wood} wood{isRecruitable(item) ? ` · ${item.food} food` : ""} · {Number(actionDuration(item, economy).toFixed(2))}s
-                                                        </small>
-                                                    </button>
-                                                )
-                                            })}
-                                    </div>
-                                </section>
-                            ))}
-                        </div>
-                    </aside>
                     <section className="planner-area">
+                        <section className="action-panel panel" aria-label="Actions">
+                            <div className="action-groups">
+                                {dependencyError && <p role="alert">{dependencyError}</p>}
+                                {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
+                                    <section key={kind} aria-label={kind === "hero" ? "heroes" : `${kind}s`}>
+                                        <div className="action-grid">
+                                            {faction.items
+                                                .filter((item) => item.kind === kind)
+                                                .map((item) => {
+                                                    const cost = itemCost(item, buildOrder, faction.startingTownHall)
+                                                    const food = isRecruitable(item) ? item.food : 0
+                                                    const duration = Number(actionDuration(item, economy).toFixed(2))
+                                                    return (
+                                                        <button
+                                                            className="action"
+                                                            key={item.id}
+                                                            aria-label={`${item.name} ${cost.gold} gold · ${cost.wood} wood · ${food} food · ${duration}s`}
+                                                            title={`${item.name}\nGold: ${cost.gold}\nWood: ${cost.wood}\nFood: ${food}\nTime: ${duration}s`}
+                                                            onClick={() => {
+                                                                try {
+                                                                    setBuildOrder(buildOrderWithDependencies(faction, buildOrder, item))
+                                                                    setDependencyError(null)
+                                                                } catch (error) {
+                                                                    setDependencyError((error as Error).message)
+                                                                }
+                                                            }}
+                                                        >
+                                                            {kind === "upgrade" && <span className="action-name">lvl {item.level}</span>}
+                                                            <img src={iconSources[item.icon]} alt="" />
+                                                            <small>
+                                                                <span className="action-stat">{cost.gold}/{cost.wood}/{food}</span>
+                                                            </small>
+                                                        </button>
+                                                    )
+                                                })}
+                                        </div>
+                                    </section>
+                                ))}
+                            </div>
+                        </section>
                         <section className="timeline panel">
                             <div className="panel-title">
                                 <h2>Timeline</h2>
-                                <span>{formatTime(endTime)} horizon · scrolls in 90-second views</span>
+                                <span>{formatTime(endTime)} horizon · scrolls in {TIMELINE_WINDOW_SECONDS}-second views</span>
                             </div>
                             <div className="timeline-grid">
                                 <div className="timeline-fixed timeline-labels">
@@ -402,7 +409,7 @@ export default function App() {
                                                                     left: `${(commandTime! / endTime) * 100}%`,
                                                                     width: `${Math.max(4, ((finishTime! - commandTime!) / endTime) * 100)}%`,
                                                                 }}
-                                                                title={`Command ${formatTime(commandTime!)} · start ${formatTime(startTime!)} · finish ${formatTime(finishTime!)}${workerReturnTime === null ? "" : ` · worker returns ${formatTime(workerReturnTime)}`}`}
+                                                                title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime })}
                                                                 onClick={() =>
                                                                     setBuildOrder((current) =>
                                                                         current.filter(
@@ -475,11 +482,11 @@ export default function App() {
                             </button>
                         </div>
                         {!buildOrder.length ? (
-                            <p className="empty">Choose actions from the left.</p>
+                            <p className="empty">Choose actions from the panel above the timeline.</p>
                         ) : (
                             <ol>
-                                {plan.map(({ item, commandTime, blocked, blockedReason }, index) => (
-                                    <li key={`${item.id}-${index}`}>
+                                {plan.map(({ item, commandTime, startTime, finishTime, workerReturnTime, blocked, blockedReason }, index) => (
+                                    <li key={`${item.id}-${index}`} title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })}>
                                         <span className="order-number">{index + 1}</span>
                                         <img src={iconSources[item.icon]} alt="" />
                                         <div>

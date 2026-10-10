@@ -40,6 +40,7 @@ test("Save shareable link copies the current profile without timings and closes 
     try {
         render(<App />)
         fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "777" } })
+        fireEvent.change(screen.getByRole("slider", { name: "Initial gold miners" }), { target: { value: "3" } })
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByLabelText("Include calculated timings"))
         fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
@@ -47,6 +48,8 @@ test("Save shareable link copies the current profile without timings and closes 
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
         const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
         expect(result.gameProfile.player.startingGold).toBe(777)
+        expect(result.gameProfile.map.goldWorkers).toBe(3)
+        expect(result.gameProfile.map.woodWorkers).toBe(2)
         writeText.mockRejectedValueOnce(new Error("Clipboard blocked"))
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
@@ -96,6 +99,8 @@ test("import replaces faction, profile and order, recalculates timings and prese
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("2000")
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
+    expect(screen.getByText("Initial gold miners: 2 · Initial wood gatherers: 1")).toBeTruthy()
+    expect(screen.getByText("Moving the slider uses 5 workers.")).toBeTruthy()
     expect((screen.getByLabelText("Base food limit") as HTMLInputElement).value).toBe("30")
     expect((screen.getByLabelText("Construction start delay (seconds)") as HTMLInputElement).value).toBe("2")
     expect((screen.getByLabelText("Order delay (seconds)") as HTMLInputElement).value).toBe("2.5")
@@ -111,6 +116,9 @@ test("import replaces faction, profile and order, recalculates timings and prese
     expect((container.querySelector(".file-menu") as HTMLDetailsElement).open).toBe(true)
     expect(screen.getByRole("heading", { name: "Dark build order" })).toBeTruthy()
     expect(order.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
+    fireEvent.change(screen.getByRole("slider", { name: "Initial gold miners" }), { target: { value: "3" } })
+    expect(screen.getByText("Initial gold miners: 3 · Initial wood gatherers: 2")).toBeTruthy()
+    expect(screen.queryByText("Moving the slider uses 5 workers.")).toBeNull()
 })
 
 test("export downloads JSON without timings by default and includes timings when checked", async () => {

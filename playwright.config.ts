@@ -3,7 +3,7 @@ import type { PlaywrightTestConfig } from "@playwright/test"
 const config: PlaywrightTestConfig = {
     testDir: "./tests",
     webServer: {
-        command: "NODE_OPTIONS=--openssl-legacy-provider npm run build && npx serve -s build -p 2987",
+        command: "npx cross-env NODE_OPTIONS=--openssl-legacy-provider npm run build && npx serve -s build -p 2987",
         port: 2987,
         timeout: 180000, // 3 minutes for build
     },
