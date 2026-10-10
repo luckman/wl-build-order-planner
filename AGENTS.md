@@ -14,6 +14,8 @@
 - Keep migration background and longer design documentation in `docs/`.
 - Update the root `README.md` when the user-facing scope, setup, or capabilities change.
 
+Update 2026-10-10: old changelog entries have been removed
+
 ## Confirmed starter game data
 
 Use only these values unless new values are provided by the project owner.

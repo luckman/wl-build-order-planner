@@ -57,4 +57,4 @@ npm start
 
 Build the production app with `npm run build`.
 
-See `docs/README.md` for migration context and `ai-changelog/2026-10-08-resource-collection-and-sc2-ui.md` for the latest change record.
+See `docs/README.md` for migration context.
