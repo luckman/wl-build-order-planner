@@ -1,5 +1,53 @@
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
+import { createShareableLink } from "./game/shareableLink"
+import { initialGameProfile } from "./game/gameProfile"
+
+beforeEach(() => window.localStorage.clear())
+afterEach(() => window.localStorage.clear())
+
+test("faction drafts survive switching and Clear only clears the selected draft", () => {
+    const { container } = render(<App />)
+    const actions = within(container.querySelector(".action-panel") as HTMLElement)
+    fireEvent.click(actions.getByRole("button", { name: /^Worker / }))
+    fireEvent.click(actions.getByRole("button", { name: /^Farm / }))
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
+    expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(screen.queryByRole("button", { name: "Remove Worker" })).toBeNull()
+    fireEvent.click(actions.getByRole("button", { name: /^Slave / }))
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
+    expect(screen.getAllByRole("button", { name: /^Remove / }).map(button => button.getAttribute("aria-label")))
+        .toEqual(["Remove Worker", "Remove Farm"])
+    expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Remove Farm" })).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Remove Slave" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }))
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
+    expect(screen.queryByRole("button", { name: "Remove Worker" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Remove Farm" })).toBeNull()
+})
+
+test("shared imports replace their faction draft and preserve the other draft", () => {
+    const { container } = render(<App />)
+    const actions = within(container.querySelector(".action-panel") as HTMLElement)
+    fireEvent.click(actions.getByRole("button", { name: /^Worker / }))
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    fireEvent.click(actions.getByRole("button", { name: /^Slave / }))
+    try {
+        window.history.replaceState(null, "", createShareableLink(window.location.href, "dark", initialGameProfile, []))
+        fireEvent(window, new Event("hashchange"))
+        expect(screen.queryByRole("button", { name: "Remove Slave" })).toBeNull()
+        fireEvent.click(screen.getByRole("button", { name: "Light" }))
+        expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
+        fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+        expect(screen.queryByRole("button", { name: "Remove Slave" })).toBeNull()
+    } finally {
+        window.history.replaceState(null, "", window.location.pathname)
+    }
+})
 
 test("resource-blocked orders are highlighted in both panels and clear when resources are available", () => {
     const { container } = render(<App />)
@@ -21,7 +69,7 @@ test("resource-blocked orders are highlighted in both panels and clear when reso
     expect(container.querySelector(".event.building")).toBeTruthy()
 })
 
-test("main worker slider selects every five-worker split and retains it across faction and advanced changes", () => {
+test("main worker slider selects every five-worker split and retains it within its faction and advanced changes", () => {
     const { container } = render(<App />)
     const slider = screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement
     expect(slider.min).toBe("0")
@@ -40,6 +88,8 @@ test("main worker slider selects every five-worker split and retains it across f
     expect(screen.queryByLabelText("Initial wood gatherers")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Hide advanced" }))
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(slider.value).toBe("4")
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(slider.value).toBe("5")
     expect(screen.getByText("Initial gold miners: 5 · Initial wood gatherers: 0")).toBeTruthy()
 })
@@ -115,12 +165,12 @@ test("player levels default to one and edits stay within integer levels 1–24",
     fireEvent.change(screen.getByLabelText("Worker level"), { target: { value: "21" } })
     expect(screen.getByRole("button", { name: /Barracks.*28.5s/ })).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
-    expect((screen.getByLabelText("Citadel level") as HTMLInputElement).value).toBe("21")
-    expect((screen.getByLabelText("Pigsty level") as HTMLInputElement).value).toBe("5")
+    expect((screen.getByLabelText("Citadel level") as HTMLInputElement).value).toBe("1")
+    expect((screen.getByLabelText("Pigsty level") as HTMLInputElement).value).toBe("1")
     expect(screen.getByLabelText("Workshop level")).toBeTruthy()
     expect(screen.getByLabelText("Dark Gate level")).toBeTruthy()
-    expect((screen.getByLabelText("Slave level") as HTMLInputElement).value).toBe("21")
-    expect(screen.getByText("Gold per trip: 55 · Wood per trip: 52 · Food per Pigsty: 21")).toBeTruthy()
+    expect((screen.getByLabelText("Slave level") as HTMLInputElement).value).toBe("1")
+    expect(screen.getByText("Gold per trip: 50 · Wood per trip: 50 · Food per Pigsty: 20")).toBeTruthy()
     expect(screen.queryByLabelText("Castle level")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect((screen.getByLabelText("Castle level") as HTMLInputElement).value).toBe("21")

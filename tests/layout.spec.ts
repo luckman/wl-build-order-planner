@@ -1,5 +1,23 @@
 import { expect, test } from "@playwright/test"
 
+test("Reset to defaults restores main and hidden advanced settings without clearing orders", async ({ page }) => {
+    await page.goto("http://localhost:2987")
+    await page.getByLabel("Starting gold", { exact: true }).fill("2000")
+    await page.locator(".action-panel").getByRole("button", { name: /^Worker / }).click()
+    await page.getByRole("button", { name: /^Advanced/ }).click()
+    await page.getByLabel("Gold travel time (seconds each way)").fill("8")
+    await page.getByLabel("Order delay (seconds)").fill("3")
+    await page.getByRole("button", { name: "Hide advanced" }).click()
+    await page.getByRole("button", { name: "Reset to defaults" }).click()
+    await expect(page.getByLabel("Starting gold", { exact: true })).toHaveValue("150")
+    await expect(page.getByLabel("Starting wood", { exact: true })).toHaveValue("50")
+    await expect(page.getByRole("slider", { name: "Initial gold miners" })).toHaveValue("4")
+    await expect(page.getByRole("button", { name: "Remove Worker" })).toHaveCount(1)
+    await page.getByRole("button", { name: /^Advanced/ }).click()
+    await expect(page.getByLabel("Gold travel time (seconds each way)")).toHaveValue("4")
+    await expect(page.getByLabel("Order delay (seconds)")).toHaveValue("1")
+})
+
 test("blocked actions use red order rows and a prominent timeline warning, clearing when resolved", async ({ page }) => {
     await page.goto("http://localhost:2987")
     await page.getByLabel("Starting wood", { exact: true }).fill("0")

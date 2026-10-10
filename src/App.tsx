@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type SetStateAction } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd"
 import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
@@ -15,7 +15,8 @@ import {
     type PlannerItem,
 } from "./game/gameData"
 import { resourceAt, workerAllocationAt } from "./game/resourceSimulation"
-import { economyFromProfile, initialGameProfile, type GameProfile } from "./game/gameProfile"
+import { economyFromProfile, type GameProfile } from "./game/gameProfile"
+import { loadFactionProfiles, saveFactionProfiles } from "./game/profileStorage"
 import { actionDuration } from "./game/playerLevels"
 import "./index.css"
 import "./timeline.css"
@@ -137,18 +138,25 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
 
 export default function App() {
     const [factionId, setFactionId] = useState<FactionId>("light")
-    const [buildOrder, updateBuildOrder] = useState<Array<PlannerItem & { orderId: string }>>([])
+    const [buildOrders, updateBuildOrders] = useState<Record<FactionId, Array<PlannerItem & { orderId: string }>>>({ light: [], dark: [] })
+    const buildOrder = buildOrders[factionId]
     const nextOrderId = useRef(0)
+    const withOrderIds = useCallback((items: PlannerItem[]) => items.map(item => "orderId" in item
+        ? item as PlannerItem & { orderId: string }
+        : { ...item, orderId: `action-${nextOrderId.current++}` }), [])
     const setBuildOrder = useCallback((update: SetStateAction<PlannerItem[]>) => {
-        updateBuildOrder(current => {
-            const items = typeof update === "function" ? update(current) : update
-            return items.map(item => "orderId" in item
-                ? item as PlannerItem & { orderId: string }
-                : { ...item, orderId: `action-${nextOrderId.current++}` })
+        updateBuildOrders(current => {
+            const items = typeof update === "function" ? update(current[factionId]) : update
+            return { ...current, [factionId]: withOrderIds(items) }
         })
-    }, [])
+    }, [factionId, withOrderIds])
     const [dependencyError, setDependencyError] = useState<string | null>(null)
-    const [gameProfile, setGameProfile] = useState<GameProfile>(initialGameProfile)
+    const [gameProfiles, updateGameProfiles] = useState(loadFactionProfiles)
+    const gameProfile = gameProfiles[factionId]
+    const setGameProfile = useCallback((profile: GameProfile) => {
+        updateGameProfiles(current => ({ ...current, [factionId]: profile }))
+    }, [factionId])
+    useEffect(() => saveFactionProfiles(gameProfiles), [gameProfiles])
     const economy = useMemo(() => economyFromProfile(gameProfile), [gameProfile])
     const { baseFoodLimit } = gameProfile.player
     const { foodPerFarm } = economy
@@ -169,11 +177,11 @@ export default function App() {
     }
     const applyImport = useCallback((result: ReturnType<typeof parseBuildOrder>) => {
         setFactionId(result.faction)
-        setBuildOrder(result.buildOrder)
-        setGameProfile(result.gameProfile)
+        updateBuildOrders(current => ({ ...current, [result.faction]: withOrderIds(result.buildOrder) }))
+        updateGameProfiles(current => ({ ...current, [result.faction]: result.gameProfile }))
         setDependencyError(null)
         setHoverTime(null)
-    }, [])
+    }, [withOrderIds])
     const maxGoldWorkers = Math.max(
         1,
         Math.ceil(
@@ -305,8 +313,8 @@ export default function App() {
                                 className={entry.id === factionId ? "selected" : ""}
                                 onClick={() => {
                                     setFactionId(entry.id)
-                                    setBuildOrder([])
                                     setDependencyError(null)
+                                    setHoverTime(null)
                                 }}
                             >
                                 {entry.name}

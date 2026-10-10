@@ -9,6 +9,8 @@ import { simulateBuildOrder } from "./game/buildSimulation"
 import { economyFromProfile } from "./game/gameProfile"
 
 afterEach(() => window.history.replaceState(null, "", window.location.pathname))
+beforeEach(() => window.localStorage.clear())
+afterEach(() => window.localStorage.clear())
 
 test("opening a shared link restores the plan and recalculates it; invalid hash changes keep it intact", () => {
     const profile = { ...initialGameProfile, delays: { ...initialGameProfile.delays, orderDelay: 2.5 } }
@@ -83,6 +85,50 @@ function upload(text: string) {
     Object.defineProperty(file, "text", { value: async () => text })
     fireEvent.change(screen.getByLabelText("Import build order JSON"), { target: { files: [file] } })
 }
+
+test("Reset to defaults restores every imported profile group while retaining faction, order, and advanced visibility", async () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, "clipboard")
+    const writeText = jest.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
+    try {
+        render(<App />)
+        const doc = documentText()
+        doc.gameProfile.basic = { goldGatherTime: 8, woodGatherTime: 15, initialGoldTravelReduction: 2 }
+        doc.gameProfile.map.goldTravelTime = 6
+        doc.gameProfile.map.woodTravelTime = 7
+        doc.gameProfile.map.sawmillWoodTravelTime = 2
+        doc.gameProfile.delays.orderDelay = 3
+        fireEvent.click(screen.getByText("Import / Export"))
+        upload(JSON.stringify(doc))
+        await waitFor(() => expect(screen.getByRole("heading", { name: "Dark build order" })).toBeTruthy())
+        fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }))
+        expect(screen.queryByLabelText("Gold travel time (seconds each way)")).toBeNull()
+        expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("150")
+        expect((screen.getByLabelText("Starting wood") as HTMLInputElement).value).toBe("50")
+        expect(screen.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeTruthy()
+        expect(screen.getByRole("heading", { name: "Dark build order" })).toBeTruthy()
+        expect(screen.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
+        fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+        for (const [label, value] of [
+            ["Gold travel time (seconds each way)", "4"], ["Wood travel time (seconds each way)", "4"],
+            ["Sawmill wood travel time (seconds)", "0.5"], ["Construction start delay (seconds)", "4"],
+            ["Order delay (seconds)", "1"],
+        ]) expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe(value)
+        fireEvent.change(screen.getByLabelText("Order delay (seconds)"), { target: { value: "9" } })
+        fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }))
+        expect((screen.getByLabelText("Order delay (seconds)") as HTMLInputElement).value).toBe("1")
+        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
+        await waitFor(() => expect(writeText).toHaveBeenCalled())
+        const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
+        expect(result.gameProfile).toEqual(initialGameProfile)
+        expect(result.faction).toBe("dark")
+        expect(result.buildOrder.map(item => item.id)).toEqual(["barracks", "goon", "goon"])
+    } finally {
+        if (original) Object.defineProperty(navigator, "clipboard", original)
+        else delete (navigator as any).clipboard
+    }
+})
 
 test("import replaces faction, profile and order, recalculates timings and preserves state after invalid imports", async () => {
     const { container } = render(<App />)

@@ -1,4 +1,4 @@
-import type { GameProfile } from "./game/gameProfile"
+import { initialGameProfile, type GameProfile } from "./game/gameProfile"
 import { useState, type ReactNode } from "react"
 import { playerLevelFields, yieldsFromLevels } from "./game/playerLevels"
 import type { FactionId } from "./game/gameData"
@@ -55,8 +55,14 @@ export default function GameProfileEditor({ faction, profile, onChange, children
         <p className="initial-allocation">
             Gold per trip: {yields.goldPerTrip} · Wood per trip: {yields.woodPerTrip} · Food per {names.farm}: {yields.foodPerFarm}
         </p>
+        <div className="profile-actions">
         <button className="advanced-toggle" type="button" aria-expanded={advanced} aria-controls="advanced-profile"
             onClick={() => setAdvanced(current => !current)}>{advanced ? "Hide advanced" : "Advanced"}</button>
+        <button className="reset-profile" type="button" onClick={() => onChange({
+            basic: { ...initialGameProfile.basic }, map: { ...initialGameProfile.map },
+            player: { ...initialGameProfile.player }, delays: { ...initialGameProfile.delays },
+        })}>Reset to defaults</button>
+        </div>
         {advanced && <div id="advanced-profile">
         <div className="economy-grid">
             {field("map", "goldTravelTime", "Gold travel time (seconds each way)", 0, 0.1)}

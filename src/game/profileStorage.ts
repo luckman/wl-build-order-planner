@@ -1,0 +1,39 @@
+import { FILE_VERSION, GAME_RULES_VERSION, parseBuildOrder } from "./buildOrderFile"
+import type { FactionId } from "./gameData"
+import { initialGameProfile, type GameProfile } from "./gameProfile"
+
+export type FactionProfiles = Record<FactionId, GameProfile>
+export const profileStorageKey = (faction: FactionId) => `wl-resource-profile-v1-${faction}`
+
+function loadProfile(faction: FactionId): GameProfile {
+    try {
+        const text = window.localStorage.getItem(profileStorageKey(faction))
+        if (text) {
+            // Reuse import validation for every profile field, including hidden settings.
+            return parseBuildOrder(JSON.stringify({
+                format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
+                faction, gameProfile: JSON.parse(text), buildOrder: [],
+            })).gameProfile
+        }
+    } catch {
+        // Invalid data or unavailable storage must not prevent using the planner.
+    }
+    return {
+        basic: { ...initialGameProfile.basic }, map: { ...initialGameProfile.map },
+        player: { ...initialGameProfile.player }, delays: { ...initialGameProfile.delays },
+    }
+}
+
+export function loadFactionProfiles(): FactionProfiles {
+    return { light: loadProfile("light"), dark: loadProfile("dark") }
+}
+
+export function saveFactionProfiles(profiles: FactionProfiles): void {
+    for (const faction of ["light", "dark"] as const) {
+        try {
+            window.localStorage.setItem(profileStorageKey(faction), JSON.stringify(profiles[faction]))
+        } catch {
+            // Keep edits working in React state if browser storage is unavailable or full.
+        }
+    }
+}

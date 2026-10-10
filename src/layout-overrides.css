@@ -8,7 +8,8 @@
 .worker-allocation { min-width: 0; }
 .economy .worker-allocation input[type="range"] { padding: 0; accent-color: #d4aa52; cursor: pointer; }
 .worker-allocation .initial-allocation { font-size: .68rem; line-height: 1.3; }
-.advanced-toggle { justify-self: start; border: 1px solid #3d6383; padding: .4rem .65rem; background: #132333; color: #a9c5df; }
+.profile-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.advanced-toggle, .reset-profile { justify-self: start; border: 1px solid #3d6383; padding: .4rem .65rem; background: #132333; color: #a9c5df; }
 .advanced-toggle::after { content: " ▾"; }
 .advanced-toggle[aria-expanded="true"]::after { content: " ▴"; }
 
