@@ -2,6 +2,15 @@
 
 .resource-chart { position: relative; cursor: crosshair; }
 
+.latest-command-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #929aa3;
+    pointer-events: none;
+}
+
 .hover-line {
     position: absolute;
     top: 0;

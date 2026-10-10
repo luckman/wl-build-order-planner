@@ -543,16 +543,17 @@ test.each(["light", "dark"] as const)("%s Barracks orders reserve escalating pri
     const faction = factions[factionId]
     const barracks = required(faction.items.find(({ id }) => id === "barracks"))
     const { plan } = simulateBuildOrder(
-        [barracks, barracks, barracks],
-        { ...economy, workerCount: 3, woodWorkers: 0 },
+        [barracks, barracks, barracks, barracks],
+        { ...abundantEconomy, workerCount: 4 },
         0, 100, 20, faction.startingTownHall,
     )
-    expect(plan.map(({ commandTime }) => commandTime)).toEqual([1, 1, 1])
-    expect(plan.map(({ startTime }) => startTime)).toEqual([5, 5, 5])
+    expect(plan.map(({ commandTime }) => commandTime)).toEqual([1, 1, 1, 1])
+    expect(plan.map(({ startTime }) => startTime)).toEqual([5, 5, 5, 5])
     expect(plan.map(({ cost }) => cost)).toEqual([
         { gold: 200, wood: 150 },
         { gold: 400, wood: 300 },
-        { gold: 600, wood: 450 },
+        { gold: 800, wood: 600 },
+        { gold: 1600, wood: 1200 },
     ])
     expect(barracks).toMatchObject({ gold: 200, wood: 150 })
 })

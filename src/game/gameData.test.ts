@@ -7,7 +7,7 @@ test.each(["Production", "Racial", "Economic", "Defensive"] as BuildingType[])(
         const upgrade = { ...building, kind: "upgrade" as const }
         const other = { ...building, id: "other-building" }
         const previous = [building, upgrade, other, building]
-        const multiplier = type === "Production" || type === "Racial" ? 3 : 1
+        const multiplier = type === "Production" || type === "Racial" ? 4 : 1
         expect(itemCost(building, previous, "Castle")).toEqual({ gold: 500 * multiplier, wood: 500 * multiplier })
         expect(itemCost(upgrade, previous, "Castle")).toEqual({ gold: 500, wood: 500 })
     },
@@ -155,7 +155,7 @@ test("Miriel inserts Altar prerequisites and cannot be queued twice across multi
     expect(order.map(item => item.id)).toEqual(["barracks", "farm", "castle-lvl-2", "altar-of-heroes", "elven-tree", "miriel"])
     const twoAltars = buildOrderWithDependencies(faction, order, altar)
     expect(() => buildOrderWithDependencies(faction, twoAltars, miriel)).toThrow("Miriel limit reached")
-    expect(itemCost(altar, twoAltars, "Castle")).toEqual({ gold: 450, wood: 300 })
+    expect(itemCost(altar, twoAltars, "Castle")).toEqual({ gold: 600, wood: 400 })
     const removed = twoAltars.filter(item => item.id !== "miriel")
     expect(buildOrderWithDependencies(faction, removed, miriel).filter(item => item.id === "miriel")).toHaveLength(1)
     expect(factions.dark.items.some(item => item.id === "miriel" || item.id === "altar-of-heroes")).toBe(false)

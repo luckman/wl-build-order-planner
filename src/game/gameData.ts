@@ -231,9 +231,9 @@ export const factions = Object.fromEntries(
 export function itemCost(item: PlannerItem, previousItems: PlannerItem[], initialTownHall: string) {
     const scales = item.kind === "building" && (item.type === "Production" || item.type === "Racial")
     const multiplier = scales
-        ? 1 +
+        ? 2 ** (
           Number(item.name === initialTownHall) +
-          previousItems.filter((previous) => previous.kind === "building" && previous.id === item.id).length
+          previousItems.filter((previous) => previous.kind === "building" && previous.id === item.id).length)
         : 1
     return { gold: item.gold * multiplier, wood: item.wood * multiplier }
 }

@@ -264,7 +264,7 @@ test("Barracks prices and resource totals update when orders are added or remove
     fireEvent.click(button)
     expect(button.textContent).toContain("400/300/0")
     fireEvent.click(button)
-    expect(button.textContent).toContain("600/450/0")
+    expect(button.textContent).toContain("800/600/0")
     const summary = container.querySelector(".resource-summary") as HTMLElement
     expect(within(summary).getByText("1400")).toBeTruthy()
     expect(within(summary).getByText("1550")).toBeTruthy()
@@ -344,6 +344,49 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "3" } })
     fireEvent.mouseMove(chart, { clientX: 0 })
     expect(within(screen.getByRole("tooltip")).getByText("Food: 10/20")).toBeTruthy()
+})
+
+test("latest-command markers stay inside graphs during hover while amounts follow the cursor", () => {
+    const { container } = render(<App />)
+    expect(container.querySelector(".latest-command-line")).toBeNull()
+    const worker = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Worker / })
+    fireEvent.click(worker)
+    fireEvent.click(worker)
+
+    const values = () => Array.from(container.querySelectorAll(".timeline-values .resource-value"), value => value.textContent)
+    const snapshot = container.querySelector(".resource-summary") as HTMLElement
+    const snapshotValue = (label: string) => Array.from(snapshot.querySelectorAll("span"))
+        .find(span => span.textContent?.startsWith(label))!.querySelector("b")!.textContent
+    const latestValues = [snapshotValue("Gold"), snapshotValue("Wood"), snapshotValue("Food")]
+    expect(values()).toEqual(latestValues)
+    const marker = container.querySelector(".latest-command-line") as HTMLElement
+    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(3)
+    container.querySelectorAll(".latest-command-line").forEach(line => {
+        expect(line.parentElement?.classList.contains("resource-chart")).toBe(true)
+        expect((line as HTMLElement).style.left).toBe(marker.style.left)
+    })
+    const events = container.querySelectorAll<HTMLElement>(".event.unit")
+    expect(marker.style.left).toBe(events[events.length - 1].style.left)
+    expect(screen.queryByRole("tooltip")).toBeNull()
+
+    const chart = container.querySelector(".resource-chart") as HTMLElement
+    jest.spyOn(chart, "getBoundingClientRect").mockReturnValue({ left: 0, width: 1200 } as DOMRect)
+    fireEvent.mouseMove(chart, { clientX: 1000 })
+    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(3)
+    expect((container.querySelector(".latest-command-line") as HTMLElement).style.left).toBe(marker.style.left)
+    expect(container.querySelectorAll(".hover-line")).toHaveLength(3)
+    expect(within(screen.getByRole("tooltip")).getByText("1:40.0")).toBeTruthy()
+    expect(values()).not.toEqual(latestValues)
+
+    fireEvent.mouseLeave(chart)
+    expect(values()).toEqual(latestValues)
+    expect((container.querySelector(".latest-command-line") as HTMLElement).style.left).toBe(marker.style.left)
+    expect(screen.queryByRole("tooltip")).toBeNull()
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove Worker" })[1])
+    expect((container.querySelector(".latest-command-line") as HTMLElement).style.left)
+        .toBe((container.querySelector(".event.unit") as HTMLElement).style.left)
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }))
+    expect(container.querySelector(".latest-command-line")).toBeNull()
 })
 
 test("the editable construction delay changes building and worker return times", () => {

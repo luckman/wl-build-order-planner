@@ -230,7 +230,9 @@ export default function App() {
             }),
         [baseFoodLimit, foodPerFarm, initialFoodUsed, plan, samples],
     )
-    const inspectedTime = hoverTime ?? endTime
+    const latestCommand = [...plan].reverse().find(({ commandTime }) => commandTime !== null)
+    const latestCommandTime = latestCommand?.commandTime ?? null
+    const inspectedTime = hoverTime ?? latestCommandTime ?? endTime
     const inspectedResources = resourceAt(economy, deliveries, spending, inspectedTime)
     const inspectedFood =
         initialFoodUsed +
@@ -260,8 +262,6 @@ export default function App() {
     const blockedActions = plan.map((action, index) => ({ ...action, index })).filter(({ blocked }) => blocked)
     const timelineWidth = `${Math.max(100, (endTime / TIMELINE_WINDOW_SECONDS) * 100)}%`
     const timelineTicks = Array.from({ length: Math.floor(endTime / 20) + 1 }, (_, index) => index * 20)
-    const latestCommand = [...plan].reverse().find(({ commandTime }) => commandTime !== null)
-    const latestCommandTime = latestCommand?.commandTime ?? null
     const latestResources =
         latestCommandTime === null ? null : resourceAt(economy, deliveries, spending, latestCommandTime)
     const latestFoodUsed =
@@ -387,6 +387,7 @@ export default function App() {
                                         onHover={setHoverTime}
                                         tooltip={tooltip}
                                         tone="gold"
+                                        latestCommandTime={latestCommandTime}
                                         maximum={totalGold}
                                         sampleTimes={samples.map(({ time }) => time)}
                                         values={samples.map(({ gold }) => gold)}
@@ -397,6 +398,7 @@ export default function App() {
                                         onHover={setHoverTime}
                                         tooltip={tooltip}
                                         tone="wood"
+                                        latestCommandTime={latestCommandTime}
                                         maximum={totalWood}
                                         sampleTimes={samples.map(({ time }) => time)}
                                         values={samples.map(({ wood }) => wood)}
@@ -407,6 +409,7 @@ export default function App() {
                                         onHover={setHoverTime}
                                         tooltip={tooltip}
                                         tone="food"
+                                        latestCommandTime={latestCommandTime}
                                         maximum={Math.max(...foodSamples.map(({ limit }) => limit), 1)}
                                         sampleTimes={foodSamples.map(({ time }) => time)}
                                         values={foodSamples.map(({ used }) => used)}
@@ -475,7 +478,7 @@ export default function App() {
                                 ))}
                             </section>}
                             <p className="timeline-help">
-                                Hover a resource graph for its exact time and amount. Food shows used capacity and its
+                                The grey line and resource amounts show the latest command. Hover a resource graph for its exact time and amount. Food shows used capacity and its
                                 limit. Production rows are individual queues. Construction includes outbound travel;
                                 hover a construction or upgrade to see its start, completion, and worker return times.
                             </p>
@@ -588,6 +591,7 @@ type ResourceRowProps = {
     limitValues?: number[]
     endTime: number
     hoverTime: number | null
+    latestCommandTime: number | null
     onHover: (time: number | null) => void
     tooltip: React.ReactNode
 }
@@ -599,6 +603,7 @@ function ResourceRow({
     limitValues,
     endTime,
     hoverTime,
+    latestCommandTime,
     onHover,
     tooltip,
 }: ResourceRowProps) {
@@ -632,6 +637,13 @@ function ResourceRow({
                     <div
                         className="limit-line"
                         style={{ bottom: `${(limitValues[limitValues.length - 1] / maximum) * 100}%` }}
+                    />
+                )}
+                {latestCommandTime !== null && (
+                    <div
+                        className="latest-command-line"
+                        aria-hidden="true"
+                        style={{ left: `${(latestCommandTime / endTime) * 100}%` }}
                     />
                 )}
                 {hoverTime !== null && <div className="hover-line" style={{ left: `${position}%` }} />}
