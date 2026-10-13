@@ -49,7 +49,7 @@ test("starting workers are fixed at five with no profile control, including afte
     const slider = screen.getByLabelText("Initial gold miners") as HTMLInputElement
     expect(slider.max).toBe("5")
     expect(slider.value).toBe("4")
-    expect(first.container.querySelector(".timeline-values")!.textContent).toContain("10 / 20")
+    expect(first.container.querySelector(".resource-legend")!.textContent).toContain("10 / 20")
     expect(loadFactionProfiles().light.player).not.toHaveProperty("startingWorkers")
     expect(JSON.parse(window.localStorage.getItem(profileStorageKey("light"))!).player).not.toHaveProperty("startingWorkers")
     change("Initial gold miners", "2")

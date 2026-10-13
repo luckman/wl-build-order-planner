@@ -81,7 +81,7 @@ test("main worker slider selects every five-worker split and retains it within i
         expect(slider.value).toBe(String(gold))
         expect(slider.getAttribute("aria-valuetext")).toBe(`${gold} gold miners, ${5 - gold} wood gatherers`)
         expect(screen.getByText(`Initial gold miners: ${gold} · Initial wood gatherers: ${5 - gold}`)).toBeTruthy()
-        expect(container.querySelector(".timeline-values")!.textContent).toContain("10 / 20")
+        expect(container.querySelector(".resource-legend")!.textContent).toContain("10 / 20")
     }
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     expect(screen.queryByRole("spinbutton", { name: "Initial gold miners" })).toBeNull()
@@ -121,7 +121,6 @@ test("action cards hide names except upgrades and expose full costs on hover", (
 
 test("timeline shows a 120-second window and extends 30 seconds past the last completion", () => {
     const { container } = render(<App />)
-    expect(screen.getByText("2:00 horizon · scrolls in 120-second views")).toBeTruthy()
     const canvas = container.querySelector(".timeline-canvas") as HTMLElement
     expect(canvas.style.width).toBe("100%")
     expect(within(container.querySelector(".time-scale") as HTMLElement).getByText("2:00")).toBeTruthy()
@@ -129,7 +128,7 @@ test("timeline shows a 120-second window and extends 30 seconds past the last co
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "100000" } })
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
     fireEvent.click(actions.getByRole("button", { name: /Castle lvl 2/ }))
-    expect(screen.getByText("2:00 horizon · scrolls in 120-second views")).toBeTruthy()
+    expect(canvas.style.width).toBe("100%")
     fireEvent.click(actions.getByRole("button", { name: /Castle lvl 3/ }))
     const finishes = Array.from(container.querySelectorAll(".queue-track .event"))
         .map(event => event.getAttribute("title")!.match(/finish (\d+):(\d+(?:\.\d+)?)/)!)
@@ -338,7 +337,7 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
     fireEvent.mouseMove(chart, { clientX: 101 })
     expect(within(screen.getByRole("tooltip")).getByText("0:10.1")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Gold: 200")).toBeTruthy()
-    expect(container.querySelectorAll(".hover-line").length).toBe(3)
+    expect(container.querySelectorAll(".hover-line").length).toBe(2)
     fireEvent.mouseLeave(chart)
     expect(screen.queryByRole("tooltip")).toBeNull()
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "3" } })
@@ -349,18 +348,22 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
 test("latest-command markers stay inside graphs during hover while amounts follow the cursor", () => {
     const { container } = render(<App />)
     expect(container.querySelector(".latest-command-line")).toBeNull()
+    expect(container.querySelector(".latest-command-caption")).toBeNull()
     const worker = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Worker / })
     fireEvent.click(worker)
     fireEvent.click(worker)
 
-    const values = () => Array.from(container.querySelectorAll(".timeline-values .resource-value"), value => value.textContent)
+    const values = () => Array.from(container.querySelectorAll(".resource-legend .resource-value"), value => value.textContent)
     const snapshot = container.querySelector(".resource-summary") as HTMLElement
     const snapshotValue = (label: string) => Array.from(snapshot.querySelectorAll("span"))
         .find(span => span.textContent?.startsWith(label))!.querySelector("b")!.textContent
-    const latestValues = [snapshotValue("Gold"), snapshotValue("Wood"), snapshotValue("Food"), snapshotValue("Mana")]
+    const latestValues = [snapshotValue("Gold"), snapshotValue("Wood"), snapshotValue("Mana"), snapshotValue("Food")]
     expect(values()).toEqual(latestValues)
     const marker = container.querySelector(".latest-command-line") as HTMLElement
-    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(3)
+    const caption = container.querySelector(".latest-command-caption") as HTMLElement
+    const latestTimestamp = caption.textContent
+    expect(latestTimestamp).toBeTruthy()
+    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(2)
     container.querySelectorAll(".latest-command-line").forEach(line => {
         expect(line.parentElement?.classList.contains("resource-chart")).toBe(true)
         expect((line as HTMLElement).style.left).toBe(marker.style.left)
@@ -372,11 +375,12 @@ test("latest-command markers stay inside graphs during hover while amounts follo
     const chart = container.querySelector(".resource-chart") as HTMLElement
     jest.spyOn(chart, "getBoundingClientRect").mockReturnValue({ left: 0, width: 1200 } as DOMRect)
     fireEvent.mouseMove(chart, { clientX: 1000 })
-    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(3)
+    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(2)
     expect((container.querySelector(".latest-command-line") as HTMLElement).style.left).toBe(marker.style.left)
-    expect(container.querySelectorAll(".hover-line")).toHaveLength(3)
+    expect(container.querySelectorAll(".hover-line")).toHaveLength(2)
     expect(within(screen.getByRole("tooltip")).getByText("1:40.0")).toBeTruthy()
     expect(values()).not.toEqual(latestValues)
+    expect(caption.textContent).toBe(latestTimestamp)
 
     fireEvent.mouseLeave(chart)
     expect(values()).toEqual(latestValues)
@@ -387,6 +391,7 @@ test("latest-command markers stay inside graphs during hover while amounts follo
         .toBe((container.querySelector(".event.unit") as HTMLElement).style.left)
     fireEvent.click(screen.getByRole("button", { name: "Clear" }))
     expect(container.querySelector(".latest-command-line")).toBeNull()
+    expect(container.querySelector(".latest-command-caption")).toBeNull()
 })
 
 test("the editable construction delay changes building and worker return times", () => {

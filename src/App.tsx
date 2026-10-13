@@ -228,7 +228,10 @@ export default function App() {
         totalWood = Math.max(...samples.map(({ wood }) => wood), 1)
     const foodSamples = useMemo(
         () =>
-            samples.map(({ time }) => {
+            Array.from(new Set([
+                ...samples.map(({ time }) => time),
+                ...plan.flatMap(({ commandTime, finishTime }) => [commandTime, finishTime].filter((time): time is number => time !== null)),
+            ])).sort((a, b) => a - b).map(time => {
                 const completed = plan.filter(({ item, finishTime }) => finishTime !== null && finishTime <= time)
                 const units = plan
                     .filter(
@@ -384,15 +387,19 @@ export default function App() {
                         </section>
                         <section className="timeline panel">
                             <div className="panel-title">
-                                <h2>Timeline</h2>
-                                <span>{formatTime(endTime)} horizon · scrolls in {TIMELINE_WINDOW_SECONDS}-second views</span>
+                                <div className="timeline-title">
+                                    <h2>Timeline</h2>
+                                    <TimelineHelp />
+                                </div>
                             </div>
                             <div className="timeline-grid">
-                                <div className="timeline-fixed timeline-labels">
-                                    <ResourceLabel name="Gold" tone="gold" />
-                                    <ResourceLabel name="Wood" tone="wood" />
-                                    <ResourceLabel name="Food" tone="food" />
-                                    <ResourceLabel name="Mana" tone="mana" />
+                                <div className="timeline-fixed timeline-legend">
+                                    <div className="resource-legend">
+                                        <ResourceLegendRow name="Gold" tone="gold" value={inspectedResources.gold} />
+                                        <ResourceLegendRow name="Wood" tone="wood" value={inspectedResources.wood} />
+                                        <ResourceLegendRow name="Mana" tone="mana" value={Math.floor(inspectedMana.mana)} limit={inspectedMana.limit} />
+                                        <ResourceLegendRow name="Food" tone="food" value={inspectedFood} limit={inspectedLimit} />
+                                    </div>
                                     <div className="time-scale-spacer" />
                                     {timelineLanes.map((lane) => (
                                         <div className="queue-label" key={lane.label}>{lane.label}</div>
@@ -405,36 +412,31 @@ export default function App() {
                                         hoverTime={hoverTime}
                                         onHover={setHoverTime}
                                         tooltip={tooltip}
-                                        tone="gold"
+                                        name="Gold and wood"
+                                        chartClass="gold-wood-chart"
+                                        showLatestTimestamp
                                         latestCommandTime={latestCommandTime}
                                         maximum={Math.max(totalGold, totalWood)}
-                                        sampleTimes={samples.map(({ time }) => time)}
-                                        values={samples.map(({ gold }) => gold)}
-                                        woodValues={samples.map(({ wood }) => wood)}
+                                        series={[
+                                            { tone: "gold", values: samples.map(({ gold }) => gold), sampleTimes: samples.map(({ time }) => time) },
+                                            { tone: "wood", values: samples.map(({ wood }) => wood), sampleTimes: samples.map(({ time }) => time) },
+                                        ]}
                                     />
                                     <ResourceRow
                                         endTime={endTime}
                                         hoverTime={hoverTime}
                                         onHover={setHoverTime}
                                         tooltip={tooltip}
-                                        tone="food"
+                                        name="Food and mana"
+                                        chartClass="food-mana-chart"
                                         latestCommandTime={latestCommandTime}
-                                        maximum={Math.max(...foodSamples.map(({ limit }) => limit), 1)}
-                                        sampleTimes={foodSamples.map(({ time }) => time)}
-                                        values={foodSamples.map(({ used }) => used)}
-                                        limitValues={foodSamples.map(({ limit }) => limit)}
-                                    />
-                                    <ResourceRow
-                                        endTime={endTime}
-                                        hoverTime={hoverTime}
-                                        onHover={setHoverTime}
-                                        tooltip={tooltip}
-                                        tone="mana"
-                                        latestCommandTime={latestCommandTime}
-                                        maximum={Math.max(...manaSamples.map(({ limit }) => limit), 1)}
-                                        sampleTimes={manaSampleTimes}
-                                        values={manaSamples.map(({ mana }) => Math.floor(mana))}
-                                        limitValues={manaSamples.map(({ limit }) => limit)}
+                                        maximum={Math.max(...foodSamples.map(({ limit, used }) => Math.max(limit, used)), ...manaSamples.map(({ limit }) => limit), 1)}
+                                        series={[
+                                            { tone: "food", capacity: true, step: true, values: foodSamples.map(({ limit }) => limit), sampleTimes: foodSamples.map(({ time }) => time) },
+                                            { tone: "mana", capacity: true, step: true, values: manaSamples.map(({ limit }) => limit), sampleTimes: manaSampleTimes },
+                                            { tone: "food", step: true, values: foodSamples.map(({ used }) => used), sampleTimes: foodSamples.map(({ time }) => time) },
+                                            { tone: "mana", values: manaSamples.map(({ mana }) => Math.floor(mana)), sampleTimes: manaSampleTimes },
+                                        ]}
                                     />
                                     <div className="time-scale">
                                         {timelineTicks.map((time) => (
@@ -481,14 +483,6 @@ export default function App() {
                                     </div>
                                 </div>
                                 </div>
-                                <div className="timeline-fixed timeline-values">
-                                    <ResourceValue value={inspectedResources.gold} />
-                                    <ResourceValue value={inspectedResources.wood} />
-                                    <ResourceValue value={inspectedFood} limit={inspectedLimit} />
-                                    <ResourceValue value={Math.floor(inspectedMana.mana)} limit={inspectedMana.limit} />
-                                    <div className="time-scale-spacer" />
-                                    {timelineLanes.map((lane) => <div className="queue-value" key={lane.label} />)}
-                                </div>
                             </div>
                             {blockedActions.length > 0 && <section className="blocked-actions" aria-label="Blocked actions">
                                 <h3>{blockedActions.length} blocked {blockedActions.length === 1 ? "action" : "actions"}</h3>
@@ -499,11 +493,6 @@ export default function App() {
                                     </div>
                                 ))}
                             </section>}
-                            <p className="timeline-help">
-                                The grey line and resource amounts show the latest command. Hover a resource graph for its exact time and amount. Food shows used capacity and its
-                                limit. Mana regenerates up to its capacity; completed Towers of Mana increase that capacity. Production rows are individual queues. Construction includes outbound travel;
-                                hover a construction or upgrade to see its start, completion, and worker return times.
-                            </p>
                         </section>
                         <section className="economy panel">
                             <div className="panel-title">
@@ -620,28 +609,26 @@ export default function App() {
     )
 }
 type ResourceRowProps = {
-    tone: string
-    values: number[]
-    woodValues?: number[]
-    sampleTimes: number[]
+    name: string
+    chartClass: string
+    series: Array<{ tone: string; values: number[]; sampleTimes: number[]; capacity?: boolean; step?: boolean }>
     maximum: number
-    limitValues?: number[]
     endTime: number
     hoverTime: number | null
     latestCommandTime: number | null
+    showLatestTimestamp?: boolean
     onHover: (time: number | null) => void
     tooltip: React.ReactNode
 }
 function ResourceRow({
-    tone,
-    values,
-    woodValues,
-    sampleTimes,
+    name,
+    chartClass,
+    series,
     maximum,
-    limitValues,
     endTime,
     hoverTime,
     latestCommandTime,
+    showLatestTimestamp,
     onHover,
     tooltip,
 }: ResourceRowProps) {
@@ -649,8 +636,8 @@ function ResourceRow({
     const position = hoverTime === null ? 0 : (hoverTime / endTime) * 100
     return (
         <div
-            className={`resource-chart ${woodValues ? "gold-wood-chart" : `${tone}-chart`}`}
-            aria-label={woodValues ? "Gold and wood graph" : `${tone[0].toUpperCase()}${tone.slice(1)} graph`}
+            className={`resource-chart ${chartClass}`}
+            aria-label={`${name} graph`}
                 onMouseMove={(event) => {
                     const box = event.currentTarget.getBoundingClientRect()
                     const time = Math.min(endTime, Math.max(0, ((event.clientX - box.left) / box.width) * endTime))
@@ -662,47 +649,36 @@ function ResourceRow({
                     setActive(false)
                 }}
             >
-                {woodValues ? (
                     <svg className="resource-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                        {[{ tone: "gold", values }, { tone: "wood", values: woodValues }].map(series => (
+                        {series.map(series => (
                             <polyline
-                                key={series.tone}
-                                className={`${series.tone}-line`}
-                                points={series.values.map((value, index) =>
-                                    `${(sampleTimes[index] / endTime) * 100},${100 - (value / maximum) * 100}`,
-                                ).join(" ")}
+                                key={`${series.tone}-${series.capacity ? "capacity" : "current"}`}
+                                className={`${series.tone}-line ${series.capacity ? "capacity-line" : "current-line"}`}
+                                points={series.values.flatMap((value, index) => {
+                                    const x = (series.sampleTimes[index] / endTime) * 100
+                                    const point = `${x},${100 - (value / maximum) * 100}`
+                                    return series.step && index > 0
+                                        ? [`${x},${100 - (series.values[index - 1] / maximum) * 100}`, point]
+                                        : [point]
+                                }).join(" ")}
                             />
                         ))}
                     </svg>
-                ) : values.slice(0, -1).map((entry, index) => (
-                    <span
-                        key={index}
-                        className={tone}
-                        style={{
-                            height: `${Math.max(2, (entry / maximum) * 100)}%`,
-                            width: `${((sampleTimes[index + 1] - sampleTimes[index]) / endTime) * 100}%`,
-                        }}
-                    />
-                ))}
-                {limitValues && tone !== "mana" && (
-                    <div
-                        className="limit-line"
-                        style={{ bottom: `${(limitValues[limitValues.length - 1] / maximum) * 100}%` }}
-                    />
-                )}
-                {limitValues && tone === "mana" && limitValues.slice(0, -1).map((limit, index) => (
-                    <div key={`limit-${index}`} className="limit-line mana-limit-line" style={{
-                        bottom: `${(limit / maximum) * 100}%`,
-                        left: `${(sampleTimes[index] / endTime) * 100}%`,
-                        width: `${((sampleTimes[index + 1] - sampleTimes[index]) / endTime) * 100}%`,
-                    }} />
-                ))}
                 {latestCommandTime !== null && (
                     <div
                         className="latest-command-line"
                         aria-hidden="true"
                         style={{ left: `${(latestCommandTime / endTime) * 100}%` }}
                     />
+                )}
+                {showLatestTimestamp && latestCommandTime !== null && (
+                    <div
+                        className={`latest-command-caption${latestCommandTime / endTime < 0.08 ? " align-right" : ""}`}
+                        aria-label={`Latest command ${formatTimeWithTenths(latestCommandTime)}`}
+                        style={{ left: `${(latestCommandTime / endTime) * 100}%` }}
+                    >
+                        {formatTimeWithTenths(latestCommandTime)}
+                    </div>
                 )}
                 {hoverTime !== null && <div className="hover-line" style={{ left: `${position}%` }} />}
                 {hoverTime !== null && active && (
@@ -718,8 +694,26 @@ function ResourceRow({
     )
 }
 
-function ResourceLabel({ name, tone }: { name: string; tone: string }) {
-    return <div className="resource-label"><i className={tone} />{name}</div>
+function TimelineHelp() {
+    const [hovered, setHovered] = useState(false)
+    const [focused, setFocused] = useState(false)
+    return <div className="timeline-help-trigger" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+        <button type="button" className="timeline-help-button" aria-label="Timeline help" aria-describedby="timeline-help-text"
+            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        >?</button>
+        <div id="timeline-help-text" className="timeline-help-tooltip" role="tooltip" hidden={!hovered && !focused}>
+            Hover a graph to see resources at that time. Otherwise, values show the latest command.
+            Hover an action to see its command, start, finish, and worker return times.
+            Left-click a command to remove it from the build order.
+        </div>
+    </div>
+}
+
+function ResourceLegendRow({ name, tone, value, limit }: { name: string; tone: string; value: number; limit?: number }) {
+    return <div className="resource-legend-row">
+        <span className="resource-label"><i className={tone} />{name}</span>
+        <ResourceValue value={value} limit={limit} />
+    </div>
 }
 
 function ResourceValue({ value, limit, precision = 0 }: { value: number; limit?: number; precision?: number }) {
