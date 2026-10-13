@@ -14,7 +14,7 @@ import {
     type ItemKind,
     type PlannerItem,
 } from "./game/gameData"
-import { resourceAt, workerAllocationAt } from "./game/resourceSimulation"
+import { manaAt, resourceAt, workerAllocationAt } from "./game/resourceSimulation"
 import { economyFromProfile, type GameProfile } from "./game/gameProfile"
 import { loadFactionProfiles, saveFactionProfiles } from "./game/profileStorage"
 import { loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
@@ -244,6 +244,13 @@ export default function App() {
     const latestCommandTime = latestCommand?.commandTime ?? null
     const inspectedTime = hoverTime ?? latestCommandTime ?? endTime
     const inspectedResources = resourceAt(economy, deliveries, spending, inspectedTime)
+    const manaSampleTimes = Array.from(new Set([
+        ...samples.map(({ time }) => time),
+        ...plan.flatMap(({ item, finishTime }) => item.id === "tower-of-mana" && finishTime !== null ? [finishTime] : []),
+    ])).sort((a, b) => a - b)
+    const manaSamples = manaSampleTimes.map(time => manaAt(economy, plan, time))
+    const inspectedMana = manaAt(economy, plan, inspectedTime)
+    const latestMana = latestCommandTime === null ? null : manaAt(economy, plan, latestCommandTime)
     const inspectedFood =
         initialFoodUsed +
         plan
@@ -263,6 +270,7 @@ export default function App() {
             <div>{formatTimeWithTenths(inspectedTime)}</div>
             <div>Gold: {Math.round(inspectedResources.gold)}</div>
             <div>Wood: {Math.round(inspectedResources.wood)}</div>
+            <div>Mana: {Number(inspectedMana.mana.toFixed(1))}/{inspectedMana.limit}</div>
             <div>
                 Food: {inspectedFood}/{inspectedLimit}
             </div>
@@ -384,6 +392,7 @@ export default function App() {
                                     <ResourceLabel name="Gold" tone="gold" />
                                     <ResourceLabel name="Wood" tone="wood" />
                                     <ResourceLabel name="Food" tone="food" />
+                                    <ResourceLabel name="Mana" tone="mana" />
                                     <div className="time-scale-spacer" />
                                     {timelineLanes.map((lane) => (
                                         <div className="queue-label" key={lane.label}>{lane.label}</div>
@@ -424,6 +433,18 @@ export default function App() {
                                         sampleTimes={foodSamples.map(({ time }) => time)}
                                         values={foodSamples.map(({ used }) => used)}
                                         limitValues={foodSamples.map(({ limit }) => limit)}
+                                    />
+                                    <ResourceRow
+                                        endTime={endTime}
+                                        hoverTime={hoverTime}
+                                        onHover={setHoverTime}
+                                        tooltip={tooltip}
+                                        tone="mana"
+                                        latestCommandTime={latestCommandTime}
+                                        maximum={Math.max(...manaSamples.map(({ limit }) => limit), 1)}
+                                        sampleTimes={manaSampleTimes}
+                                        values={manaSamples.map(({ mana }) => mana)}
+                                        limitValues={manaSamples.map(({ limit }) => limit)}
                                     />
                                     <div className="time-scale">
                                         {timelineTicks.map((time) => (
@@ -474,6 +495,7 @@ export default function App() {
                                     <ResourceValue value={inspectedResources.gold} />
                                     <ResourceValue value={inspectedResources.wood} />
                                     <ResourceValue value={inspectedFood} limit={inspectedLimit} />
+                                    <ResourceValue value={inspectedMana.mana} limit={inspectedMana.limit} precision={1} />
                                     <div className="time-scale-spacer" />
                                     {timelineLanes.map((lane) => <div className="queue-value" key={lane.label} />)}
                                 </div>
@@ -489,7 +511,7 @@ export default function App() {
                             </section>}
                             <p className="timeline-help">
                                 The grey line and resource amounts show the latest command. Hover a resource graph for its exact time and amount. Food shows used capacity and its
-                                limit. Production rows are individual queues. Construction includes outbound travel;
+                                limit. Mana regenerates up to its capacity; completed Towers of Mana increase that capacity. Production rows are individual queues. Construction includes outbound travel;
                                 hover a construction or upgrade to see its start, completion, and worker return times.
                             </p>
                         </section>
@@ -589,6 +611,7 @@ export default function App() {
                                     <span>Gold <b>{Math.round(latestResources.gold)}</b></span>
                                     <span>Wood <b>{Math.round(latestResources.wood)}</b></span>
                                     <span>Food <b>{latestFoodUsed} / {latestFoodLimit}</b></span>
+                                    {latestMana && <span>Mana <b>{Number(latestMana.mana.toFixed(1))} / {latestMana.limit}</b></span>}
                                     <span>Total workers <b>{latestWorkers.total}</b></span>
                                     <span>Gathering gold <b>{latestWorkers.gold}</b></span>
                                     <span>Gathering wood <b>{latestWorkers.wood}</b></span>
@@ -634,7 +657,8 @@ function ResourceRow({
     const position = hoverTime === null ? 0 : (hoverTime / endTime) * 100
     return (
         <div
-            className="resource-chart"
+            className={`resource-chart ${tone}-chart`}
+            aria-label={`${tone[0].toUpperCase()}${tone.slice(1)} graph`}
                 onMouseMove={(event) => {
                     const box = event.currentTarget.getBoundingClientRect()
                     const time = Math.min(endTime, Math.max(0, ((event.clientX - box.left) / box.width) * endTime))
@@ -656,12 +680,19 @@ function ResourceRow({
                         }}
                     />
                 ))}
-                {limitValues && (
+                {limitValues && tone !== "mana" && (
                     <div
                         className="limit-line"
                         style={{ bottom: `${(limitValues[limitValues.length - 1] / maximum) * 100}%` }}
                     />
                 )}
+                {limitValues && tone === "mana" && limitValues.slice(0, -1).map((limit, index) => (
+                    <div key={`limit-${index}`} className="limit-line mana-limit-line" style={{
+                        bottom: `${(limit / maximum) * 100}%`,
+                        left: `${(sampleTimes[index] / endTime) * 100}%`,
+                        width: `${((sampleTimes[index + 1] - sampleTimes[index]) / endTime) * 100}%`,
+                    }} />
+                ))}
                 {latestCommandTime !== null && (
                     <div
                         className="latest-command-line"
@@ -687,6 +718,6 @@ function ResourceLabel({ name, tone }: { name: string; tone: string }) {
     return <div className="resource-label"><i className={tone} />{name}</div>
 }
 
-function ResourceValue({ value, limit }: { value: number; limit?: number }) {
-    return <b className="resource-value">{Math.round(value)}{limit === undefined ? "" : ` / ${limit}`}</b>
+function ResourceValue({ value, limit, precision = 0 }: { value: number; limit?: number; precision?: number }) {
+    return <b className="resource-value">{Number(value.toFixed(precision))}{limit === undefined ? "" : ` / ${limit}`}</b>
 }

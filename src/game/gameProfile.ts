@@ -2,21 +2,21 @@ import type { EconomySettings } from "./resourceSimulation"
 import { initialPlayerLevels, yieldsFromLevels, type PlayerBuildingLevels } from "./playerLevels"
 
 export type GameProfile = {
-    basic: { goldGatherTime: number; woodGatherTime: number; initialGoldTravelReduction: number }
+    basic: { goldGatherTime: number; woodGatherTime: number; initialGoldTravelReduction: number; manaPerMinute: number }
     map: {
         goldTravelTime: number; woodTravelTime: number;
         sawmillWoodTravelTime: number
     }
     player: PlayerBuildingLevels & {
-        startingGold: number; startingWood: number; baseFoodLimit: number
+        startingGold: number; startingWood: number; baseFoodLimit: number; startingMana: number; baseManaLimit: number
     }
     delays: { constructionStartDelay: number; orderDelay: number }
 }
 
 export const initialGameProfile: GameProfile = {
-    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1 },
+    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, manaPerMinute: 10 },
     map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
-    player: { startingGold: 150, startingWood: 50, baseFoodLimit: 20, ...initialPlayerLevels },
+    player: { startingGold: 150, startingWood: 50, baseFoodLimit: 20, startingMana: 35, baseManaLimit: 50, ...initialPlayerLevels },
     delays: { constructionStartDelay: 4, orderDelay: 1 },
 }
 

@@ -10,10 +10,12 @@ Resource profiles and build-order drafts are saved independently per faction in 
 
 `gameProfile` contains four blocks:
 
-- `basic`: `goldGatherTime`, `woodGatherTime`, `initialGoldTravelReduction`.
+- `basic`: `goldGatherTime`, `woodGatherTime`, `initialGoldTravelReduction`, `manaPerMinute` (default 10).
 - `map`: `goldTravelTime`, `woodTravelTime`, `sawmillWoodTravelTime`.
-- `player`: `startingGold`, `startingWood`, `baseFoodLimit`, `townHallLevel`, `sawmillLevel`, `farmLevel`, `barracksLevel`, `industrialBuildingLevel`, `arcaneBuildingLevel`, `workerLevel`.
+- `player`: `startingGold`, `startingWood`, `baseFoodLimit`, `startingMana` (default 35), `baseManaLimit` (default 50), `townHallLevel`, `sawmillLevel`, `farmLevel`, `manaTowerLevel`, `barracksLevel`, `industrialBuildingLevel`, `arcaneBuildingLevel`, `workerLevel`.
 - `delays`: `constructionStartDelay`, `orderDelay`.
+
+Missing mana fields in older profiles default to the values above, with `manaTowerLevel` defaulting to 1. Supplied values are validated normally. Tower levels are integers 1–24 and add 50–55 capacity per completed tower in four-level tiers. Mana regenerates continuously into available capacity; time spent capped does not bank income. Tower completion increases capacity without adding mana. These settings persist and round-trip through JSON and shareable links.
 
 `goldTravelTime` and `woodTravelTime` each apply to both outbound and return trips (default 4 seconds each way). They replace the separate outbound/return fields. Initial gold travel reduction and Sawmill overrides still apply. These travel fields retain their existing behavior.
 

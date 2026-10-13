@@ -3,6 +3,10 @@ import type { PlayerBuildingLevels } from "./playerLevels"
 export type EconomySettings = PlayerBuildingLevels & {
     startingGold: number
     startingWood: number
+    startingMana: number
+    baseManaLimit: number
+    manaPerMinute: number
+    manaPerTower: number
     workerCount: number
     goldWorkers: number
     woodWorkers: number
@@ -21,6 +25,29 @@ export type EconomySettings = PlayerBuildingLevels & {
 
 export type ResourceDelivery = { time: number; gold: number; wood: number; worker: number }
 export type ResourcePoint = { time: number; gold: number; wood: number }
+
+/** Regenerate only into available capacity; income while capped is discarded. */
+export function manaAt(
+    settings: Pick<EconomySettings, "startingMana" | "baseManaLimit" | "manaPerMinute" | "manaPerTower">,
+    actions: Array<{ item: { id: string; kind: string }; finishTime: number | null }>,
+    time: number,
+): { time: number; mana: number; limit: number } {
+    let limit = settings.baseManaLimit
+    let mana = Math.min(settings.startingMana, limit)
+    let previousTime = 0
+    const completions = actions
+        .filter(action => action.item.id === "tower-of-mana" && action.item.kind === "building" &&
+            action.finishTime !== null && action.finishTime <= time)
+        .map(action => action.finishTime!)
+        .sort((a, b) => a - b)
+    for (const completion of completions) {
+        mana = Math.min(limit, mana + (completion - previousTime) * settings.manaPerMinute / 60)
+        limit += settings.manaPerTower
+        previousTime = completion
+    }
+    mana = Math.min(limit, mana + Math.max(0, time - previousTime) * settings.manaPerMinute / 60)
+    return { time, mana, limit }
+}
 export type WorkerStart = { time: number; assignment: "gold" | "wood" }
 
 export type GatheringWorker = {

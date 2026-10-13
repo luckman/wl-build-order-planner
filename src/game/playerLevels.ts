@@ -2,14 +2,14 @@ import { isRecruitable, type PlannerItem } from "./gameData"
 
 export const playerLevelFields = [
     "townHallLevel", "sawmillLevel", "farmLevel", "barracksLevel",
-    "industrialBuildingLevel", "arcaneBuildingLevel", "workerLevel",
+    "industrialBuildingLevel", "arcaneBuildingLevel", "workerLevel", "manaTowerLevel",
 ] as const
 export type PlayerLevelField = typeof playerLevelFields[number]
 export type PlayerBuildingLevels = Record<PlayerLevelField, number>
 
 export const initialPlayerLevels: PlayerBuildingLevels = {
     townHallLevel: 1, sawmillLevel: 1, farmLevel: 1, barracksLevel: 1,
-    industrialBuildingLevel: 1, arcaneBuildingLevel: 1, workerLevel: 1,
+    industrialBuildingLevel: 1, arcaneBuildingLevel: 1, workerLevel: 1, manaTowerLevel: 1,
 }
 
 /** Player progression is separate from building upgrades performed during a match. */
@@ -25,6 +25,7 @@ export function yieldsFromLevels(levels: PlayerBuildingLevels) {
         goldPerTrip: 50 + playerLevelTier(levels.townHallLevel),
         woodPerTrip: 50 + playerLevelTier(levels.sawmillLevel),
         foodPerFarm: 20 + playerLevelTier(levels.farmLevel),
+        manaPerTower: 50 + playerLevelTier(levels.manaTowerLevel),
     }
 }
 

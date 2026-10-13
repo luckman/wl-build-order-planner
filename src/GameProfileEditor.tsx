@@ -29,9 +29,12 @@ export default function GameProfileEditor({ faction, profile, onChange, children
             {field("player", "startingGold", "Starting gold")}
             {field("player", "startingWood", "Starting wood")}
             {field("player", "baseFoodLimit", "Base food limit")}
+            {field("player", "startingMana", "Starting mana")}
+            {field("player", "baseManaLimit", "Base mana capacity")}
             {field("player", "townHallLevel", `${names.townHall} level`, 1, 1, 24)}
             {field("player", "sawmillLevel", "Sawmill level", 1, 1, 24)}
             {field("player", "farmLevel", `${names.farm} level`, 1, 1, 24)}
+            {field("player", "manaTowerLevel", "Tower of Mana level", 1, 1, 24)}
             {field("player", "barracksLevel", "Barracks level", 1, 1, 24)}
             {field("player", "industrialBuildingLevel", `${names.industrial} level`, 1, 1, 24)}
             {field("player", "arcaneBuildingLevel", `${names.arcane} level`, 1, 1, 24)}
@@ -39,6 +42,7 @@ export default function GameProfileEditor({ faction, profile, onChange, children
         </div>
         <p className="initial-allocation">
             Gold per trip: {yields.goldPerTrip} · Wood per trip: {yields.woodPerTrip} · Food per {names.farm}: {yields.foodPerFarm}
+            {` · Mana capacity per Tower of Mana: +${yields.manaPerTower} · Mana regeneration: ${profile.basic.manaPerMinute}/minute`}
         </p>
         <div className="profile-actions">
         <button className="advanced-toggle" type="button" aria-expanded={advanced} aria-controls="advanced-profile"

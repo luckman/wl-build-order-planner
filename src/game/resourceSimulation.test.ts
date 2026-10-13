@@ -4,6 +4,7 @@ import { createDeliveries, WorkerEconomy } from "./resourceSimulation"
 const settings = {
     startingGold: 0,
     startingWood: 0,
+    startingMana: 35, baseManaLimit: 50, manaPerMinute: 10, manaPerTower: 50,
     workerCount: 4,
     goldWorkers: 4,
     woodWorkers: 0,

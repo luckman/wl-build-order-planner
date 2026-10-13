@@ -6,6 +6,7 @@ import type { EconomySettings } from "./resourceSimulation"
 const economy: EconomySettings = {
     startingGold: 2000,
     startingWood: 2000,
+    startingMana: 35, baseManaLimit: 50, manaPerMinute: 10, manaPerTower: 50,
     workerCount: 1,
     goldWorkers: 0,
     woodWorkers: 1,

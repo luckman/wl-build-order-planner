@@ -1,12 +1,12 @@
 import { factions, type FactionId, type PlannerItem } from "./gameData"
-import { STARTING_WORKER_COUNT, initialOpeningAction, type OpeningAction, type GameProfile } from "./gameProfile"
+import { STARTING_WORKER_COUNT, initialGameProfile, initialOpeningAction, type OpeningAction, type GameProfile } from "./gameProfile"
 export type { GameProfile } from "./gameProfile"
 import { type ScheduledAction } from "./buildSimulation"
 import { playerLevelFields, playerLevelTier } from "./playerLevels"
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-10.8"
+export const GAME_RULES_VERSION = "2026-10-13.1"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -58,9 +58,9 @@ export function parseBuildOrder(text: string): {
     if (typeof doc.gameRulesVersion !== "string" || !doc.gameRulesVersion.trim()) throw new Error("Missing gameRulesVersion.")
     const profile = object(doc.gameProfile, "gameProfile")
     const fields: { [Block in keyof GameProfile]: Array<keyof GameProfile[Block]> } = {
-        basic: ["goldGatherTime", "woodGatherTime", "initialGoldTravelReduction"],
+        basic: ["goldGatherTime", "woodGatherTime", "initialGoldTravelReduction", "manaPerMinute"],
         map: ["goldTravelTime", "woodTravelTime", "sawmillWoodTravelTime"],
-        player: ["startingGold", "startingWood", "baseFoodLimit", ...playerLevelFields],
+        player: ["startingGold", "startingWood", "baseFoodLimit", "startingMana", "baseManaLimit", ...playerLevelFields],
         delays: ["constructionStartDelay", "orderDelay"],
     }
     const parsed: Record<string, Record<string, number>> = {}
@@ -68,7 +68,10 @@ export function parseBuildOrder(text: string): {
         const raw = object(profile[block], `gameProfile.${block}`)
         parsed[block] = {}
         for (const key of fields[block]) {
-            parsed[block][key] = number(raw[key], `gameProfile.${block}.${key}`,
+            // Older profiles have no mana fields; retain their other settings.
+            const manaField = ["startingMana", "baseManaLimit", "manaPerMinute", "manaTowerLevel"].includes(key)
+            const value = manaField && !(key in raw) ? initialGameProfile[block][key as keyof typeof initialGameProfile[typeof block]] : raw[key]
+            parsed[block][key] = number(value, `gameProfile.${block}.${key}`,
                 key === "goldGatherTime" || key === "woodGatherTime")
             if (block === "player" && playerLevelFields.some(field => field === key)) {
                 try { playerLevelTier(parsed[block][key]) } catch {

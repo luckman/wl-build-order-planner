@@ -70,7 +70,7 @@ function documentText() {
         gameProfile: {
             basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1 },
             map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
-            player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 30, ...initialPlayerLevels, townHallLevel: 9, farmLevel: 21 },
+            player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 30, startingMana: 35, baseManaLimit: 50, ...initialPlayerLevels, townHallLevel: 9, farmLevel: 21 },
             delays: { constructionStartDelay: 2, orderDelay: 1 },
         },
         buildOrder: [

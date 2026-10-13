@@ -141,7 +141,7 @@ test("timeline shows a 120-second window and extends 30 seconds past the last co
 
 test("player levels default to one and edits stay within integer levels 1–24", () => {
     render(<App />)
-    for (const label of ["Castle level", "Sawmill level", "Farm level", "Barracks level", "Factory level", "Sanctuary level", "Worker level"]) {
+    for (const label of ["Castle level", "Sawmill level", "Farm level", "Tower of Mana level", "Barracks level", "Factory level", "Sanctuary level", "Worker level"]) {
         const input = screen.getByLabelText(label) as HTMLInputElement
         expect(input.value).toBe("1")
         expect(input.min).toBe("1")
@@ -156,11 +156,11 @@ test("player levels default to one and edits stay within integer levels 1–24",
     for (const label of ["Gold per trip", "Wood per trip", "Food per Farm"]) {
         expect(screen.queryByLabelText(label)).toBeNull()
     }
-    expect(screen.getByText("Gold per trip: 50 · Wood per trip: 50 · Food per Farm: 20")).toBeTruthy()
+    expect(screen.getByText(/Gold per trip: 50 · Wood per trip: 50 · Food per Farm: 20/)).toBeTruthy()
     fireEvent.change(screen.getByLabelText("Castle level"), { target: { value: "21" } })
     fireEvent.change(screen.getByLabelText("Sawmill level"), { target: { value: "9" } })
     fireEvent.change(screen.getByLabelText("Farm level"), { target: { value: "5" } })
-    expect(screen.getByText("Gold per trip: 55 · Wood per trip: 52 · Food per Farm: 21")).toBeTruthy()
+    expect(screen.getByText(/Gold per trip: 55 · Wood per trip: 52 · Food per Farm: 21/)).toBeTruthy()
     expect(screen.getByRole("button", { name: /Worker.*16.92s/ })).toBeTruthy()
     fireEvent.change(screen.getByLabelText("Worker level"), { target: { value: "21" } })
     expect(screen.getByRole("button", { name: /Barracks.*28.5s/ })).toBeTruthy()
@@ -170,7 +170,7 @@ test("player levels default to one and edits stay within integer levels 1–24",
     expect(screen.getByLabelText("Workshop level")).toBeTruthy()
     expect(screen.getByLabelText("Dark Gate level")).toBeTruthy()
     expect((screen.getByLabelText("Slave level") as HTMLInputElement).value).toBe("1")
-    expect(screen.getByText("Gold per trip: 50 · Wood per trip: 50 · Food per Pigsty: 20")).toBeTruthy()
+    expect(screen.getByText(/Gold per trip: 50 · Wood per trip: 50 · Food per Pigsty: 20/)).toBeTruthy()
     expect(screen.queryByLabelText("Castle level")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect((screen.getByLabelText("Castle level") as HTMLInputElement).value).toBe("21")
@@ -338,7 +338,7 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
     fireEvent.mouseMove(chart, { clientX: 101 })
     expect(within(screen.getByRole("tooltip")).getByText("0:10.1")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Gold: 200")).toBeTruthy()
-    expect(container.querySelectorAll(".hover-line").length).toBe(3)
+    expect(container.querySelectorAll(".hover-line").length).toBe(4)
     fireEvent.mouseLeave(chart)
     expect(screen.queryByRole("tooltip")).toBeNull()
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "3" } })
@@ -357,10 +357,10 @@ test("latest-command markers stay inside graphs during hover while amounts follo
     const snapshot = container.querySelector(".resource-summary") as HTMLElement
     const snapshotValue = (label: string) => Array.from(snapshot.querySelectorAll("span"))
         .find(span => span.textContent?.startsWith(label))!.querySelector("b")!.textContent
-    const latestValues = [snapshotValue("Gold"), snapshotValue("Wood"), snapshotValue("Food")]
+    const latestValues = [snapshotValue("Gold"), snapshotValue("Wood"), snapshotValue("Food"), snapshotValue("Mana")]
     expect(values()).toEqual(latestValues)
     const marker = container.querySelector(".latest-command-line") as HTMLElement
-    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(3)
+    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(4)
     container.querySelectorAll(".latest-command-line").forEach(line => {
         expect(line.parentElement?.classList.contains("resource-chart")).toBe(true)
         expect((line as HTMLElement).style.left).toBe(marker.style.left)
@@ -372,9 +372,9 @@ test("latest-command markers stay inside graphs during hover while amounts follo
     const chart = container.querySelector(".resource-chart") as HTMLElement
     jest.spyOn(chart, "getBoundingClientRect").mockReturnValue({ left: 0, width: 1200 } as DOMRect)
     fireEvent.mouseMove(chart, { clientX: 1000 })
-    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(3)
+    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(4)
     expect((container.querySelector(".latest-command-line") as HTMLElement).style.left).toBe(marker.style.left)
-    expect(container.querySelectorAll(".hover-line")).toHaveLength(3)
+    expect(container.querySelectorAll(".hover-line")).toHaveLength(4)
     expect(within(screen.getByRole("tooltip")).getByText("1:40.0")).toBeTruthy()
     expect(values()).not.toEqual(latestValues)
 

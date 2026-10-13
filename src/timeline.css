@@ -1,4 +1,6 @@
 .food { background-color: #9b6fca; }
+.mana { background-color: #429fe3; }
+.resource-chart .mana-limit-line { background: #a7dcff; box-shadow: 0 0 3px #429fe3; right: auto; }
 
 .resource-chart { position: relative; cursor: crosshair; }
 

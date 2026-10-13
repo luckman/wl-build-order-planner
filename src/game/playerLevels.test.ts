@@ -10,9 +10,9 @@ test.each([
     [17, 54, 24, 0.95], [20, 54, 24, 0.95], [21, 55, 25, 0.94], [24, 55, 25, 0.94],
 ])("level %s derives yields and worker training duration", (level, resources, food, multiplier) => {
     const profile = { ...initialGameProfile, player: { ...initialGameProfile.player,
-        townHallLevel: level, sawmillLevel: level, farmLevel: level } }
+        townHallLevel: level, sawmillLevel: level, farmLevel: level, manaTowerLevel: level } }
     const economy = economyFromProfile(profile)
-    expect(economy).toMatchObject({ goldPerTrip: resources, woodPerTrip: resources, foodPerFarm: food })
+    expect(economy).toMatchObject({ goldPerTrip: resources, woodPerTrip: resources, foodPerFarm: food, manaPerTower: resources })
     for (const faction of Object.values(factions)) {
         const worker = faction.items.find(item => item.name === faction.workerName)!
         expect(productionDuration(worker, economy)).toBeCloseTo(worker.seconds * multiplier)
@@ -68,10 +68,11 @@ test.each(playerLevelFields)("%s round trips exactly, rejects invalid levels, an
     expect(parsed).toEqual(profile)
     expect(economyFromProfile(parsed).goldPerTrip).toBe(field === "townHallLevel" ? 55 : 50)
     for (const invalid of [0, -1, 1.5, 25, "5", null, undefined]) {
+        if (field === "manaTowerLevel" && invalid === undefined) continue // Older profiles default this new field.
         doc.gameProfile.player[field] = invalid
         expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(field)
     }
-    expect(Object.values(initialPlayerLevels)).toEqual([1, 1, 1, 1, 1, 1, 1])
+    expect(Object.values(initialPlayerLevels)).toEqual([1, 1, 1, 1, 1, 1, 1, 1])
 })
 
 test.each([
