@@ -24,6 +24,7 @@ import { manaAt, resourceAt, workerAllocationAt } from "./game/resourceSimulatio
 import { economyFromProfile, type GameProfile } from "./game/gameProfile"
 import { loadFactionProfiles, saveFactionProfiles } from "./game/profileStorage"
 import { loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
+import type { BuildDraft } from "./game/draftStorage"
 import { actionDuration } from "./game/playerLevels"
 import "./index.css"
 import "./timeline.css"
@@ -209,6 +210,12 @@ export default function App() {
         setDependencyError(null)
         setHoverTime(null)
     }, [withOrderIds])
+    const applyTemplate = (draft: BuildDraft) => {
+        updateBuildOrders(current => ({ ...current, [factionId]: { opening: draft.opening, items: withOrderIds(draft.items) } }))
+        setDependencyError(null)
+        setHoverTime(null)
+        setEditingEventId(null)
+    }
     const maxGoldWorkers = Math.max(
         1,
         Math.ceil(
@@ -339,7 +346,7 @@ export default function App() {
                 </div>
                 <nav>
                     <button className="active">Planner</button>
-                    <BuildOrderFiles faction={factionId} profile={gameProfile} plan={plan} opening={opening} onImport={applyImport} />
+                    <BuildOrderFiles faction={factionId} profile={gameProfile} plan={plan} opening={opening} onImport={applyImport} onSelectTemplate={applyTemplate} />
                 </nav>
             </header>
             <main>

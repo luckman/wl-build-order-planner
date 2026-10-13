@@ -1,5 +1,5 @@
 import { initialPlayerLevels } from "./game/playerLevels"
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import App from "./App"
 import { GAME_RULES_VERSION } from "./game/buildOrderFile"
 import { createShareableLink, parseShareableLink } from "./game/shareableLink"
@@ -7,10 +7,116 @@ import { initialGameProfile } from "./game/gameProfile"
 import { factions } from "./game/gameData"
 import { simulateBuildOrder } from "./game/buildSimulation"
 import { economyFromProfile } from "./game/gameProfile"
+import { draftStorageKey } from "./game/draftStorage"
+import { profileStorageKey } from "./game/profileStorage"
 
 afterEach(() => window.history.replaceState(null, "", window.location.pathname))
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
+
+test("success notices stay for five seconds after the latest operation and support manual dismissal", () => {
+    jest.useFakeTimers()
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(true)
+    try {
+        render(<App />)
+        const loadTemplate = () => {
+            fireEvent.click(screen.getByText("Import / Export"))
+            fireEvent.click(screen.getByRole("button", { name: "10 workers t2 on basic account", exact: true }))
+        }
+        loadTemplate()
+        expect(screen.getByRole("status").classList.contains("file-notice-success")).toBe(true)
+        act(() => { jest.advanceTimersByTime(4000) })
+        loadTemplate()
+        act(() => { jest.advanceTimersByTime(4999) })
+        expect(screen.getByRole("status")).toBeTruthy()
+        act(() => { jest.advanceTimersByTime(1) })
+        expect(screen.queryByRole("status")).toBeNull()
+        loadTemplate()
+        fireEvent.click(screen.getByRole("button", { name: "Dismiss message" }))
+        expect(screen.queryByRole("status")).toBeNull()
+    } finally {
+        confirm.mockRestore()
+        jest.useRealTimers()
+    }
+})
+
+test("shared-link error popups also disappear after five seconds", () => {
+    jest.useFakeTimers()
+    window.history.replaceState(null, "", "#build=2.invalid!")
+    try {
+        render(<App />)
+        expect(screen.getByRole("alert").classList.contains("file-notice-error")).toBe(true)
+        act(() => { jest.advanceTimersByTime(4999) })
+        expect(screen.getByRole("alert")).toBeTruthy()
+        act(() => { jest.advanceTimersByTime(1) })
+        expect(screen.queryByRole("alert")).toBeNull()
+    } finally { jest.useRealTimers() }
+})
+
+test.each([
+    ["10 workers t2 on basic account", ["worker", "worker", "worker", "worker", "barracks", "farm", "worker", "castle-lvl-2"]],
+    ["10 workers t2 with swordsman", ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"]],
+] as const)("template order %s keeps the entire game profile and persists the exact order", (name, ids) => {
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(true)
+    const profile = {
+        ...initialGameProfile,
+        basic: { ...initialGameProfile.basic, goldGatherTime: 4, timeBetweenScrolls: 15 },
+        map: { ...initialGameProfile.map, woodTravelTime: 3 },
+        player: { ...initialGameProfile.player, startingGold: 777, workerLevel: 12 },
+        delays: { ...initialGameProfile.delays, orderDelay: 2 },
+    }
+    window.localStorage.setItem(profileStorageKey("light"), JSON.stringify(profile))
+    try {
+        const { unmount } = render(<App />)
+        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByRole("button", { name, exact: true }))
+        expect(confirm).not.toHaveBeenCalled()
+        const expected = [{ type: "allocate-workers", goldWorkers: 3 }, ...ids.map(itemId => ({ itemId }))]
+        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)).toEqual(expected)
+        expect(JSON.parse(window.localStorage.getItem(profileStorageKey("light"))!)).toEqual(profile)
+        expect((screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement).value).toBe("3")
+        expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
+        unmount()
+        render(<App />)
+        expect(screen.getAllByRole("button", { name: "Remove Worker", exact: true })).toHaveLength(5)
+        expect(screen.getByRole("button", { name: "Remove Castle lvl 2" })).toBeTruthy()
+        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)).toEqual(expected)
+    } finally { confirm.mockRestore() }
+})
+
+test("template orders warn before replacement and cancellation retains the draft", () => {
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(false)
+    try {
+        render(<App />)
+        fireEvent.click(screen.getByRole("button", { name: /^Sawmill \d+ gold/ }))
+        const original = window.localStorage.getItem(draftStorageKey("light"))
+        fireEvent.click(screen.getByText("Import / Export"))
+        const template = screen.getByRole("button", { name: "10 workers t2 with swordsman", exact: true })
+        fireEvent.click(template)
+        expect(confirm).toHaveBeenCalledWith(expect.stringContaining("will replace your current build order"))
+        expect(window.localStorage.getItem(draftStorageKey("light"))).toBe(original)
+        expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(true)
+        confirm.mockReturnValue(true)
+        fireEvent.click(template)
+        expect(screen.queryByRole("button", { name: "Remove Sawmill" })).toBeNull()
+        expect(screen.getByRole("button", { name: "Remove Swordsman" })).toBeTruthy()
+    } finally { confirm.mockRestore() }
+})
+
+test("template suggestions follow the selected faction and leave the other faction draft intact", () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
+    fireEvent.click(screen.getByRole("button", { name: /^Slave \d+ gold/ }))
+    const darkDraft = window.localStorage.getItem(draftStorageKey("dark"))
+    fireEvent.click(screen.getByText("Import / Export"))
+    expect(screen.queryByRole("region", { name: "Start from template" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Light", exact: true }))
+    fireEvent.click(screen.getByText("Import / Export"))
+    fireEvent.click(screen.getByRole("button", { name: "10 workers t2 on basic account", exact: true }))
+    expect(window.localStorage.getItem(draftStorageKey("dark"))).toBe(darkDraft)
+    fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
+    expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
+})
 
 test("opening a shared link restores the plan and recalculates it; invalid hash changes keep it intact", () => {
     const profile = { ...initialGameProfile, delays: { ...initialGameProfile.delays, orderDelay: 2.5 } }
@@ -35,7 +141,7 @@ test("opening a shared link restores the plan and recalculates it; invalid hash 
     expect(screen.queryByRole("alert")).toBeNull()
 })
 
-test("Save shareable link copies the current profile without timings and closes the menu", async () => {
+test("Copy link copies the current profile without timings and closes the menu", async () => {
     const original = Object.getOwnPropertyDescriptor(navigator, "clipboard")
     const writeText = jest.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
@@ -53,8 +159,9 @@ test("Save shareable link copies the current profile without timings and closes 
         expect(menu.open).toBe(false)
         expect(document.activeElement).toBe(startingGold)
         fireEvent.click(screen.getByText("Import / Export"))
-        fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
+        fireEvent.click(screen.getByRole("button", { name: "Copy link" }))
         await waitFor(() => expect(screen.getByRole("status").textContent).toContain("copied"))
+        expect(screen.getByRole("status").classList.contains("file-notice-success")).toBe(true)
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
         const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
         expect(result.gameProfile.player.startingGold).toBe(777)
@@ -62,7 +169,7 @@ test("Save shareable link copies the current profile without timings and closes 
         expect(5 - result.opening.goldWorkers).toBe(2)
         writeText.mockRejectedValueOnce(new Error("Clipboard blocked"))
         fireEvent.click(screen.getByText("Import / Export"))
-        fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
+        fireEvent.click(screen.getByRole("button", { name: "Copy link" }))
         await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Copy the link below"))
         expect((screen.getByLabelText("Shareable link") as HTMLInputElement).value).toBe(writeText.mock.calls[1][0])
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(true)
@@ -127,7 +234,7 @@ test("Reset to defaults restores every imported profile group while retaining fa
         fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }))
         expect((screen.getByLabelText("Order delay (seconds)") as HTMLInputElement).value).toBe("1")
         fireEvent.click(screen.getByText("Import / Export"))
-        fireEvent.click(screen.getByRole("button", { name: "Save shareable link" }))
+        fireEvent.click(screen.getByRole("button", { name: "Copy link" }))
         await waitFor(() => expect(writeText).toHaveBeenCalled())
         const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
         expect(result.gameProfile).toEqual(initialGameProfile)
@@ -149,6 +256,7 @@ test("import replaces faction, profile and order, recalculates timings and prese
     doc.gameRulesVersion = "older-rules"
     upload(JSON.stringify(doc))
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("different game rules"))
+    expect(screen.getByRole("status").classList.contains("file-notice-warning")).toBe(true)
     expect((container.querySelector(".file-menu") as HTMLDetailsElement).open).toBe(false)
     expect(screen.getByRole("button", { name: "Dark", exact: true }).classList.contains("selected")).toBe(true)
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))

@@ -6,6 +6,8 @@ import { type FactionId } from "./game/gameData"
 import { type ScheduledAction } from "./game/buildSimulation"
 
 import type { OpeningAction } from "./game/gameProfile"
+import type { BuildDraft } from "./game/draftStorage"
+import { createBuildOrderFromTemplate, buildOrderTemplates } from "./game/buildOrderTemplates"
 
 type Props = {
     opening: OpeningAction
@@ -13,9 +15,10 @@ type Props = {
     profile: GameProfile
     plan: ScheduledAction[]
     onImport: (result: ReturnType<typeof parseBuildOrder>) => void
+    onSelectTemplate: (draft: BuildDraft) => void
 }
 
-export default function BuildOrderFiles({ faction, profile, plan, opening, onImport }: Props) {
+export default function BuildOrderFiles({ faction, profile, plan, opening, onImport, onSelectTemplate }: Props) {
     const input = useRef<HTMLInputElement>(null)
     const menu = useRef<HTMLDetailsElement>(null)
     const closeMenu = () => {
@@ -26,10 +29,14 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     }
     const [includeTimings, setIncludeTimings] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [message, setMessage] = useState<string | null>(null)
+    const [notice, setNotice] = useState<{ text: string; kind: "success" | "warning" | "error" } | null>(null)
     const [busy, setBusy] = useState(false)
-    const [linkError, setLinkError] = useState<string | null>(null)
     const [manualLink, setManualLink] = useState<string | null>(null)
+    useEffect(() => {
+        if (!notice) return
+        const timeout = window.setTimeout(() => setNotice(null), 5000)
+        return () => window.clearTimeout(timeout)
+    }, [notice])
     useEffect(() => {
         const dismissOutside = (event: MouseEvent) => {
             if (menu.current?.open && event.target instanceof Node && !menu.current.contains(event.target)) {
@@ -45,12 +52,10 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
                 const result = parseShareableLink(window.location.hash)
                 if (!result) return
                 onImport(result)
-                setLinkError(null)
-                setMessage(result.warning ?? "Shared build order and game profile loaded. Timings recalculated.")
+                setNotice({ text: result.warning ?? "Shared build order and game profile loaded. Timings recalculated.", kind: result.warning ? "warning" : "success" })
                 if (menu.current) menu.current.open = false
             } catch (reason) {
-                setMessage(null)
-                setLinkError(reason instanceof Error ? reason.message : "Could not open the shareable link.")
+                setNotice({ text: reason instanceof Error ? reason.message : "Could not open the shareable link.", kind: "error" })
             }
         }
         loadLink()
@@ -59,15 +64,14 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     }, [onImport])
     const shareLink = async () => {
         setBusy(true)
-        setLinkError(null)
         setError(null)
-        setMessage(null)
+        setNotice(null)
         setManualLink(null)
         try {
             const link = createShareableLink(window.location.href, faction, profile, plan, opening)
             try {
                 await navigator.clipboard.writeText(link)
-                setMessage("Shareable link copied to clipboard.")
+                setNotice({ text: "Shareable link copied to clipboard.", kind: "success" })
                 closeMenu()
             } catch {
                 setManualLink(link)
@@ -78,10 +82,9 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     }
     const exportFile = async () => {
         setBusy(true)
-        setLinkError(null)
         setManualLink(null)
         setError(null)
-        setMessage(null)
+        setNotice(null)
         try {
             const saved = await saveJson(serializeBuildOrder(faction, profile, plan, includeTimings, opening), `${faction}-build-order.wl-build-order.json`)
             if (saved) closeMenu()
@@ -96,28 +99,27 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     }}>
         <summary>Import / Export</summary>
         <div className="build-order-files">
+        <small>Import replaces the build order and game profile. Timings are always recalculated.</small>
         <div className="file-buttons">
             <button type="button" onClick={exportFile} disabled={busy}>Export JSON</button>
-            <button type="button" onClick={shareLink} disabled={busy}>Save shareable link</button>
+            <button type="button" onClick={shareLink} disabled={busy}>Copy link</button>
             <button type="button" onClick={() => input.current?.click()} disabled={busy}>Import JSON</button>
         </div>
         <label><input type="checkbox" checked={includeTimings} onChange={event => setIncludeTimings(event.target.checked)} /> Include calculated timings</label>
-        <small>Import replaces the build order and game profile. Timings are always recalculated.</small>
         <input ref={input} type="file" accept=".json,application/json" aria-label="Import build order JSON" hidden
             onChange={async event => {
                 const file = event.target.files?.[0]
                 event.target.value = ""
                 if (!file) return
                 setBusy(true)
-                setLinkError(null)
                 setManualLink(null)
                 setError(null)
-                setMessage(null)
+                setNotice(null)
                 try {
                     if (file.size > MAX_FILE_BYTES) throw new Error("Choose a JSON file smaller than 1 MB.")
                     const result = parseBuildOrder(await file.text())
                     onImport(result)
-                    setMessage(result.warning ?? "Build order and game profile imported. Timings recalculated.")
+                    setNotice({ text: result.warning ?? "Build order and game profile imported. Timings recalculated.", kind: result.warning ? "warning" : "success" })
                     closeMenu()
                 } catch (reason) {
                     setError(reason instanceof Error ? reason.message : "Could not read the file.")
@@ -126,11 +128,25 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
         {error && <p role="alert">{error}</p>}
         {manualLink && <label>Shareable link<input readOnly value={manualLink}
             ref={element => { element?.focus(); element?.select() }} onFocus={event => event.target.select()} /></label>}
+        {buildOrderTemplates[faction].length > 0 && <section className="build-order-templates" aria-label="Start from template">
+            <strong>Start from template</strong>
+            <small>Replace the build order while keeping your Resource collection settings.</small>
+            <div className="file-buttons">
+                {buildOrderTemplates[faction].map(template => <button key={template.name} type="button" disabled={busy} onClick={() => {
+                    if (plan.length > 0 && !window.confirm(`“${template.name}” will replace your current build order. Continue?`)) return
+                    onSelectTemplate(createBuildOrderFromTemplate(faction, template))
+                    setError(null)
+                    setManualLink(null)
+                    setNotice({ text: "Build order template loaded. Resource collection settings preserved. Timings recalculated.", kind: "success" })
+                    closeMenu()
+                }}>{template.name}</button>)}
+            </div>
+        </section>}
         </div>
     </details>
-    {(message || linkError) && <div className="file-notice" role={linkError ? "alert" : "status"}>
-        <span>{linkError ?? message}</span>
-        <button type="button" aria-label="Dismiss import message" onClick={() => { setMessage(null); setLinkError(null) }}>×</button>
+    {notice && <div className={`file-notice file-notice-${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"}>
+        <span>{notice.text}</span>
+        <button type="button" aria-label="Dismiss message" onClick={() => setNotice(null)}>×</button>
     </div>}
     </>
 }

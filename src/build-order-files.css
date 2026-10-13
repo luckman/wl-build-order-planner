@@ -5,16 +5,22 @@
 .file-menu > summary:focus-visible { outline: 2px solid #e3b75e; outline-offset: -3px; }
 .build-order-files { position: absolute; right: 0; top: 100%; z-index: 20; width: min(320px, calc(100vw - 1.5rem)); display: grid; gap: .6rem; padding: .75rem; border: 1px solid #34536e; background: #101d2c; box-shadow: 0 4px 12px #0008; }
 .file-buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
+.build-order-templates { display: grid; gap: .6rem; margin-top: .6rem; padding-top: 1rem; border-top: 1px solid #34536e; }
+.build-order-templates strong { font-size: .95rem; color: #dce6f4; }
+.build-order-templates .file-buttons { display: grid; }
+.build-order-templates button { text-align: left; }
 .file-buttons button { padding: .4rem .6rem; border: 1px solid #3d6383; background: #132333; color: #dce6f4; }
 .build-order-files label { display: flex; align-items: center; gap: .4rem; font-size: .76rem; }
 .build-order-files small { color: #a9c1d3; font-size: .72rem; line-height: 1.4; }
 .build-order-files p { margin: 0; font-size: .76rem; line-height: 1.4; overflow-wrap: anywhere; }
 .build-order-files [role="alert"] { color: #ffb5a9; }
-.build-order-files [role="status"] { color: #e1b55f; }
+.build-order-files [role="status"] { color: #9be1af; }
 .build-order-files label:has(input[readonly]) { display: grid; }
 .build-order-files input[readonly] { min-width: 0; width: 100%; padding: .4rem; border: 1px solid #3d6383; background: #080e17; color: #dce6f4; }
 .file-notice { position: fixed; top: 64px; right: 16px; z-index: 25; width: min(360px, calc(100vw - 2rem)); display: flex; align-items: flex-start; gap: .5rem; padding: .75rem; border: 1px solid #34536e; background: #101d2c; color: #e1b55f; font-size: .8rem; line-height: 1.4; box-shadow: 0 4px 12px #0008; }
-.file-notice button { border: 0; background: transparent; color: #a9c5df; padding: 0 .3rem; }
+.file-notice-success { border-color: #3b7951; background: #11291d; color: #9be1af; }
+.file-notice-error { border-color: #96564f; background: #2d191c; color: #ffb5a9; }
+.file-notice button { border: 0; background: transparent; color: inherit; padding: 0 .3rem; }
 @media (max-width: 700px) {
     .topbar { height: auto; min-height: 54px; flex-wrap: wrap; padding: .5rem .75rem 0; gap: .5rem; }
     .topbar nav { display: flex; height: 42px; margin-left: auto; }
