@@ -338,7 +338,7 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
     fireEvent.mouseMove(chart, { clientX: 101 })
     expect(within(screen.getByRole("tooltip")).getByText("0:10.1")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Gold: 200")).toBeTruthy()
-    expect(container.querySelectorAll(".hover-line").length).toBe(4)
+    expect(container.querySelectorAll(".hover-line").length).toBe(3)
     fireEvent.mouseLeave(chart)
     expect(screen.queryByRole("tooltip")).toBeNull()
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "3" } })
@@ -360,7 +360,7 @@ test("latest-command markers stay inside graphs during hover while amounts follo
     const latestValues = [snapshotValue("Gold"), snapshotValue("Wood"), snapshotValue("Food"), snapshotValue("Mana")]
     expect(values()).toEqual(latestValues)
     const marker = container.querySelector(".latest-command-line") as HTMLElement
-    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(4)
+    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(3)
     container.querySelectorAll(".latest-command-line").forEach(line => {
         expect(line.parentElement?.classList.contains("resource-chart")).toBe(true)
         expect((line as HTMLElement).style.left).toBe(marker.style.left)
@@ -372,9 +372,9 @@ test("latest-command markers stay inside graphs during hover while amounts follo
     const chart = container.querySelector(".resource-chart") as HTMLElement
     jest.spyOn(chart, "getBoundingClientRect").mockReturnValue({ left: 0, width: 1200 } as DOMRect)
     fireEvent.mouseMove(chart, { clientX: 1000 })
-    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(4)
+    expect(container.querySelectorAll(".latest-command-line")).toHaveLength(3)
     expect((container.querySelector(".latest-command-line") as HTMLElement).style.left).toBe(marker.style.left)
-    expect(container.querySelectorAll(".hover-line")).toHaveLength(4)
+    expect(container.querySelectorAll(".hover-line")).toHaveLength(3)
     expect(within(screen.getByRole("tooltip")).getByText("1:40.0")).toBeTruthy()
     expect(values()).not.toEqual(latestValues)
 

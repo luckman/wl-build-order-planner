@@ -53,3 +53,6 @@ Use only these values unless new values are provided by the project owner.
 ## Verification
 
 - For source changes, run `npm run build` and `npm run typecheck` when dependencies are available.
+- Run Jest without watch mode: `npm run testAll -- --runInBand` (add `--silent` if existing React deprecation warnings obscure the results).
+- On Windows, Jest may fail before running tests with `EPERM: operation not permitted, realpath` from `jest-util` / `jest-config`, often while resolving the sandbox's temporary directory. This is an execution-environment failure. Retry the same test command with `sandbox_permissions: "require_escalated"` through the normal approval mechanism when available; this resolved the issue on 2026-10-13. Changing `TEMP` / `TMP` did not resolve it, so avoid repeated temporary-directory workarounds or changes to application code for this error.
+- Actual test assertion failures still require investigation and fixes. If the retry is unavailable or denied, report that tests could not run and include the environment error; do not report them as passing.

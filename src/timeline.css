@@ -4,6 +4,12 @@
 
 .resource-chart { position: relative; cursor: crosshair; }
 
+.gold-wood-chart { height: 88px; }
+.resource-lines { width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.resource-lines polyline { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.gold-line { stroke: #d3a741; }
+.wood-line { stroke: #5caa73; }
+
 .latest-command-line {
     position: absolute;
     top: 0;

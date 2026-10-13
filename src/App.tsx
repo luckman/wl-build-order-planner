@@ -270,7 +270,7 @@ export default function App() {
             <div>{formatTimeWithTenths(inspectedTime)}</div>
             <div>Gold: {Math.round(inspectedResources.gold)}</div>
             <div>Wood: {Math.round(inspectedResources.wood)}</div>
-            <div>Mana: {Number(inspectedMana.mana.toFixed(1))}/{inspectedMana.limit}</div>
+            <div>Mana: {Math.floor(inspectedMana.mana)}/{inspectedMana.limit}</div>
             <div>
                 Food: {inspectedFood}/{inspectedLimit}
             </div>
@@ -407,20 +407,10 @@ export default function App() {
                                         tooltip={tooltip}
                                         tone="gold"
                                         latestCommandTime={latestCommandTime}
-                                        maximum={totalGold}
+                                        maximum={Math.max(totalGold, totalWood)}
                                         sampleTimes={samples.map(({ time }) => time)}
                                         values={samples.map(({ gold }) => gold)}
-                                    />
-                                    <ResourceRow
-                                        endTime={endTime}
-                                        hoverTime={hoverTime}
-                                        onHover={setHoverTime}
-                                        tooltip={tooltip}
-                                        tone="wood"
-                                        latestCommandTime={latestCommandTime}
-                                        maximum={totalWood}
-                                        sampleTimes={samples.map(({ time }) => time)}
-                                        values={samples.map(({ wood }) => wood)}
+                                        woodValues={samples.map(({ wood }) => wood)}
                                     />
                                     <ResourceRow
                                         endTime={endTime}
@@ -443,7 +433,7 @@ export default function App() {
                                         latestCommandTime={latestCommandTime}
                                         maximum={Math.max(...manaSamples.map(({ limit }) => limit), 1)}
                                         sampleTimes={manaSampleTimes}
-                                        values={manaSamples.map(({ mana }) => mana)}
+                                        values={manaSamples.map(({ mana }) => Math.floor(mana))}
                                         limitValues={manaSamples.map(({ limit }) => limit)}
                                     />
                                     <div className="time-scale">
@@ -495,7 +485,7 @@ export default function App() {
                                     <ResourceValue value={inspectedResources.gold} />
                                     <ResourceValue value={inspectedResources.wood} />
                                     <ResourceValue value={inspectedFood} limit={inspectedLimit} />
-                                    <ResourceValue value={inspectedMana.mana} limit={inspectedMana.limit} precision={1} />
+                                    <ResourceValue value={Math.floor(inspectedMana.mana)} limit={inspectedMana.limit} />
                                     <div className="time-scale-spacer" />
                                     {timelineLanes.map((lane) => <div className="queue-value" key={lane.label} />)}
                                 </div>
@@ -611,7 +601,7 @@ export default function App() {
                                     <span>Gold <b>{Math.round(latestResources.gold)}</b></span>
                                     <span>Wood <b>{Math.round(latestResources.wood)}</b></span>
                                     <span>Food <b>{latestFoodUsed} / {latestFoodLimit}</b></span>
-                                    {latestMana && <span>Mana <b>{Number(latestMana.mana.toFixed(1))} / {latestMana.limit}</b></span>}
+                                    {latestMana && <span>Mana <b>{Math.floor(latestMana.mana)} / {latestMana.limit}</b></span>}
                                     <span>Total workers <b>{latestWorkers.total}</b></span>
                                     <span>Gathering gold <b>{latestWorkers.gold}</b></span>
                                     <span>Gathering wood <b>{latestWorkers.wood}</b></span>
@@ -632,6 +622,7 @@ export default function App() {
 type ResourceRowProps = {
     tone: string
     values: number[]
+    woodValues?: number[]
     sampleTimes: number[]
     maximum: number
     limitValues?: number[]
@@ -644,6 +635,7 @@ type ResourceRowProps = {
 function ResourceRow({
     tone,
     values,
+    woodValues,
     sampleTimes,
     maximum,
     limitValues,
@@ -657,8 +649,8 @@ function ResourceRow({
     const position = hoverTime === null ? 0 : (hoverTime / endTime) * 100
     return (
         <div
-            className={`resource-chart ${tone}-chart`}
-            aria-label={`${tone[0].toUpperCase()}${tone.slice(1)} graph`}
+            className={`resource-chart ${woodValues ? "gold-wood-chart" : `${tone}-chart`}`}
+            aria-label={woodValues ? "Gold and wood graph" : `${tone[0].toUpperCase()}${tone.slice(1)} graph`}
                 onMouseMove={(event) => {
                     const box = event.currentTarget.getBoundingClientRect()
                     const time = Math.min(endTime, Math.max(0, ((event.clientX - box.left) / box.width) * endTime))
@@ -670,7 +662,19 @@ function ResourceRow({
                     setActive(false)
                 }}
             >
-                {values.slice(0, -1).map((entry, index) => (
+                {woodValues ? (
+                    <svg className="resource-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                        {[{ tone: "gold", values }, { tone: "wood", values: woodValues }].map(series => (
+                            <polyline
+                                key={series.tone}
+                                className={`${series.tone}-line`}
+                                points={series.values.map((value, index) =>
+                                    `${(sampleTimes[index] / endTime) * 100},${100 - (value / maximum) * 100}`,
+                                ).join(" ")}
+                            />
+                        ))}
+                    </svg>
+                ) : values.slice(0, -1).map((entry, index) => (
                     <span
                         key={index}
                         className={tone}
