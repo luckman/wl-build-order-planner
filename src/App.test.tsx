@@ -7,6 +7,29 @@ import { draftStorageKey } from "./game/draftStorage"
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
+function chooseUpgrade(name: string) {
+    const trigger = screen.getByRole("button", { name: `${name.split(" lvl ")[0]} upgrade` })
+    if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole("menuitem", { name: new RegExp(`^${name} `) }))
+}
+
+test("opening upgrade cards adds nothing and selecting a higher level inserts prerequisites for either faction", () => {
+    render(<App />)
+    const castle = screen.getByRole("button", { name: "Castle upgrade" })
+    fireEvent.click(castle)
+    expect(screen.queryByRole("button", { name: /^Remove / })).toBeNull()
+    chooseUpgrade("Castle lvl 3")
+    expect(screen.getByRole("button", { name: "Remove Castle lvl 2" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Remove Castle lvl 3" })).toBeTruthy()
+    expect(castle.getAttribute("aria-expanded")).toBe("false")
+    expect(screen.queryByRole("menu")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(screen.queryByRole("button", { name: "Castle upgrade" })).toBeNull()
+    expect(screen.getAllByRole("button", { name: "Citadel upgrade" })).toHaveLength(1)
+    chooseUpgrade("Citadel lvl 2")
+    expect(screen.getByRole("button", { name: "Remove Citadel lvl 2" })).toBeTruthy()
+})
+
 test("faction drafts survive switching and Clear only clears the selected draft", () => {
     const { container } = render(<App />)
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
@@ -29,6 +52,27 @@ test("faction drafts survive switching and Clear only clears the selected draft"
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(screen.queryByRole("button", { name: "Remove Worker" })).toBeNull()
     expect(screen.queryByRole("button", { name: "Remove Farm" })).toBeNull()
+})
+
+test("upgrade menus support keyboard navigation, focus return, outside dismissal and faction switching", () => {
+    render(<App />)
+    const trigger = screen.getByRole("button", { name: "Castle upgrade" })
+    fireEvent.keyDown(trigger, { key: "ArrowDown" })
+    const options = screen.getAllByRole("menuitem")
+    expect(document.activeElement).toBe(options[0])
+    fireEvent.keyDown(options[0], { key: "ArrowDown" })
+    expect(document.activeElement).toBe(options[1])
+    fireEvent.keyDown(options[1], { key: "End" })
+    expect(document.activeElement).toBe(options[options.length - 1])
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" })
+    expect(screen.queryByRole("menu")).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+    fireEvent.click(trigger)
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole("menu")).toBeNull()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(screen.queryByRole("menu")).toBeNull()
 })
 
 test("shared imports replace their faction draft and preserve the other draft", () => {
@@ -108,7 +152,7 @@ test("main worker slider selects one to four gold miners and retains it within i
     expect(screen.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeTruthy()
 })
 
-test("action cards hide names except upgrades and expose full costs on hover", () => {
+test("action cards expose hover costs and group upgrades in dropdown cards", () => {
     const { container } = render(<App />)
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
     expect(actions.getByRole("heading", { name: "Actions" })).toBeTruthy()
@@ -117,11 +161,16 @@ test("action cards hide names except upgrades and expose full costs on hover", (
     expect(actions.queryByText("Click to add")).toBeNull()
     const castle = actions.getByRole("button", { name: /^Castle 500 gold/ })
     const worker = actions.getByRole("button", { name: /^Worker / })
-    const upgrade = actions.getByRole("button", { name: /Castle lvl 2/ })
+    const upgrade = actions.getByRole("button", { name: "Castle upgrade" })
     expect(castle.querySelector(".action-name")).toBeNull()
     expect(worker.querySelector(".action-name")).toBeNull()
-    expect(upgrade.querySelector(".action-name")?.textContent).toBe("lvl 2")
-    expect(upgrade.title).toContain("Castle lvl 2\nGold: 200\nWood: 200\nFood: 0\nTime: 45s")
+    expect(upgrade.querySelector(".action-name")?.textContent).toBe("Upgrade")
+    expect(upgrade.querySelector(".action-stat")).toBeNull()
+    expect(actions.queryByRole("button", { name: /Castle lvl/ })).toBeNull()
+    expect(screen.queryByRole("menuitem")).toBeNull()
+    fireEvent.click(upgrade)
+    expect(screen.getByRole("menuitem", { name: "Castle lvl 2 200 gold · 200 wood · 0 food" })).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
     expect(within(castle).getByText("500/500/0")).toBeTruthy()
     expect(within(worker).getByText("150/0/2")).toBeTruthy()
     expect(within(castle).queryByText("60s")).toBeNull()
@@ -143,9 +192,9 @@ test("timeline shows a 120-second window and extends 30 seconds past the last co
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "100000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "100000" } })
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
-    fireEvent.click(actions.getByRole("button", { name: /Castle lvl 2/ }))
+    chooseUpgrade("Castle lvl 2")
     expect(canvas.style.width).toBe("100%")
-    fireEvent.click(actions.getByRole("button", { name: /Castle lvl 3/ }))
+    chooseUpgrade("Castle lvl 3")
     const finishes = Array.from(container.querySelectorAll(".queue-track .event"))
         .map(event => event.getAttribute("title")!.match(/finish (\d+):(\d+(?:\.\d+)?)/)!)
         .map(match => Number(match[1]) * 60 + Number(match[2]))
@@ -237,14 +286,13 @@ test("duplicate upgrades are rejected until another Castle is explicitly added",
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "100000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "100000" } })
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
-    const upgrade = actions.getByRole("button", { name: /Castle lvl 2/ })
-    fireEvent.click(upgrade)
-    fireEvent.click(upgrade)
+    chooseUpgrade("Castle lvl 2")
+    chooseUpgrade("Castle lvl 2")
     expect(screen.getByRole("alert").textContent).toBe("Requires another Castle")
     const order = container.querySelector(".order") as HTMLElement
     expect(within(order).getAllByText("Castle lvl 2")).toHaveLength(1)
     fireEvent.click(actions.getByRole("button", { name: /^Castle 500 gold/ }))
-    fireEvent.click(upgrade)
+    chooseUpgrade("Castle lvl 2")
     expect(screen.queryByRole("alert")).toBeNull()
     expect(within(order).getAllByText("Castle lvl 2")).toHaveLength(2)
 })
@@ -429,9 +477,7 @@ test("town hall upgrades show builder travel and return time in the construction
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
-    fireEvent.click(
-        within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /Castle lvl 2/ }),
-    )
+    chooseUpgrade("Castle lvl 2")
 
     expect(container.querySelector(".event.upgrade")?.getAttribute("title")).toBe(
         "Command 0:36 · start 0:40 · finish 1:25 · worker returns 1:29",

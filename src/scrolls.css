@@ -1,4 +1,4 @@
-.hero-scroll-grid { grid-template-columns: repeat(3, 78px) 10px 78px; }
+.hero-scroll-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px var(--action-card-width); }
 .scroll-card-delimiter { border-left: 1px solid #49667e; margin: 10px 4px; }
 .scroll-order-marker { color: #bda3d5; text-align: center; }
 .order-timed-event { cursor: pointer; }

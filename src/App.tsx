@@ -3,6 +3,7 @@ import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-p
 import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
 import ScrollDialog from "./ScrollDialog"
+import UpgradeCards from "./UpgradeCards"
 import EventTimeDialog from "./EventTimeDialog"
 import { createScrollAction, GOLD_RUSH, isScrollAction } from "./game/scrolls"
 import { earliestScrollTime } from "./game/scrollTiming"
@@ -367,7 +368,15 @@ export default function App() {
                                 {dependencyError && <p role="alert">{dependencyError}</p>}
                                 {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
                                     <section key={kind} aria-label={kind === "hero" ? "heroes" : `${kind}s`}>
-                                        <div className={`action-grid${kind === "hero" && factionId === "light" ? " hero-scroll-grid" : ""}`}>
+                                        {kind === "upgrade" ? <UpgradeCards key={faction.id} faction={faction} buildOrder={buildOrder} iconSources={iconSources}
+                                            onAdd={item => {
+                                                try {
+                                                    setBuildOrder(buildOrderWithDependencies(faction, buildOrder, item))
+                                                    setDependencyError(null)
+                                                } catch (error) {
+                                                    setDependencyError((error as Error).message)
+                                                }
+                                            }} /> : <div className={`action-grid${kind === "hero" && factionId === "light" ? " hero-scroll-grid" : ""}`}>
                                             {faction.items
                                                 .filter((item) => item.kind === kind)
                                                 .map((item) => {
@@ -389,7 +398,6 @@ export default function App() {
                                                                 }
                                                             }}
                                                         >
-                                                            {kind === "upgrade" && <span className="action-name">lvl {item.level}</span>}
                                                             <img src={iconSources[item.icon]} alt="" />
                                                             <small>
                                                                 <span className="action-stat">{cost.gold}/{cost.wood}/{food}</span>
@@ -405,7 +413,7 @@ export default function App() {
                                                     <small><span className="action-stat">{GOLD_RUSH.manaCost} mana</span></small>
                                                 </button>
                                             </>}
-                                        </div>
+                                        </div>}
                                     </section>
                                 ))}
                             </div>
