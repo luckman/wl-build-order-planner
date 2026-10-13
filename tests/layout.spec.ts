@@ -19,11 +19,9 @@ test("Reset to defaults restores main and hidden advanced settings without clear
 })
 
 test("blocked actions use red order rows and a prominent timeline warning, clearing when resolved", async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem("wl-build-draft-v2-light", JSON.stringify([{ type: "allocate-workers", goldWorkers: 5 }])))
     await page.goto("http://localhost:2987")
     await page.getByLabel("Starting wood", { exact: true }).fill("0")
-    const slider = page.getByRole("slider", { name: "Initial gold miners" })
-    await slider.focus()
-    await slider.press("End")
     await page.locator(".action-panel").getByRole("button", { name: /^Barracks \d/ }).click()
     const row = page.locator(".order li").first()
     await expect(row).toHaveClass("order-blocked")
@@ -35,8 +33,6 @@ test("blocked actions use red order rows and a prominent timeline warning, clear
     const graph = (await page.locator(".timeline-grid").boundingBox())!
     const notice = (await warning.boundingBox())!
     expect(notice.y).toBeGreaterThan(graph.y + graph.height)
-    const help = (await page.locator(".timeline-help").boundingBox())!
-    expect(notice.y + notice.height).toBeLessThanOrEqual(help.y)
     await page.screenshot({ path: "test-results/blocked-actions.png", fullPage: true })
     await page.getByLabel("Starting wood", { exact: true }).fill("2000")
     await expect(row).not.toHaveClass("order-blocked")
@@ -57,7 +53,17 @@ for (const width of [1440, 1024, 390]) {
             expect(actions!.width).toBe(timeline!.width)
             expect(timeline!.y - (actions!.y + actions!.height)).toBeCloseTo(12, 0)
             const groups = page.locator(".action-groups > section")
-            await expect(page.locator(".action-panel .panel-title")).toHaveCount(0)
+            await expect(page.locator(".action-panel").getByRole("heading", { name: "Actions" })).toBeVisible()
+            await expect(page.getByText("Economy timeline", { exact: true })).toHaveCount(0)
+            await expect(page.getByRole("heading", { name: `${faction} build order` })).toHaveCount(0)
+            const switcher = (await page.locator(".factions").boundingBox())!
+            const order = (await page.locator(".order").boundingBox())!
+            if (width > 1050) {
+                expect(actions!.y).toBeCloseTo(switcher.y, 0)
+                expect(order.y).toBeGreaterThan(switcher.y + switcher.height)
+            } else {
+                expect(actions!.y).toBeGreaterThan(switcher.y + switcher.height)
+            }
             await expect(groups.locator("h3")).toHaveCount(0)
             expect(await groups.evaluateAll(elements => elements.map(el => el.getAttribute("aria-label"))))
                 .toEqual(["buildings", "units", "heroes", "upgrades"])
@@ -89,7 +95,7 @@ for (const width of [1440, 1024, 390]) {
             await expect(firstCard).toHaveAttribute("title", `${faction === "Light" ? "Castle" : "Citadel"}\nGold: 500\nWood: 500\nFood: 0\nTime: 60s`)
             expect(timeline!.width).toBe(planner!.width)
             expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
-            await expect(page.getByText("2:00 horizon · scrolls in 120-second views")).toBeVisible()
+            await expect(page.locator(".timeline").getByRole("heading", { name: "Timeline", exact: true })).toBeVisible()
             if (faction === "Light") {
                 await page.screenshot({ path: `test-results/layout-${width}.png`, fullPage: true })
             }
@@ -150,7 +156,7 @@ test("resource collection has four columns and the fixed opening action supports
     const slider = page.getByRole("slider", { name: "Initial gold miners" })
     await expect(page.locator(".economy").getByRole("slider")).toHaveCount(0)
     await expect(page.getByLabel("Starting workers", { exact: true })).toHaveCount(0)
-    await expect(slider).toHaveAttribute("max", "5")
+    await expect(slider).toHaveAttribute("max", "4")
     await expect(page.locator(".order").getByRole("slider")).toHaveCount(1)
     await expect(page.getByRole("region", { name: "Opening worker allocation" }).getByRole("button")).toHaveCount(0)
     await slider.scrollIntoViewIfNeeded()
@@ -161,22 +167,22 @@ test("resource collection has four columns and the fixed opening action supports
     await expect(slider).toHaveValue("3")
     await expect(page.getByText("Initial gold miners: 3 · Initial wood gatherers: 2")).toBeVisible()
     await slider.press("Home")
-    await expect(slider).toHaveValue("0")
-    await expect(page.getByText("Initial gold miners: 0 · Initial wood gatherers: 5")).toBeVisible()
+    await expect(slider).toHaveValue("1")
+    await expect(page.getByText("Initial gold miners: 1 · Initial wood gatherers: 4")).toBeVisible()
     await slider.press("End")
-    await expect(slider).toHaveValue("5")
-    await expect(page.getByText("Initial gold miners: 5 · Initial wood gatherers: 0")).toBeVisible()
+    await expect(slider).toHaveValue("4")
+    await expect(page.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeVisible()
     await page.getByRole("button", { name: /^Advanced/ }).click()
     expect(await page.locator("#advanced-profile .economy-grid").first()
         .evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length)).toBe(4)
     await page.getByRole("button", { name: "Hide advanced" }).click()
     await expect(slider).toBeVisible()
-    await expect(slider).toHaveValue("5")
+    await expect(slider).toHaveValue("4")
     await page.locator(".action-panel").getByRole("button", { name: /^Worker \d/ }).click()
     await page.getByRole("button", { name: "Reset to defaults" }).click()
-    await expect(slider).toHaveValue("5")
+    await expect(slider).toHaveValue("4")
     await page.reload()
-    await expect(slider).toHaveValue("5")
+    await expect(slider).toHaveValue("4")
     await expect(page.getByRole("button", { name: "Remove Worker" })).toBeVisible()
     await page.screenshot({ path: "test-results/opening-worker-allocation.png", fullPage: true })
 })

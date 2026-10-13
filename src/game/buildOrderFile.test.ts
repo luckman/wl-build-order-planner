@@ -5,9 +5,9 @@ import { factions, type FactionId } from "./gameData"
 import { economyFromProfile } from "./gameProfile"
 
 const profile: GameProfile = {
-    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, manaPerMinute: 10 },
+    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, manaPerMinute: 10, timeBetweenScrolls: 10 },
     map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
-    player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 24, startingMana: 35, baseManaLimit: 50, ...initialPlayerLevels },
+    player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 24, startingMana: 35, baseManaLimit: 50, scrollLevel: 1, ...initialPlayerLevels },
     delays: { constructionStartDelay: 2.5, orderDelay: 1 },
 }
 function sample(faction: FactionId = "light", timings = false) {

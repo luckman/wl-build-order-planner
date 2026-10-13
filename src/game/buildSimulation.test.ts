@@ -26,6 +26,23 @@ const economy: EconomySettings = {
 
 const abundantEconomy = { ...economy, startingGold: 100000, startingWood: 100000, workerCount: 20, woodWorkers: 0 }
 
+test.each(["light", "dark"] as const)("%s food warnings count queued recruits and clear after a food building completes", factionId => {
+    const faction = factions[factionId]
+    const worker = required(faction.items.find(item => item.id === (factionId === "light" ? "worker" : "slave")))
+    const farm = required(faction.items.find(item => item.id === (factionId === "light" ? "farm" : "pigsty")))
+    const recruits = Array(6).fill(worker)
+    const blocked = simulateBuildOrder(recruits, abundantEconomy, 10, 20, 20, faction.startingTownHall).plan
+    expect(blocked.slice(0, 5).every(action => !action.blocked)).toBe(true)
+    expect(blocked[5]).toMatchObject({ blocked: true,
+        blockedReason: "Insufficient supply: requires 2, available 0 (20/20 used)" })
+
+    const recovered = simulateBuildOrder([...recruits.slice(0, 5), farm, worker], abundantEconomy,
+        10, 20, 20, faction.startingTownHall).plan
+    expect(recovered[6].blocked).toBe(false)
+    expect(recovered[6].blockedReason).toBeUndefined()
+    expect(recovered[6].commandTime!).toBeGreaterThanOrEqual(recovered[5].finishTime!)
+})
+
 test.each(["light", "dark"] as const)("%s reordered recruitment warns and does not prevent its later producer from building", factionId => {
     const faction = factions[factionId]
     const barracks = required(faction.items.find(item => item.id === "barracks"))
@@ -100,6 +117,8 @@ test("Miriel waits for Altar completion, reserves ten food, and is unique across
 
     const foodBlocked = simulateBuildOrder([...dependencies, miriel], abundantEconomy, 21, 10, 20, "Castle")
     expect(foodBlocked.plan[foodBlocked.plan.length - 1].blocked).toBe(true) // Farm supplies 20: only 9 food left.
+    expect(foodBlocked.plan[foodBlocked.plan.length - 1].blockedReason)
+        .toBe("Insufficient supply: requires 10, available 9 (21/30 used)")
 })
 
 test("all three hero types can recruit once and duplicates remain blocked across Altars", () => {

@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction 
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd"
 import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
+import ScrollDialog from "./ScrollDialog"
+import EventTimeDialog from "./EventTimeDialog"
+import { createScrollAction, GOLD_RUSH, isScrollAction } from "./game/scrolls"
+import { earliestScrollTime } from "./game/scrollTiming"
 import GameProfileEditor from "./GameProfileEditor"
+import warLegendsLogo from "./icons/war-legends-logo.png"
 import { type ScheduledAction, simulateBuildOrder } from "./game/buildSimulation"
 import {
     buildOrderWithDependencies,
@@ -24,8 +29,10 @@ import "./timeline.css"
 import "./parallel-timeline.css"
 import "./layout-overrides.css"
 import "./build-order-files.css"
+import "./scrolls.css"
 
 const iconSources: Record<string, string> = {
+    lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     lightCastle: require("./icons/buildings/light-castle.png"),
     lightSawmill: require("./icons/buildings/light-sawmill.png"),
     lightFarm: require("./icons/buildings/light-farm.png"),
@@ -118,7 +125,8 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
         if (action.blocked || action.commandTime === null || action.finishTime === null) {
             return
         }
-        const group = isRecruitable(action.item) ? action.item.producer : "Construction"
+        const group = action.item.kind === "scroll" ? "Scrolls and events"
+            : isRecruitable(action.item) ? action.item.producer : "Construction"
         const lanes = availableLanes.get(group) ?? []
         let lane = lanes.find((candidate) => candidate.availableAt <= action.commandTime!)
         if (!lane) {
@@ -129,7 +137,8 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
         lane.availableAt = action.workerReturnTime ?? action.finishTime
         availableLanes.set(group, lanes)
     })
-    return Array.from(availableLanes).flatMap(([group, lanes]) =>
+    return Array.from(availableLanes).sort(([a], [b]) =>
+        Number(a === "Scrolls and events") - Number(b === "Scrolls and events")).flatMap(([group, lanes]) =>
         lanes.map((lane, index) => ({
             label: lanes.length === 1 ? group : `${group} ${index + 1}`,
             events: lane.events,
@@ -139,6 +148,8 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
 
 export default function App() {
     const [factionId, setFactionId] = useState<FactionId>("light")
+    const [scrollDialogOpen, setScrollDialogOpen] = useState(false)
+    const [editingEventId, setEditingEventId] = useState<string | null>(null)
     const nextOrderId = useRef(0)
     const withOrderIds = useCallback((items: PlannerItem[]) => items.map(item => "orderId" in item
         ? item as PlannerItem & { orderId: string }
@@ -149,6 +160,7 @@ export default function App() {
         return { light: { ...drafts.light, items: withOrderIds(drafts.light.items) }, dark: { ...drafts.dark, items: withOrderIds(drafts.dark.items) } }
     })
     const buildOrder = buildOrders[factionId].items
+    const editingEvent = buildOrder.find(item => item.orderId === editingEventId)
     const opening = buildOrders[factionId].opening
     const setOpeningGoldWorkers = (goldWorkers: number) => {
         updateBuildOrders(current => ({ ...current, [factionId]: { ...current[factionId], opening: { type: "allocate-workers", goldWorkers } } }))
@@ -176,10 +188,14 @@ export default function App() {
     const [hoverTime, setHoverTime] = useState<number | null>(null)
     const reorderActions = ({ source, destination }: DropResult) => {
         if (!destination || source.index === destination.index) return
+        if (displayPlan[source.index].item.kind === "scroll") return
         setBuildOrder(current => {
             const reordered = [...current]
-            const [moved] = reordered.splice(source.index, 1)
-            reordered.splice(destination.index, 0, moved)
+            const sourceIndex = current.indexOf(displayPlan[source.index].item as typeof current[number])
+            const destinationIndex = current.indexOf(displayPlan[destination.index].item as typeof current[number])
+            if (sourceIndex < 0 || destinationIndex < 0) return current
+            const [moved] = reordered.splice(sourceIndex, 1)
+            reordered.splice(destinationIndex, 0, moved)
             return reordered
         })
         setDependencyError(null)
@@ -212,10 +228,14 @@ export default function App() {
     )
     const deliveries = scheduled.deliveries
     const plan = scheduled.plan
+    const scrollTimes = plan.filter(action => action.item.kind === "scroll").map(action => action.commandTime!)
+    const minimumScrollTime = scrollTimes.length ? Math.max(...scrollTimes) + gameProfile.basic.timeBetweenScrolls + economy.orderDelay : 0
+    const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime)
+    const displayPlan = buildOrder.some(item => item.kind === "scroll") ? scheduled.orderedPlan : plan
     const spending = plan.flatMap(({ cost, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
     )
-    const lastCompletionTime = Math.max(0, ...plan.map(({ finishTime }) => finishTime ?? 0))
+    const lastCompletionTime = Math.max(0, ...plan.map(({ finishTime, commandTime }) => finishTime ?? commandTime ?? 0))
     const endTime = Math.max(TIMELINE_WINDOW_SECONDS, lastCompletionTime + 30)
     const samples = useMemo(
         () =>
@@ -243,13 +263,14 @@ export default function App() {
             }),
         [baseFoodLimit, foodPerFarm, initialFoodUsed, plan, samples],
     )
-    const latestCommand = [...plan].reverse().find(({ commandTime }) => commandTime !== null)
+    const latestCommand = [...scheduled.orderedPlan].reverse().find(({ commandTime }) => commandTime !== null)
     const latestCommandTime = latestCommand?.commandTime ?? null
     const inspectedTime = hoverTime ?? latestCommandTime ?? endTime
     const inspectedResources = resourceAt(economy, deliveries, spending, inspectedTime)
     const manaSampleTimes = Array.from(new Set([
         ...samples.map(({ time }) => time),
         ...plan.flatMap(({ item, finishTime }) => item.id === "tower-of-mana" && finishTime !== null ? [finishTime] : []),
+        ...plan.flatMap(({ item, commandTime }) => item.kind === "scroll" && commandTime !== null ? [commandTime] : []),
     ])).sort((a, b) => a - b)
     const manaSamples = manaSampleTimes.map(time => manaAt(economy, plan, time))
     const inspectedMana = manaAt(economy, plan, inspectedTime)
@@ -279,8 +300,8 @@ export default function App() {
             </div>
         </>
     )
-    const timelineLanes = useMemo(() => createTimelineLanes(plan), [plan])
-    const blockedActions = plan.map((action, index) => ({ ...action, index })).filter(({ blocked }) => blocked)
+    const timelineLanes = useMemo(() => createTimelineLanes(displayPlan), [displayPlan])
+    const blockedActions = displayPlan.map((action, index) => ({ ...action, index })).filter(({ blocked }) => blocked)
     const timelineWidth = `${Math.max(100, (endTime / TIMELINE_WINDOW_SECONDS) * 100)}%`
     const timelineTicks = Array.from({ length: Math.floor(endTime / 20) + 1 }, (_, index) => index * 20)
     const latestResources =
@@ -312,45 +333,41 @@ export default function App() {
         <div className="sc2-shell">
             <header className="topbar">
                 <div>
-                    <span className="brand-mark">WL</span>
+                    <img className="brand-logo" src={warLegendsLogo} alt="" />
                     <strong>War Legends Build Order Planner</strong>
                 </div>
                 <nav>
                     <button className="active">Planner</button>
-                    <button disabled>Settings</button>
                     <BuildOrderFiles faction={factionId} profile={gameProfile} plan={plan} opening={opening} onImport={applyImport} />
                 </nav>
             </header>
             <main>
-                <section className="title-row">
-                    <div>
-                        <p className="eyebrow">Economy timeline</p>
-                        <h1>{faction.name} build order</h1>
-                    </div>
-                    <div className="factions">
-                        {(Object.values(factions) as Faction[]).map((entry) => (
-                            <button
-                                key={entry.id}
-                                className={entry.id === factionId ? "selected" : ""}
-                                onClick={() => {
-                                    setFactionId(entry.id)
-                                    setDependencyError(null)
-                                    setHoverTime(null)
-                                }}
-                            >
-                                {entry.name}
-                            </button>
-                        ))}
-                    </div>
-                </section>
                 <div className="workspace">
+                    <section className="title-row">
+                        <div className="factions">
+                            {(Object.values(factions) as Faction[]).map((entry) => (
+                                <button
+                                    key={entry.id}
+                                    className={entry.id === factionId ? "selected" : ""}
+                                    onClick={() => {
+                                        setFactionId(entry.id)
+                                        setDependencyError(null)
+                                        setHoverTime(null)
+                                    }}
+                                >
+                                    {entry.name}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
                     <section className="planner-area">
                         <section className="action-panel panel" aria-label="Actions">
+                            <div className="panel-title"><h2>Actions</h2></div>
                             <div className="action-groups">
                                 {dependencyError && <p role="alert">{dependencyError}</p>}
                                 {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
                                     <section key={kind} aria-label={kind === "hero" ? "heroes" : `${kind}s`}>
-                                        <div className="action-grid">
+                                        <div className={`action-grid${kind === "hero" && factionId === "light" ? " hero-scroll-grid" : ""}`}>
                                             {faction.items
                                                 .filter((item) => item.kind === kind)
                                                 .map((item) => {
@@ -380,6 +397,14 @@ export default function App() {
                                                         </button>
                                                     )
                                                 })}
+                                            {kind === "hero" && factionId === "light" && <>
+                                                <span className="scroll-card-delimiter" aria-hidden="true" />
+                                                <button className="action scroll-card" aria-label="Gold Rush 50 mana · 30s"
+                                                    title="Gold Rush: 50 mana, +10 gold per mine exit for 30 seconds" onClick={() => setScrollDialogOpen(true)}>
+                                                    <img src={iconSources.lightGoldRush} alt="" />
+                                                    <small><span className="action-stat">{GOLD_RUSH.manaCost} mana</span></small>
+                                                </button>
+                                            </>}
                                         </div>
                                     </section>
                                 ))}
@@ -468,7 +493,7 @@ export default function App() {
                                                                 onClick={() =>
                                                                     setBuildOrder((current) =>
                                                                         current.filter(
-                                                                            (_, position) => position !== index,
+                                                                            entry => entry !== item,
                                                                         ),
                                                                     )
                                                                 }
@@ -531,12 +556,12 @@ export default function App() {
                         <section className="opening-action" aria-label="Opening worker allocation">
                             <div className="worker-allocation">
                                 <label htmlFor="initial-worker-allocation">Initial worker allocation ({initialWorkerCount} workers)</label>
-                                <input id="initial-worker-allocation" type="range" min={0} max={initialWorkerCount} step={1}
+                                <input id="initial-worker-allocation" type="range" min={1} max={4} step={1}
                                     aria-label="Initial gold miners"
                                     aria-valuetext={`${economy.goldWorkers} gold miners, ${economy.woodWorkers} wood gatherers`}
                                     value={economy.goldWorkers} onChange={event => {
                                         const value = event.target.valueAsNumber
-                                        if (Number.isFinite(value)) setOpeningGoldWorkers(Math.min(initialWorkerCount, Math.max(0, Math.round(value))))
+                                        if (Number.isFinite(value)) setOpeningGoldWorkers(Math.min(4, Math.max(1, Math.round(value))))
                                     }} />
                                 <p className="initial-allocation">Initial gold miners: {economy.goldWorkers} · Initial wood gatherers: {economy.woodWorkers}</p>
                             </div>
@@ -547,10 +572,12 @@ export default function App() {
                             <DragDropContext onDragEnd={reorderActions}>
                             <Droppable droppableId="build-order">
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
-                                {plan.map(({ item, commandTime, startTime, finishTime, workerReturnTime, blocked, blockedReason }, index) => (
-                                    <Draggable key={buildOrder[index].orderId} draggableId={buildOrder[index].orderId} index={index} disableInteractiveElementBlocking>
-                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })}>
-                                        <button className="order-drag-handle" {...drag.dragHandleProps} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>
+                                {displayPlan.map(({ item, commandTime, startTime, finishTime, workerReturnTime, blocked, blockedReason }, index) => (
+                                    <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={item.kind === "scroll"} disableInteractiveElementBlocking>
+                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", item.kind === "scroll" && "order-timed-event"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })}
+                                        onClick={item.kind === "scroll" ? () => setEditingEventId((item as typeof buildOrder[number]).orderId) : undefined}>
+                                        {item.kind === "scroll" ? <button className="scroll-order-marker" aria-label={`Change ${item.name} timestamp, action ${index + 1}`} title="Click to change timestamp">◷</button>
+                                            : <button className="order-drag-handle" {...drag.dragHandleProps} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>}
                                         <span className="order-number">{index + 1}</span>
                                         <img src={iconSources[item.icon]} alt="" />
                                         <div>
@@ -563,10 +590,11 @@ export default function App() {
                                         </div>
                                         <button
                                             aria-label={`Remove ${item.name}`}
-                                            onClick={() => {
+                                            onClick={event => {
+                                                event.stopPropagation()
                                                 setDependencyError(null)
                                                 setBuildOrder((current) =>
-                                                    current.filter((_, position) => position !== index),
+                                                    current.filter(entry => entry !== item),
                                                 )
                                             }}
                                         >
@@ -600,6 +628,21 @@ export default function App() {
                         </div>
                     </aside>
                 </div>
+                {editingEvent && isScrollAction(editingEvent) && <EventTimeDialog key={editingEvent.orderId}
+                    name={editingEvent.name} commandTime={editingEvent.commandTime}
+                    onClose={() => setEditingEventId(null)} onSave={commandTime => {
+                        setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime } : item))
+                        setEditingEventId(null)
+                        setDependencyError(null)
+                        setHoverTime(null)
+                    }} />}
+                {scrollDialogOpen && <ScrollDialog minimumTime={minimumScrollTime} automaticTime={automaticScrollTime}
+                    onClose={() => setScrollDialogOpen(false)} onAdd={commandTime => {
+                        setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: "gold-rush", commandTime }, factionId)])
+                        setScrollDialogOpen(false)
+                        setDependencyError(null)
+                        setHoverTime(null)
+                    }} />}
                 <footer>
                     Trip timings follow the documented War Legends model. Starting state, worker allocation, and yields
                     are visible inputs—not assumed game facts.

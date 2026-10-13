@@ -2,6 +2,7 @@ import { FILE_VERSION, GAME_RULES_VERSION, parseBuildOrder } from "./buildOrderF
 import { initialOpeningAction, type GameProfile, type OpeningAction } from "./gameProfile"
 import type { FactionId, PlannerItem } from "./gameData"
 import type { FactionProfiles } from "./profileStorage"
+import { isScrollAction, scrollCommand } from "./scrolls"
 
 export type BuildDraft = { opening: OpeningAction; items: PlannerItem[] }
 export type FactionDrafts = Record<FactionId, BuildDraft>
@@ -42,7 +43,7 @@ export function saveFactionDrafts(drafts: FactionDrafts): void {
         try {
             const draft = drafts[faction]
             window.localStorage.setItem(draftStorageKey(faction), JSON.stringify([
-                draft.opening, ...draft.items.map(item => ({ itemId: item.id })),
+                draft.opening, ...draft.items.map(item => isScrollAction(item) ? scrollCommand(item) : ({ itemId: item.id })),
             ]))
         } catch {
             // Keep editing in memory when browser storage is unavailable or full.

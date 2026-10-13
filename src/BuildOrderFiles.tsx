@@ -31,6 +31,15 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     const [linkError, setLinkError] = useState<string | null>(null)
     const [manualLink, setManualLink] = useState<string | null>(null)
     useEffect(() => {
+        const dismissOutside = (event: MouseEvent) => {
+            if (menu.current?.open && event.target instanceof Node && !menu.current.contains(event.target)) {
+                menu.current.open = false
+            }
+        }
+        document.addEventListener("click", dismissOutside, true)
+        return () => document.removeEventListener("click", dismissOutside, true)
+    }, [])
+    useEffect(() => {
         const loadLink = () => {
             try {
                 const result = parseShareableLink(window.location.hash)

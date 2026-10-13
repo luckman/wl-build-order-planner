@@ -10,9 +10,9 @@ Resource profiles and build-order drafts are saved independently per faction in 
 
 `gameProfile` contains four blocks:
 
-- `basic`: `goldGatherTime`, `woodGatherTime`, `initialGoldTravelReduction`, `manaPerMinute` (default 10).
+- `basic`: `goldGatherTime`, `woodGatherTime`, `initialGoldTravelReduction`, `manaPerMinute` (default 10), `timeBetweenScrolls` (default 10 seconds, hidden from the profile UI).
 - `map`: `goldTravelTime`, `woodTravelTime`, `sawmillWoodTravelTime`.
-- `player`: `startingGold`, `startingWood`, `baseFoodLimit`, `startingMana` (default 35), `baseManaLimit` (default 50), `townHallLevel`, `sawmillLevel`, `farmLevel`, `manaTowerLevel`, `barracksLevel`, `industrialBuildingLevel`, `arcaneBuildingLevel`, `workerLevel`.
+- `player`: `startingGold`, `startingWood`, `baseFoodLimit`, `startingMana` (default 35), `baseManaLimit` (default 50), `townHallLevel`, `sawmillLevel`, `farmLevel`, `manaTowerLevel`, `scrollLevel` (default 1, hidden), `barracksLevel`, `industrialBuildingLevel`, `arcaneBuildingLevel`, `workerLevel`.
 - `delays`: `constructionStartDelay`, `orderDelay`.
 
 Missing mana fields in older profiles default to the values above, with `manaTowerLevel` defaulting to 1. Supplied values are validated normally. Tower levels are integers 1–24 and add 50–55 capacity per completed tower in four-level tiers. Mana regenerates continuously into available capacity; time spent capped does not bank income. Tower completion increases capacity without adding mana. These settings persist and round-trip through JSON and shareable links.
@@ -68,9 +68,31 @@ The unchecked-by-default Include calculated timings option adds `timings` to eac
 
 Validation requires finite non-negative profile numbers, integer worker assignments, and strictly positive gathering durations. Files are limited to 1 MB, 1,000 catalog actions plus the opening allocation, and five initial workers. Unknown additional fields are ignored. Errors leave the current planner state intact.
 
+## Timed scroll commands
+
+Version 2 also accepts timed scroll commands after the opening allocation:
+
+```json
+{ "type": "use-scroll", "scrollId": "gold-rush", "commandTime": 90 }
+```
+
+`commandTime` is a required finite non-negative number of seconds after game start, rather than cached simulation output. Scroll level is a global `gameProfile.player.scrollLevel` setting: an integer from 1 to 6, defaulting to 1 when older files or profiles omit it. It is saved, exported, shared, and reset with the profile, but has no UI control. Obsolete per-command `level` fields are ignored and omitted on subsequent export. Gold Rush is Light-only. Invalid fields, unknown scroll IDs, and Gold Rush in a Dark build reject the whole import. Existing version 2 catalog-only files remain supported; earlier app releases cannot read the new scroll entries. The rules revision is `2026-10-13.4`.
+
+Scroll commands run at their timestamps independently of their positions among catalog rows. Equal-time scrolls run in source order; resource deliveries, worker recruitment completions, and mana-tower capacity completions at that timestamp are available before validation. Catalog actions retain their existing sequence and scheduling rules. Validation is recalculated on every simulation, including imports. Insufficient mana retains a blocked command and its requested timestamp, with a warning, no mana expenditure, and no effect; it does not wait for regeneration.
+
+Gold Rush spends 50 mana at command time. Its start is command time plus 1 second and its finish is start plus 30 seconds. All six profile levels currently use the level 1 effect, giving the same +10 gold bonus. Workers exiting the mine at or after start and strictly before finish carry the bonus, including a worker already gathering when the effect starts. A worker still inside at finish receives no bonus. Cargo is fixed at mine exit, so a bonus load deposited after expiry keeps the bonus, and a load already outside before activation receives none. Overlapping Gold Rush effects give a single +10 bonus while either is active. Construction interruption discards the load normally.
+
+The command fields are preserved in plain and timed JSON, local drafts, and shareable links. Optional `timings` may accompany a scroll, but are ignored on import, just like catalog-action caches. Derived start/finish times are recalculated from the command timestamp. `createScrollAction` validates direct API input; `simulateBuildOrder` returns `plan` aligned to input rows plus `orderedPlan` sorted by command timestamp (blocked catalog rows without timestamps follow timed rows). Scrolls are shown between actions by command time and in scroll/event timeline lanes after construction/recruitment. Their build-order rows have no drag handle and cannot be dragged.
+
+The Gold Rush card shares the Light heroes row after a small divider. Its dialog offers a command time in mm:ss in one compact keyboard-editable field (fractional seconds are preserved) and notes that only level 1 scroll effects are currently supported. Automatic timing is selected initially and disables the time field. It selects the first affordable timestamp at or after the latest existing scroll command plus `basic.timeBetweenScrolls` plus `delays.orderDelay`; with no scrolls, the minimum is zero. Manual timing also enforces that minimum. The chosen timestamp is fixed when added; changing the plan or profile later produces warnings rather than moving it. If enough mana cannot be reached, automatic insertion is disabled; a manual timestamp can still add a blocked command. Typing 215 or 0215 is interpreted as 02:15; direct mm:ss entry and fractional seconds are supported. The dialog caps keyboard and pasted values at 99:59; automatic suggestions above that limit cannot be submitted. A live mask keeps the colon visible while typing: 215 and 0215 display 02:15 immediately, while 1234 displays 12:34. The dialog supports Cancel, Escape, keyboard focus trapping, and focus restoration.
+
+`basic.timeBetweenScrolls` is a finite non-negative duration and defaults to 10 for older files and saved profiles that omit it. It is exported, shared, saved, and reset with the profile, but has no profile-editor control. Simulation validates cooldown chronologically between successful command times, with an additional `delays.orderDelay` after cooldown expires. With defaults, a cast at 190 has cooldown expiry at 200 and the next command can be sent at 201. A cast inside cooldown remains blocked with no mana spending or bonus. Blocked commands do not start a cooldown. The insertion dialog uses the latest requested scroll timestamp, including blocked commands, as its lower bound.
+
+Mana availability also requires `delays.orderDelay` before sending a scroll command. If mana reaches 50 at 80 and orderDelay is 1, the earliest command is 81 and its effect starts at 82. Both readiness waits overlap: use the later of mana readiness plus orderDelay and cooldown expiry plus orderDelay. If mana was already sufficient long before the command, this does not add another wait. Starting mana is available from time zero. Manual/imported fixed timestamps are validated against both rules and retain their timestamp with no spending/effect if blocked.
+
 ## Shareable links
 
-Save shareable link in the Import / Export menu copies a URL containing the current faction, exact action sequence, and complete profile. Timings are always omitted, regardless of the JSON export checkbox. Successful copying closes the menu and shows a notice. If clipboard access fails, the menu stays open with the link selected for manual copying.
+Save shareable link in the Import / Export menu copies a URL containing the current faction, exact action sequence, and complete profile. Calculated timings are always omitted, regardless of the JSON export checkbox; required scroll command timestamps remain. Successful copying closes the menu and shows a notice. If clipboard access fails, the menu stays open with the link selected for manual copying.
 
 Open the copied URL in a browser to restore the build order and profile automatically. Changes to the URL fragment in an already-open planner also load the new shared order. Imports reuse JSON validation and current catalog/simulation rules; saved timings are ignored. Different game-rules revisions warn without blocking. Invalid or unsupported links display an error and leave the current plan intact. Unrelated URL fragments are ignored.
 

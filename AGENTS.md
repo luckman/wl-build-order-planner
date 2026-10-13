@@ -10,6 +10,7 @@
 ## Documentation and changelog
 
 - Write a dated changelog entry for each meaningful implementation change in `ai-changelog/`.
+- Before creating a new changelog file during the same browser/chat session, review the existing session entries and append to a relevant file when the changes continue the same topic. Create a separate file when the topic is distinct; use dated sections within a reused file to preserve chronology.
 - Changelog filenames must begin with the current date in `YYYY-MM-DD` format.
 - Keep migration background and longer design documentation in `docs/`.
 - Update the root `README.md` when the user-facing scope, setup, or capabilities change.
@@ -51,6 +52,8 @@ Use only these values unless new values are provided by the project owner.
 - Add a value only after the project owner supplies it, then update the relevant documentation and changelog.
 
 ## Verification
+
+- Use `src/DurationInput.tsx` as the default command-time control for all planner events. Shared formatting, parsing, and the 99:59 limit live in `src/durationTime.ts`; keep event-specific validation in the caller. See `docs/DURATION_INPUT.md` for usage.
 
 - For source changes, run `npm run build` and `npm run typecheck` when dependencies are available.
 - Run Jest without watch mode: `npm run testAll -- --runInBand` (add `--silent` if existing React deprecation warnings obscure the results).

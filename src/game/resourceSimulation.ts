@@ -1,4 +1,5 @@
 import type { PlayerBuildingLevels } from "./playerLevels"
+import { GOLD_RUSH } from "./scrolls"
 
 export type EconomySettings = PlayerBuildingLevels & {
     startingGold: number
@@ -7,6 +8,8 @@ export type EconomySettings = PlayerBuildingLevels & {
     baseManaLimit: number
     manaPerMinute: number
     manaPerTower: number
+    timeBetweenScrolls?: number
+    scrollLevel?: number
     workerCount: number
     goldWorkers: number
     woodWorkers: number
@@ -29,21 +32,27 @@ export type ResourcePoint = { time: number; gold: number; wood: number }
 /** Regenerate only into available capacity; income while capped is discarded. */
 export function manaAt(
     settings: Pick<EconomySettings, "startingMana" | "baseManaLimit" | "manaPerMinute" | "manaPerTower">,
-    actions: Array<{ item: { id: string; kind: string }; finishTime: number | null }>,
+    actions: Array<{ item: { id: string; kind: string }; finishTime: number | null;
+        commandTime?: number | null; manaCost?: number; blocked?: boolean }>,
     time: number,
 ): { time: number; mana: number; limit: number } {
     let limit = settings.baseManaLimit
     let mana = Math.min(settings.startingMana, limit)
     let previousTime = 0
-    const completions = actions
-        .filter(action => action.item.id === "tower-of-mana" && action.item.kind === "building" &&
+    const events = actions.flatMap(action => {
+        if (action.blocked) return []
+        if (action.item.id === "tower-of-mana" && action.item.kind === "building" &&
             action.finishTime !== null && action.finishTime <= time)
-        .map(action => action.finishTime!)
-        .sort((a, b) => a - b)
-    for (const completion of completions) {
-        mana = Math.min(limit, mana + (completion - previousTime) * settings.manaPerMinute / 60)
-        limit += settings.manaPerTower
-        previousTime = completion
+            return [{ time: action.finishTime, capacity: settings.manaPerTower, spend: 0 }]
+        if (action.manaCost && action.commandTime != null && action.commandTime <= time)
+            return [{ time: action.commandTime, capacity: 0, spend: action.manaCost }]
+        return []
+    }).sort((a, b) => a.time - b.time || b.capacity - a.capacity)
+    for (const event of events) {
+        mana = Math.min(limit, mana + (event.time - previousTime) * settings.manaPerMinute / 60)
+        limit += event.capacity
+        mana = Math.max(0, mana - event.spend)
+        previousTime = event.time
     }
     mana = Math.min(limit, mana + Math.max(0, time - previousTime) * settings.manaPerMinute / 60)
     return { time, mana, limit }
@@ -56,6 +65,7 @@ export type GatheringWorker = {
     state: "idle" | "outbound" | "waiting" | "gathering" | "deposit" | "construction"
     stateSince: number
     nextAt: number
+    cargoGold: number
 }
 
 export type WorkerAllocation = {
@@ -74,6 +84,8 @@ type WorkerStateAction = {
     finishTime: number | null
     workerReturnTime: number | null
     workerId: number | null
+    startTime?: number | null
+    blocked?: boolean
 }
 
 /** Chronological worker simulation shared by income previews and build scheduling. */
@@ -84,6 +96,7 @@ export class WorkerEconomy {
     private mineWorker: number | null = null
     private delayedInitialWoodWorkerIds: number[] = []
     private sawmillCompletions: number[] = []
+    private goldRushWindows: Array<{ startTime: number; finishTime: number; bonus: number }> = []
 
     constructor(private settings: EconomySettings) {
         for (let i = 0; i < settings.goldWorkers; i++) {
@@ -107,6 +120,7 @@ export class WorkerEconomy {
             state: "idle",
             stateSince: this.time,
             nextAt: Infinity,
+            cargoGold: 0,
         }
         this.workers.push(worker)
         if (assignment !== "idle") {
@@ -121,6 +135,10 @@ export class WorkerEconomy {
 
     scheduleSawmill(finishTime: number) {
         this.sawmillCompletions.push(finishTime)
+    }
+
+    scheduleGoldRush(startTime: number, finishTime: number, bonus: number) {
+        this.goldRushWindows.push({ startTime, finishTime, bonus })
     }
 
     private travel(assignment: "gold" | "wood") {
@@ -190,6 +208,10 @@ export class WorkerEconomy {
                 } else if (worker.state === "gathering") {
                     if (worker.assignment === "gold") {
                         this.mineWorker = null
+                        // Lock cargo at mine exit: start is inclusive, expiry is exclusive.
+                        worker.cargoGold = this.settings.goldPerTrip + Math.max(0,
+                            ...this.goldRushWindows.filter(window => window.startTime <= this.time && this.time < window.finishTime)
+                                .map(window => window.bonus))
                     }
                     this.transition(
                         worker,
@@ -200,7 +222,7 @@ export class WorkerEconomy {
                     this.deliveries.push({
                         time: this.time,
                         worker: worker.id,
-                        gold: worker.assignment === "gold" ? this.settings.goldPerTrip : 0,
+                        gold: worker.assignment === "gold" ? worker.cargoGold : 0,
                         wood: worker.assignment === "wood" ? this.settings.woodPerTrip : 0,
                     })
                     if (worker.assignment !== "idle") {
@@ -217,7 +239,7 @@ export class WorkerEconomy {
         const amount = (worker: GatheringWorker) => {
             const yieldPerTrip = worker.assignment === "gold" ? this.settings.goldPerTrip : this.settings.woodPerTrip
             if (worker.state === "deposit") {
-                return yieldPerTrip
+                return worker.assignment === "gold" ? worker.cargoGold : yieldPerTrip
             }
             if (worker.state === "gathering") {
                 return (yieldPerTrip * (this.time - worker.stateSince)) / Math.max(0.001, this.settings.woodGatherTime)
@@ -236,6 +258,7 @@ export class WorkerEconomy {
 
     construct(worker: GatheringWorker, buildTime: number) {
         // Interrupted cargo is discarded. Return directly to the resource and start gathering again.
+        worker.cargoGold = 0
         this.transition(worker, "construction", 2 * this.settings.constructionStartDelay + buildTime)
     }
 }
@@ -285,6 +308,9 @@ export function workerAllocationAt(
 ): WorkerAllocation {
     const simulation = new WorkerEconomy(settings)
     for (const action of actions) {
+        if (action.item.kind === "scroll" && !action.blocked && action.startTime != null && action.finishTime !== null) {
+            simulation.scheduleGoldRush(action.startTime, action.finishTime, GOLD_RUSH.goldBonus)
+        }
         if (action.item.id === "sawmill" && action.finishTime !== null) {
             simulation.scheduleSawmill(action.finishTime)
         }

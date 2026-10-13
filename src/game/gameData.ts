@@ -3,7 +3,7 @@ import { buildingLimit, newBuilding, plannedBuildings, requirementCount } from "
 
 export type FactionId = "light" | "dark"
 export type ItemKind = "building" | "unit" | "hero" | "upgrade"
-export function isRecruitable(item: { kind: ItemKind }) {
+export function isRecruitable(item: { kind: ItemKind | "scroll" }) {
     return item.kind === "unit" || item.kind === "hero"
 }
 export type BuildingType = "Economic" | "Production" | "Racial" | "Defensive"
@@ -17,6 +17,7 @@ export type BuildingLimit = {
     byHighestLevel: Array<{ minLevel: number; max: number }>
 }
 export type IconId =
+    | "lightGoldRush"
     | "lightCastle"
     | "lightSawmill"
     | "lightFarm"
@@ -110,7 +111,6 @@ type RawFaction = {
 export type PlannerItem = {
     id: string
     name: string
-    kind: ItemKind
     type?: BuildingType
     gold: number
     wood: number
@@ -126,7 +126,7 @@ export type PlannerItem = {
     level?: number
     upgradeFrom?: string
     producerBuildingId?: string
-}
+} & ({ kind: ItemKind } | { kind: "scroll"; scrollId: "gold-rush"; commandTime: number })
 
 export type Faction = {
     id: FactionId

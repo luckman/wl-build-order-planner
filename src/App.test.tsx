@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
 import { createShareableLink } from "./game/shareableLink"
 import { initialGameProfile } from "./game/gameProfile"
+import { draftStorageKey } from "./game/draftStorage"
 
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
@@ -50,9 +51,9 @@ test("shared imports replace their faction draft and preserve the other draft", 
 })
 
 test("resource-blocked orders are highlighted in both panels and clear when resources are available", () => {
+    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify([{ type: "allocate-workers", goldWorkers: 5 }]))
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "0" } })
-    fireEvent.change(screen.getByRole("slider", { name: "Initial gold miners" }), { target: { value: "5" } })
     fireEvent.click(within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ }))
     const row = screen.getByRole("button", { name: "Remove Barracks" }).closest("li")!
     expect(row.classList.contains("order-blocked")).toBe(true)
@@ -69,14 +70,27 @@ test("resource-blocked orders are highlighted in both panels and clear when reso
     expect(container.querySelector(".event.building")).toBeTruthy()
 })
 
-test("main worker slider selects every five-worker split and retains it within its faction and advanced changes", () => {
+test("food shortages explain the required and available food in both warning locations", () => {
+    const { container } = render(<App />)
+    const actions = within(container.querySelector(".action-panel") as HTMLElement)
+    for (let i = 0; i < 6; i++) fireEvent.click(actions.getByRole("button", { name: /^Worker / }))
+    const row = screen.getAllByRole("button", { name: "Remove Worker" })[5].closest("li")!
+    const reason = "Insufficient supply: requires 2, available 0 (20/20 used)"
+    expect(within(row).getByText(reason)).toBeTruthy()
+    expect(within(screen.getByRole("region", { name: "Blocked actions" })).getByText(reason)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Base food limit"), { target: { value: "22" } })
+    expect(row.classList.contains("order-blocked")).toBe(false)
+    expect(screen.queryByRole("region", { name: "Blocked actions" })).toBeNull()
+})
+
+test("main worker slider selects one to four gold miners and retains it within its faction and advanced changes", () => {
     const { container } = render(<App />)
     const slider = screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement
-    expect(slider.min).toBe("0")
-    expect(slider.max).toBe("5")
+    expect(slider.min).toBe("1")
+    expect(slider.max).toBe("4")
     expect(slider.step).toBe("1")
     expect(slider.closest("#advanced-profile")).toBeNull()
-    for (let gold = 0; gold <= 5; gold++) {
+    for (let gold = 1; gold <= 4; gold++) {
         fireEvent.change(slider, { target: { value: String(gold) } })
         expect(slider.value).toBe(String(gold))
         expect(slider.getAttribute("aria-valuetext")).toBe(`${gold} gold miners, ${5 - gold} wood gatherers`)
@@ -90,14 +104,16 @@ test("main worker slider selects every five-worker split and retains it within i
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     expect(slider.value).toBe("4")
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
-    expect(slider.value).toBe("5")
-    expect(screen.getByText("Initial gold miners: 5 · Initial wood gatherers: 0")).toBeTruthy()
+    expect(slider.value).toBe("4")
+    expect(screen.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeTruthy()
 })
 
 test("action cards hide names except upgrades and expose full costs on hover", () => {
     const { container } = render(<App />)
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
-    expect(actions.queryByRole("heading")).toBeNull()
+    expect(actions.getByRole("heading", { name: "Actions" })).toBeTruthy()
+    expect(screen.queryByText("Economy timeline")).toBeNull()
+    expect(screen.queryByText("Light build order")).toBeNull()
     expect(actions.queryByText("Click to add")).toBeNull()
     const castle = actions.getByRole("button", { name: /^Castle 500 gold/ })
     const worker = actions.getByRole("button", { name: /^Worker / })
@@ -254,11 +270,11 @@ test("adding a second Farm inserts the needed upgrade and removal explains block
 })
 
 test("Barracks prices and resource totals update when orders are added or removed", () => {
+    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify([{ type: "allocate-workers", goldWorkers: 0 }]))
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
-    fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "0" } })
     const button = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ })
     fireEvent.click(button)
     expect(button.textContent).toContain("400/300/0")

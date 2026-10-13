@@ -1,0 +1,4 @@
+.duration-control.duration-control { display: flex; align-items: center; gap: 12px; padding: 0; margin: 0; min-width: 0; font-size: .85rem; }
+.duration-control .duration-input { width: 12ch; min-width: 0; padding: 8px; color: #e4eef8; border: 1px solid #49667e; background: #091520; font-variant-numeric: tabular-nums; text-align: center; }
+.duration-control .duration-input:disabled { opacity: .6; }
+.duration-control .duration-input:focus-visible { outline: 2px solid #e1b55f; outline-offset: 2px; }

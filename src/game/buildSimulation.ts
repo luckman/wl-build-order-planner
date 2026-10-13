@@ -1,6 +1,7 @@
 import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
-import { type EconomySettings, resourceAt, WorkerEconomy } from "./resourceSimulation"
+import { type EconomySettings, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
+import { createScrollAction, GOLD_RUSH, isScrollAction, scrollCommand } from "./scrolls"
 import { actionDuration } from "./playerLevels"
 
 export type ScheduledAction = {
@@ -14,6 +15,7 @@ export type ScheduledAction = {
     finishTime: number | null
     workerReturnTime: number | null
     workerId: number | null
+    manaCost?: number
 }
 
 function requiresConstructionWorker(item: PlannerItem) {
@@ -33,6 +35,17 @@ export function simulateBuildOrder(
     const plan: ScheduledAction[] = []
     const spending: Array<{ time: number; gold: number; wood: number }> = []
     const catalog = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!.items
+    const faction = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!.id
+    const pendingScrolls = buildOrder.flatMap((item, index) => {
+        if (!isScrollAction(item)) return []
+        createScrollAction(scrollCommand(item), faction)
+        return [{ item, index }]
+    }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
+    // Timed commands are processed independently of their position among catalog rows.
+    until = Math.max(until, ...pendingScrolls.map(({ item }) => item.commandTime + GOLD_RUSH.startDelay + GOLD_RUSH.duration))
+    const scrollPlan: ScheduledAction[] = []
+    let lastScrollCommand = -Infinity
+    const scrollsByIndex = new Map<number, ScheduledAction>()
     const initial = catalog.find(item => item.name === initialTownHall)!
     const namesById = new Map([...catalog, ...buildOrder].map(item => [item.id, item.name]))
     const buildings = [newBuilding(initial)]
@@ -47,11 +60,39 @@ export function simulateBuildOrder(
 
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
-        while (workerCompletions.length && workerCompletions[0] <= time) {
-            simulation.advanceTo(workerCompletions[0])
-            workerCompletions.shift()
-            const goldCount = simulation.workers.filter(({ assignment }) => assignment === "gold").length
-            simulation.addWorker(goldCount < saturation ? "gold" : "wood")
+        while (Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity) <= time) {
+            const eventTime = Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity)
+            simulation.advanceTo(eventTime)
+            while (workerCompletions[0] === eventTime) {
+                workerCompletions.shift()
+                const goldCount = simulation.workers.filter(({ assignment }) => assignment === "gold").length
+                simulation.addWorker(goldCount < saturation ? "gold" : "wood")
+            }
+            while (pendingScrolls[0]?.item.commandTime === eventTime) {
+                const { item, index } = pendingScrolls.shift()!
+                const availableMana = manaAt(economy, [...plan, ...scrollPlan], eventTime).mana
+                const readyMana = manaAt(economy, [...plan, ...scrollPlan], Math.max(0, eventTime - economy.orderDelay)).mana
+                const cooldownUntil = lastScrollCommand + (economy.timeBetweenScrolls ?? 10) + economy.orderDelay
+                const cooldownBlocked = eventTime < cooldownUntil
+                const manaBlocked = availableMana + 1e-9 < GOLD_RUSH.manaCost
+                const orderDelayBlocked = eventTime < economy.orderDelay || readyMana + 1e-9 < GOLD_RUSH.manaCost
+                const blocked = cooldownBlocked || manaBlocked || orderDelayBlocked
+                const startTime = eventTime + GOLD_RUSH.startDelay
+                const finishTime = startTime + GOLD_RUSH.duration
+                scrollPlan.push({ item, cost: { gold: 0, wood: 0 }, commandTime: eventTime,
+                    startTime: blocked ? null : startTime, finishTime: blocked ? null : finishTime,
+                    workerReturnTime: null, workerId: null, manaCost: GOLD_RUSH.manaCost, blocked,
+                    ...(blocked ? { blockedReason: cooldownBlocked
+                        ? `Scroll cooldown: next scroll can be used at ${cooldownUntil} seconds`
+                        : manaBlocked ? `Insufficient mana for Gold Rush: requires 50, available ${availableMana.toFixed(1)}`
+                        : `Scroll order delay: 50 mana must be available for ${economy.orderDelay} seconds before the command` } : {}),
+                })
+                scrollsByIndex.set(index, scrollPlan[scrollPlan.length - 1])
+                if (!blocked) {
+                    lastScrollCommand = eventTime
+                    simulation.scheduleGoldRush(startTime, finishTime, GOLD_RUSH.goldBonus)
+                }
+            }
         }
         simulation.advanceTo(time)
         completeUpgrades(buildings, time)
@@ -76,6 +117,7 @@ export function simulateBuildOrder(
     }
 
     for (const item of buildOrder) {
+        if (isScrollAction(item)) continue
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)
         const needsProducer = item.kind !== "building"
         const requiredAltarLevel = item.kind === "hero"
@@ -139,6 +181,8 @@ export function simulateBuildOrder(
                         ? "town-hall" : namesById.get(item.limit?.basedOn ?? "") ?? "prerequisite"} level`
                     : !heroTierUnlocked
                         ? `Requires at least one ${item.producer} at level ${requiredAltarLevel} or higher for hero ${requiredAltarLevel}`
+                    : isRecruitable(item) && foodUsed + item.food > foodLimit
+                        ? `Insufficient supply: requires ${item.food}, available ${Math.max(0, foodLimit - foodUsed)} (${foodUsed}/${foodLimit} used)`
                     : "Waiting for resources, food, producer, or worker"
             if (
                 (!needsProducer || producer) &&
@@ -185,6 +229,7 @@ export function simulateBuildOrder(
             const nextTime = Math.min(
                 ...[
                     simulation.nextEventTime,
+                    pendingScrolls[0]?.item.commandTime ?? Infinity,
                     ...workerCompletions,
                     ...buildings.map(({ availableAt }) => availableAt),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime])),
@@ -219,5 +264,13 @@ export function simulateBuildOrder(
             ...plan.map(({ finishTime, workerReturnTime }) => workerReturnTime ?? finishTime ?? 0),
         ),
     )
-    return { plan, deliveries: simulation.deliveries }
+    // Preserve source row identity for existing consumers; orderedPlan is the chronological view.
+    const catalogPlan = [...plan]
+    const inputPlan = buildOrder.map((item, index) => isScrollAction(item)
+        ? scrollsByIndex.get(index)!
+        : catalogPlan.shift()!)
+    const orderedPlan = inputPlan.map((action, index) => ({ action, index }))
+        .sort((a, b) => (a.action.commandTime ?? Infinity) - (b.action.commandTime ?? Infinity) || a.index - b.index)
+        .map(({ action }) => action)
+    return { plan: inputPlan, orderedPlan, deliveries: simulation.deliveries }
 }

@@ -3,10 +3,11 @@ import { STARTING_WORKER_COUNT, initialGameProfile, initialOpeningAction, type O
 export type { GameProfile } from "./gameProfile"
 import { type ScheduledAction } from "./buildSimulation"
 import { playerLevelFields, playerLevelTier } from "./playerLevels"
+import { createScrollAction, isScrollAction, scrollCommand, type ScrollCommand } from "./scrolls"
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-13.1"
+export const GAME_RULES_VERSION = "2026-10-13.4"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -14,10 +15,11 @@ export type BuildOrderDocument = {
     gameRulesVersion: string
     faction: FactionId
     gameProfile: GameProfile
-    buildOrder: Array<OpeningAction | {
+    buildOrder: Array<OpeningAction | ((ScrollCommand | {
         itemId: string
+    }) & {
         timings?: Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime">
-    }>
+    })>
 }
 
 export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile, actions: ScheduledAction[], includeTimings = false,
@@ -26,7 +28,7 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
         buildOrder: [opening, ...actions.map(({ item, commandTime, startTime, finishTime, workerReturnTime }) => ({
-            itemId: item.id,
+            ...(isScrollAction(item) ? scrollCommand(item) : { itemId: item.id }),
             ...(includeTimings ? { timings: { commandTime, startTime, finishTime, workerReturnTime } } : {}),
         }))],
     }
@@ -58,9 +60,9 @@ export function parseBuildOrder(text: string): {
     if (typeof doc.gameRulesVersion !== "string" || !doc.gameRulesVersion.trim()) throw new Error("Missing gameRulesVersion.")
     const profile = object(doc.gameProfile, "gameProfile")
     const fields: { [Block in keyof GameProfile]: Array<keyof GameProfile[Block]> } = {
-        basic: ["goldGatherTime", "woodGatherTime", "initialGoldTravelReduction", "manaPerMinute"],
+        basic: ["goldGatherTime", "woodGatherTime", "initialGoldTravelReduction", "manaPerMinute", "timeBetweenScrolls"],
         map: ["goldTravelTime", "woodTravelTime", "sawmillWoodTravelTime"],
-        player: ["startingGold", "startingWood", "baseFoodLimit", "startingMana", "baseManaLimit", ...playerLevelFields],
+        player: ["startingGold", "startingWood", "baseFoodLimit", "startingMana", "baseManaLimit", "scrollLevel", ...playerLevelFields],
         delays: ["constructionStartDelay", "orderDelay"],
     }
     const parsed: Record<string, Record<string, number>> = {}
@@ -69,10 +71,13 @@ export function parseBuildOrder(text: string): {
         parsed[block] = {}
         for (const key of fields[block]) {
             // Older profiles have no mana fields; retain their other settings.
-            const manaField = ["startingMana", "baseManaLimit", "manaPerMinute", "manaTowerLevel"].includes(key)
+            const manaField = ["startingMana", "baseManaLimit", "manaPerMinute", "manaTowerLevel", "timeBetweenScrolls", "scrollLevel"].includes(key)
             const value = manaField && !(key in raw) ? initialGameProfile[block][key as keyof typeof initialGameProfile[typeof block]] : raw[key]
             parsed[block][key] = number(value, `gameProfile.${block}.${key}`,
                 key === "goldGatherTime" || key === "woodGatherTime")
+            if (key === "scrollLevel" && (!Number.isInteger(parsed[block][key]) || parsed[block][key] < 1 || parsed[block][key] > 6)) {
+                throw new Error("gameProfile.player.scrollLevel must be an integer from 1 to 6.")
+            }
             if (block === "player" && playerLevelFields.some(field => field === key)) {
                 try { playerLevelTier(parsed[block][key]) } catch {
                     throw new Error(`gameProfile.player.${key} must be an integer from 1 to 24.`)
@@ -87,9 +92,15 @@ export function parseBuildOrder(text: string): {
     const goldWorkers = number(first.goldWorkers, "Opening action.goldWorkers", false, true)
     if (goldWorkers > STARTING_WORKER_COUNT) throw new Error("The opening allocation exceeds the starting worker count of five.")
     const opening: OpeningAction = { type: "allocate-workers", goldWorkers }
-    const catalog = new Map(factions[doc.faction].items.map(item => [item.id, item]))
+    const faction = doc.faction
+    const catalog = new Map(factions[faction].items.map(item => [item.id, item]))
     const buildOrder = doc.buildOrder.slice(1).map((entry: unknown, index: number) => {
         const action = object(entry, `Action ${index + 1}`)
+        if (action.type === "use-scroll") {
+            if (action.scrollId !== "gold-rush") throw new Error(`Action ${index + 1}: unknown scroll ID ${String(action.scrollId)}.`)
+            return createScrollAction({ type: "use-scroll", scrollId: action.scrollId,
+                commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`) }, faction)
+        }
         if ("type" in action) throw new Error("Worker allocation is only allowed as the opening action.")
         const item = typeof action.itemId === "string" ? catalog.get(action.itemId) : undefined
         if (!item) throw new Error(`Action ${index + 1}: unknown item ID ${String(action.itemId)} for ${doc.faction}.`)

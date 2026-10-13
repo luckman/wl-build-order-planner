@@ -1,6 +1,11 @@
 .workspace {
     grid-template-columns: minmax(0, 1fr) 255px;
+    grid-template-rows: auto 1fr;
 }
+.workspace > .title-row { grid-column: 2; grid-row: 1; justify-content: flex-end; margin: 0; }
+.workspace > .planner-area { grid-column: 1; grid-row: 1 / span 2; }
+.workspace > .order { grid-column: 2; grid-row: 2; }
+.brand-logo { width: 74px; height: 44px; object-fit: contain; flex-shrink: 0; }
 
 .profile-blocks { padding: .65rem; display: grid; gap: .6rem; }
 .initial-allocation { margin: 0; color: #a9c5df; font-size: .76rem; }
@@ -99,9 +104,13 @@
 
 @media (max-width: 1050px) {
     .workspace { grid-template-columns: minmax(0, 1fr); }
+    .workspace > .title-row { grid-column: 1; grid-row: 1; align-items: flex-end; }
+    .workspace > .planner-area { grid-column: 1; grid-row: 2; }
+    .workspace > .order { grid-column: 1; grid-row: 3; }
 }
 
 @media (max-width: 700px) {
+    .topbar strong { font-size: .8rem; }
     .economy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .panel-title { gap: .5rem; flex-wrap: wrap; }
 }
