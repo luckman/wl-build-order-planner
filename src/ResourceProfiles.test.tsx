@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import App from "./App"
-import { initialGameProfile } from "./game/gameProfile"
+import { initialGameProfile, scrollLevelFields } from "./game/gameProfile"
 import { loadFactionProfiles, profileStorageKey, saveFactionProfiles } from "./game/profileStorage"
 import { createShareableLink } from "./game/shareableLink"
 
@@ -25,14 +25,16 @@ test("mana capacity never falls below starting mana during edits or after reload
     change("Starting mana", "25")
     expect(value("Base mana capacity")).toBe("75")
     change("Base mana capacity", "25")
-    expect(value("Base mana capacity")).toBe("50")
+    expect(value("Base mana capacity")).toBe("25")
     first.unmount()
     render(<App />)
-    expect(value("Starting mana")).toBe("35")
-    expect(value("Base mana capacity")).toBe("50")
+    expect(value("Starting mana")).toBe("25")
+    expect(value("Base mana capacity")).toBe("25")
     change("Starting mana", "0")
     change("Base mana capacity", "0")
-    expect(value("Base mana capacity")).toBe("50")
+    expect(value("Base mana capacity")).toBe("0")
+    change("Starting mana", "1")
+    expect(value("Base mana capacity")).toBe("1")
 })
 
 test("gathering reductions use one decimal, enforce bounds, and sit in the first column with food in the second", () => {
@@ -69,10 +71,10 @@ test("gathering reductions use one decimal, enforce bounds, and sit in the first
 
 test("reset basic restores main fields while preserving advanced settings, hidden settings, and the build", () => {
     const editedProfile = {
-        basic: { ...initialGameProfile.basic, goldGatherTime: 5, manaPerMinute: 15 },
+        basic: { ...initialGameProfile.basic, goldGatherTime: 5 },
         map: { goldTravelTime: 8, woodTravelTime: 9, sawmillWoodTravelTime: 2 },
         delays: { constructionStartDelay: 6, orderDelay: 3 },
-        player: { ...initialGameProfile.player, startingGold: 2000, startingMana: 45, townHallLevel: 9, workerLevel: 9, scrollLevel: 5 },
+        player: { ...initialGameProfile.player, startingGold: 2000, startingMana: 45, townHallLevel: 9, workerLevel: 9, lightGoldRushLevel: 2, lightLumberGatheringLevel: 3, darkWhipLevel: 5, darkLegionsCallLevel: 6, massConstructionCostReduction: 12.5 },
     }
     saveFactionProfiles({ light: editedProfile, dark: initialGameProfile })
     render(<App />)
@@ -92,6 +94,20 @@ test("reset basic restores main fields while preserving advanced settings, hidde
     expect(value("Initial gold miners")).toBe("2")
     expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
     expect(screen.getByRole("button", { name: "Hide advanced" })).toBeTruthy()
+    const draftProfile = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).gameProfile
+    for (const field of scrollLevelFields) {
+        expect(draftProfile.player[field]).toBe(editedProfile.player[field])
+        expect(document.getElementById(`profile-player-${field}`)).toBeNull()
+    }
+    expect(draftProfile.player.massConstructionCostReduction).toBe(12.5)
+    expect(document.getElementById("profile-player-massConstructionCostReduction")).toBeNull()
+    expect(draftProfile.player).not.toHaveProperty("scrollLevel")
+    fireEvent.click(screen.getByRole("button", { name: "Save profile" }))
+    expect(loadFactionProfiles().light.player).toEqual(draftProfile.player)
+    fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
+    const resetProfile = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).gameProfile
+    for (const field of scrollLevelFields) expect(resetProfile.player[field]).toBe(1)
+    expect(resetProfile.player.massConstructionCostReduction).toBe(0)
 })
 
 test("advanced help is specific to each field, appears on hover or focus, and follows edited values", () => {

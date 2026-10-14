@@ -1,17 +1,18 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
 import { draftStorageKey } from "./game/draftStorage"
-import { initialOpeningAction } from "./game/gameProfile"
+import { serializeBuildOrder } from "./game/buildOrderFile"
+import { initialGameProfile, initialOpeningAction } from "./game/gameProfile"
 import { MAX_PLAN_ACTIONS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
 
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
 function fullDraft() {
-    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify([
+    storeDraft([
         initialOpeningAction,
         ...Array.from({ length: MAX_PLAN_ACTIONS }, () => ({ type: "add-resources", commandTime: 0, gold: 0, wood: 0 })),
-    ]))
+    ])
 }
 
 test("action-limit notifications are red, restart their timeout, and support dismissal", () => {
@@ -91,10 +92,10 @@ test("panel additions repeatedly explain the limit and existing event edits rema
 })
 
 test("editor rejects additions with dependencies atomically at the action limit and still allows removal", () => {
-    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify([
+    storeDraft([
         initialOpeningAction,
         ...Array.from({ length: MAX_PLAN_ACTIONS - 1 }, () => ({ type: "add-resources", commandTime: 0, gold: 0, wood: 0 })),
-    ]))
+    ])
     render(<App />)
     const count = () => storedOrder().length - 1
     fireEvent.click(screen.getByRole("button", { name: /^Swordsman 150 gold/ }))
@@ -131,5 +132,11 @@ test("event time entry caps at 29:59 and its timeline samples remain bounded", (
 
 function storedOrder() {
     const stored = JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)
-    return Array.isArray(stored) ? stored : stored.buildOrder
+    return stored.buildOrder
+}
+
+function storeDraft(buildOrder: unknown[]) {
+    const document = JSON.parse(serializeBuildOrder("light", initialGameProfile, []))
+    document.buildOrder = buildOrder
+    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify(document))
 }

@@ -58,17 +58,13 @@ test("farm level changes food gating for both factions", () => {
     }
 })
 
-test.each(playerLevelFields)("%s round trips exactly, rejects invalid levels, and ignores obsolete yields", field => {
+test.each(playerLevelFields)("%s round trips exactly, rejects invalid levels,", field => {
     const profile = { ...initialGameProfile, player: { ...initialGameProfile.player, [field]: 24 } }
     const doc = JSON.parse(serializeBuildOrder("light", profile, []))
-    doc.gameProfile.player.goldPerTrip = 999
-    doc.gameProfile.player.woodPerTrip = 999
-    doc.gameProfile.player.foodPerFarm = 999
     const parsed = parseBuildOrder(JSON.stringify(doc)).gameProfile
     expect(parsed).toEqual(profile)
     expect(economyFromProfile(parsed).goldPerTrip).toBe(field === "townHallLevel" ? 55 : 50)
-    for (const invalid of [0, -1, 1.5, 25, "5", null, undefined]) {
-        if (field === "manaTowerLevel" && invalid === undefined) continue // Older profiles default this new field.
+    for (const invalid of [0, -1, 1.5, 25, "5", null]) {
         doc.gameProfile.player[field] = invalid
         expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(field)
     }

@@ -2,13 +2,13 @@ import { initialPlayerLevels } from "./playerLevels"
 import { GAME_RULES_VERSION, parseBuildOrder, serializeBuildOrder, type GameProfile } from "./buildOrderFile"
 import { simulateBuildOrder } from "./buildSimulation"
 import { factions, type FactionId } from "./gameData"
-import { economyFromProfile } from "./gameProfile"
+import { economyFromProfile, initialGameProfile } from "./gameProfile"
 
 const profile: GameProfile = {
-    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, manaPerMinute: 10, timeBetweenScrolls: 10 },
+    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, timeBetweenScrolls: 10 },
     map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
-    player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 24, startingMana: 35, baseManaLimit: 50, scrollLevel: 1,
-        manaAccumulation: 10, manaFromManaWells: 60, scrollCooldownReduction: 0,
+    player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 24, startingMana: 35, baseManaLimit: 50, lightGoldRushLevel: 1, lightLumberGatheringLevel: 1, darkWhipLevel: 1, darkLegionsCallLevel: 1,
+        manaAccumulation: 10, manaFromManaWells: 60, scrollCooldownReduction: 0, massConstructionCostReduction: 12.5,
         goldMiningTimeReduction: 0, woodMiningTimeReduction: 0, ...initialPlayerLevels },
     delays: { constructionStartDelay: 2.5, orderDelay: 1 },
 }
@@ -64,12 +64,30 @@ test("blocked actions are preserved without adding prerequisites and export null
     })
 })
 
-test("empty orders import and derived worker counts cannot be overridden", () => {
+test("empty orders import", () => {
     const doc = JSON.parse(sample())
     doc.buildOrder = [doc.buildOrder[0]]
-    doc.gameProfile.map.workerCount = 999
-    expect(economyFromProfile(parseBuildOrder(JSON.stringify(doc)).gameProfile).workerCount).toBe(5)
     expect(parseBuildOrder(JSON.stringify(doc)).buildOrder).toEqual([])
+})
+
+test("every missing profile field or block uses its default and unknown fields are discarded", () => {
+    const original = JSON.parse(sample())
+    for (const [block, defaults] of Object.entries(initialGameProfile)) {
+        for (const [key, value] of Object.entries(defaults)) {
+            const doc = JSON.parse(sample())
+            delete doc.gameProfile[block][key]
+            expect((parseBuildOrder(JSON.stringify(doc)).gameProfile[block as keyof GameProfile] as any)[key]).toBe(value)
+        }
+        const doc = JSON.parse(sample())
+        delete doc.gameProfile[block]
+        expect(parseBuildOrder(JSON.stringify(doc)).gameProfile[block as keyof GameProfile]).toEqual(defaults)
+    }
+    delete original.gameProfile
+    expect(parseBuildOrder(JSON.stringify(original)).gameProfile).toEqual(initialGameProfile)
+    original.gameProfile = { player: { startingGold: 777, unknownSetting: 123 }, unknownBlock: { value: 5 } }
+    const expected = { ...initialGameProfile, player: { ...initialGameProfile.player, startingGold: 777 } }
+    expect(parseBuildOrder(JSON.stringify(original)).gameProfile).toEqual(expected)
+    expect(JSON.parse(serializeBuildOrder("light", original.gameProfile, [])).gameProfile).toEqual(expected)
 })
 
 test("custom values in every block round trip with unchanged format and rules versions", () => {
@@ -99,25 +117,19 @@ test.each([
     ["invalid faction", (doc: any) => { doc.faction = "other" }],
     ["unknown item", (doc: any) => { doc.buildOrder[1].itemId = "unknown" }],
     ["wrong faction item", (doc: any) => { doc.buildOrder[1].itemId = "goon" }],
+    ...[-1, 100.1, null, "5"].map(value => ["invalid mass construction reduction " + value, (doc: any) => { doc.gameProfile.player.massConstructionCostReduction = value } ] as const),
     ["negative resources", (doc: any) => { doc.gameProfile.player.startingGold = -1 }],
+    ["null profile", (doc: any) => { doc.gameProfile = null }],
+    ["null player block", (doc: any) => { doc.gameProfile.player = null }],
+    ["null gold setting", (doc: any) => { doc.gameProfile.player.startingGold = null }],
     ["fractional workers", (doc: any) => { doc.buildOrder[0].goldWorkers = 1.5 }],
     ["zero gathering duration", (doc: any) => { doc.gameProfile.basic.goldGatherTime = 0 }],
-    ["missing profile", (doc: any) => { delete doc.gameProfile }],
     ["missing rules version", (doc: any) => { delete doc.gameRulesVersion }],
     ["oversized allocation", (doc: any) => { doc.buildOrder[0].goldWorkers = 1001 }],
-    ["missing basic", (doc: any) => { delete doc.gameProfile.basic }],
-    ["missing map", (doc: any) => { delete doc.gameProfile.map }],
-    ["missing player", (doc: any) => { delete doc.gameProfile.player }],
-    ["missing delays", (doc: any) => { delete doc.gameProfile.delays }],
-    ["missing initial delay", (doc: any) => { delete doc.gameProfile.delays.orderDelay }],
     ["negative initial delay", (doc: any) => { doc.gameProfile.delays.orderDelay = -1 }],
-    ["missing sawmill travel", (doc: any) => { delete doc.gameProfile.map.sawmillWoodTravelTime }],
     ["negative sawmill travel", (doc: any) => { doc.gameProfile.map.sawmillWoodTravelTime = -1 }],
-    ["missing gold travel", (doc: any) => { delete doc.gameProfile.map.goldTravelTime }],
-    ["missing wood travel", (doc: any) => { delete doc.gameProfile.map.woodTravelTime }],
     ["negative gold travel", (doc: any) => { doc.gameProfile.map.goldTravelTime = -1 }],
     ["negative wood travel", (doc: any) => { doc.gameProfile.map.woodTravelTime = -1 }],
-    ["missing initial gold reduction", (doc: any) => { delete doc.gameProfile.basic.initialGoldTravelReduction }],
     ["negative initial gold reduction", (doc: any) => { doc.gameProfile.basic.initialGoldTravelReduction = -1 }],
 ])("rejects %s", (_name, mutate) => {
     const doc = JSON.parse(sample())

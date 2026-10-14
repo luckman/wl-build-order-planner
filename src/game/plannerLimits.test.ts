@@ -50,7 +50,7 @@ test("100 actions round trip through files, links and drafts; 101 cannot be expo
     expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("100")
     saveFactionDrafts({ light: { ...draft, items: oversized }, dark: { ...draft, items: [] } }, profiles)
     expect(window.localStorage.getItem(draftStorageKey("light"))).toBe(previous)
-    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify(doc.buildOrder))
+    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify(doc))
     expect(loadFactionDrafts(profiles).light.items).toEqual([])
 })
 
@@ -98,6 +98,6 @@ test("untrusted timestamps cannot bypass limits through links or saved drafts", 
     const payload = btoa(Array.from(deflate(JSON.stringify(doc)), byte => String.fromCharCode(byte)).join(""))
         .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
     expect(() => parseShareableLink(`#build=2.${payload}`)).toThrow("29:59")
-    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify(doc.buildOrder))
+    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify(doc))
     expect(loadFactionDrafts(profiles).light.items).toEqual([])
 })

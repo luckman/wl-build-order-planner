@@ -3,7 +3,7 @@ import { createUnitLossAction, unitLossCommand, type UnitLossCommand } from "./u
 import { createManaWellAction, manaWellCommand, type ManaWellCommand } from "./manaWells"
 import { createResourceAction, resourceCommand, type AddResourcesCommand } from "./resourceEvents"
 import { factions, type FactionId, type PlannerItem } from "./gameData"
-import { economyFromProfile, STARTING_WORKER_COUNT, initialGameProfile, initialOpeningAction, type OpeningAction, type GameProfile } from "./gameProfile"
+import { economyFromProfile, STARTING_WORKER_COUNT, scrollLevelFields, initialGameProfile, initialOpeningAction, type OpeningAction, type GameProfile } from "./gameProfile"
 export type { GameProfile } from "./gameProfile"
 import { type ScheduledAction } from "./buildSimulation"
 import { playerLevelFields, playerLevelTier } from "./playerLevels"
@@ -38,8 +38,8 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
         }))],
     }
     const text = JSON.stringify(document, null, 2)
-    parseBuildOrder(text)
-    return text
+    const parsed = parseBuildOrder(text)
+    return JSON.stringify({ ...document, gameProfile: parsed.gameProfile }, null, 2)
 }
 
 function object(value: unknown, path: string): Record<string, unknown> {
@@ -65,30 +65,18 @@ export function parseBuildOrder(text: string): {
     if (doc.version !== FILE_VERSION) throw new Error(`Unsupported JSON format version: ${String(doc.version)}.`)
     if (doc.faction !== "light" && doc.faction !== "dark") throw new Error("Faction must be light or dark.")
     if (typeof doc.gameRulesVersion !== "string" || !doc.gameRulesVersion.trim()) throw new Error("Missing gameRulesVersion.")
-    const profile = object(doc.gameProfile, "gameProfile")
-    const fields: { [Block in keyof GameProfile]: Array<keyof GameProfile[Block]> } = {
-        basic: ["goldGatherTime", "woodGatherTime", "initialGoldTravelReduction", "manaPerMinute", "timeBetweenScrolls"],
-        map: ["goldTravelTime", "woodTravelTime", "sawmillWoodTravelTime"],
-        player: ["startingGold", "startingWood", "baseFoodLimit", "startingMana", "baseManaLimit", "scrollLevel",
-            "manaAccumulation", "manaFromManaWells", "scrollCooldownReduction",
-            "goldMiningTimeReduction", "woodMiningTimeReduction", ...playerLevelFields],
-        delays: ["constructionStartDelay", "orderDelay"],
-    }
+    const profile = object(doc.gameProfile === undefined ? {} : doc.gameProfile, "gameProfile")
     const parsed: Record<string, Record<string, number>> = {}
-    for (const block of Object.keys(fields) as Array<keyof GameProfile>) {
-        const raw = object(profile[block], `gameProfile.${block}`)
+    for (const block of Object.keys(initialGameProfile) as Array<keyof GameProfile>) {
+        const raw = object(profile[block] === undefined ? {} : profile[block], `gameProfile.${block}`)
         parsed[block] = {}
-        for (const key of fields[block]) {
-            // Default fields added after the initial profile schema, retaining older settings.
-            const optionalField = ["startingMana", "baseManaLimit", "manaPerMinute", "manaTowerLevel", "timeBetweenScrolls", "scrollLevel",
-                "manaAccumulation", "manaFromManaWells", "scrollCooldownReduction",
-                "goldMiningTimeReduction", "woodMiningTimeReduction"].includes(key)
-            const value = key === "manaAccumulation" && !(key in raw) ? parsed.basic.manaPerMinute :
-                optionalField && !(key in raw) ? initialGameProfile[block][key as keyof typeof initialGameProfile[typeof block]] : raw[key]
+        for (const key of Object.keys(initialGameProfile[block])) {
+            const value = key in raw ? raw[key] :
+                initialGameProfile[block][key as keyof typeof initialGameProfile[typeof block]]
             parsed[block][key] = number(value, `gameProfile.${block}.${key}`,
                 key === "goldGatherTime" || key === "woodGatherTime")
-            if (key === "scrollCooldownReduction" && parsed[block][key] > 100) {
-                throw new Error("gameProfile.player.scrollCooldownReduction must be from 0 to 100 percent.")
+            if ((key === "scrollCooldownReduction" || key === "massConstructionCostReduction") && parsed[block][key] > 100) {
+                throw new Error(`gameProfile.player.${key} must be from 0 to 100 percent.`)
             }
             if (key === "goldMiningTimeReduction" || key === "woodMiningTimeReduction") {
                 const maximum = key === "goldMiningTimeReduction" ? 1 : 5
@@ -96,8 +84,8 @@ export function parseBuildOrder(text: string): {
                     throw new Error(`gameProfile.player.${key} must be from 0 to ${maximum.toFixed(1)} seconds.`)
                 }
             }
-            if (key === "scrollLevel" && (!Number.isInteger(parsed[block][key]) || parsed[block][key] < 1 || parsed[block][key] > 6)) {
-                throw new Error("gameProfile.player.scrollLevel must be an integer from 1 to 6.")
+            if (scrollLevelFields.some(field => field === key) && (!Number.isInteger(parsed[block][key]) || parsed[block][key] < 1 || parsed[block][key] > 6)) {
+                throw new Error(`gameProfile.player.${key} must be an integer from 1 to 6.`)
             }
             if (block === "player" && playerLevelFields.some(field => field === key)) {
                 try { playerLevelTier(parsed[block][key]) } catch {

@@ -15,16 +15,6 @@ export function loadSavedProfile(faction: FactionId): GameProfile | null {
                 faction, gameProfile: JSON.parse(text), buildOrder: [{ type: "allocate-workers", goldWorkers: 0 }],
             })).gameProfile
         }
-        const legacyText = window.localStorage.getItem(`wl-resource-profile-v1-${faction}`)
-        if (legacyText) {
-            const legacy = JSON.parse(legacyText)
-            const { goldWorkers, woodWorkers, ...map } = legacy.map
-            return parseBuildOrder(JSON.stringify({
-                format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
-                faction, gameProfile: { ...legacy, map },
-                buildOrder: [{ type: "allocate-workers", goldWorkers }],
-            })).gameProfile
-        }
     } catch {
         // Invalid data or unavailable storage must not prevent using the planner.
     }
@@ -36,11 +26,11 @@ export function loadFactionProfiles(): FactionProfiles {
 }
 
 export function saveProfile(faction: FactionId, profile: GameProfile): void {
-    parseBuildOrder(JSON.stringify({
+    const parsed = parseBuildOrder(JSON.stringify({
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile: profile, buildOrder: [{ type: "allocate-workers", goldWorkers: 0 }],
     }))
-    window.localStorage.setItem(profileStorageKey(faction), JSON.stringify(profile))
+    window.localStorage.setItem(profileStorageKey(faction), JSON.stringify(parsed.gameProfile))
 }
 
 export function saveFactionProfiles(profiles: FactionProfiles): void {

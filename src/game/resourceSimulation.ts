@@ -14,7 +14,10 @@ export type EconomySettings = PlayerBuildingLevels & {
     manaPerTower: number
     timeBetweenScrolls?: number
     scrollCooldownReduction?: number
-    scrollLevel?: number
+    lightGoldRushLevel?: number
+    lightLumberGatheringLevel?: number
+    darkWhipLevel?: number
+    darkLegionsCallLevel?: number
     workerCount: number
     goldWorkers: number
     woodWorkers: number

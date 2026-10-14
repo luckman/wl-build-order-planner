@@ -85,7 +85,7 @@ test("overlaps do not stack and all six levels use identical effects", () => {
     const overlap = simulate([scroll(0), scroll(10)])
     expect(overlap.plan.every(action => !action.blocked)).toBe(true)
     expect(Math.max(...overlap.deliveries.map(delivery => delivery.gold))).toBe(settings.goldPerTrip + 10)
-    for (let level = 2; level <= 6; level++) expect(simulate([scroll(0)], { ...settings, scrollLevel: level }).deliveries).toEqual(simulate([scroll(0)]).deliveries)
+    for (let level = 2; level <= 6; level++) expect(simulate([scroll(0)], { ...settings, lightGoldRushLevel: level }).deliveries).toEqual(simulate([scroll(0)]).deliveries)
 })
 
 test("scroll position does not change income or catalog scheduling; bonus can unblock an earlier row", () => {

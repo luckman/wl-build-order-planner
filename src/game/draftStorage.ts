@@ -18,23 +18,9 @@ function loadDraft(faction: FactionId, profile: GameProfile): LoadedDraft {
     try {
         const text = window.localStorage.getItem(draftStorageKey(faction))
         if (text) {
-            const stored = JSON.parse(text)
-            const result = parseBuildOrder(JSON.stringify(Array.isArray(stored) ? {
-                format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
-                faction, gameProfile: profile, buildOrder: stored,
-            } : stored))
+            const result = parseBuildOrder(text)
             if (result.faction !== faction) throw new Error("Draft faction mismatch")
             return { opening: result.opening, items: result.buildOrder, gameProfile: result.gameProfile }
-        }
-        const legacyText = window.localStorage.getItem(`wl-resource-profile-v1-${faction}`)
-        if (legacyText) {
-            const legacy = JSON.parse(legacyText)
-            const result = parseBuildOrder(JSON.stringify({
-                format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
-                faction, gameProfile: profile,
-                buildOrder: [{ type: "allocate-workers", goldWorkers: legacy.map.goldWorkers }],
-            }))
-            return { opening: result.opening, items: [], gameProfile: profile }
         }
     } catch {
         // A damaged draft or unavailable storage must not prevent using the planner.
@@ -61,8 +47,8 @@ export function saveFactionDrafts(drafts: FactionDrafts, profiles: FactionProfil
                 format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
                 faction, gameProfile: profiles[faction], buildOrder,
             }
-            parseBuildOrder(JSON.stringify(document))
-            window.localStorage.setItem(draftStorageKey(faction), JSON.stringify(document))
+            const parsed = parseBuildOrder(JSON.stringify(document))
+            window.localStorage.setItem(draftStorageKey(faction), JSON.stringify({ ...document, gameProfile: parsed.gameProfile }))
         } catch {
             // Keep editing in memory when browser storage is unavailable or full.
         }

@@ -52,7 +52,7 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
                 if (decimalPlaces !== undefined) event.currentTarget.value = bounded.toFixed(decimalPlaces)
                 if (block === "player" && key === "startingMana") {
                     onChange({ ...profile, player: { ...profile.player, startingMana: bounded,
-                        baseManaLimit: Math.max(50, profile.player.baseManaLimit, bounded) } })
+                        baseManaLimit: Math.max(profile.player.baseManaLimit, bounded) } })
                     return
                 }
                 if (block === "player" && key === "baseManaLimit") {
@@ -74,15 +74,15 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         {durationError && <p role="alert">{durationError}</p>}
         <div className="economy-grid resource-profile-grid">
             <div className="resource-profile-column">
-                {field("player", "startingGold", "Starting gold", 150)}
-                {field("player", "startingWood", "Starting wood", 50)}
+                {field("player", "startingGold", "Starting gold")}
+                {field("player", "startingWood", "Starting wood")}
                 {field("player", "townHallLevel", `${names.townHall} level`, 1, 1, 24)}
                 {field("player", "sawmillLevel", "Sawmill level", 1, 1, 24)}
                 {field("player", "goldMiningTimeReduction", "Gold mining time reduction (seconds)", 0, 0.1, 1, 1)}
                 {field("player", "woodMiningTimeReduction", "Wood gathering time reduction (seconds)", 0, 0.1, 5, 1)}
             </div>
             <div className="resource-profile-column">
-                {field("player", "baseFoodLimit", "Base food limit", 20, 1, 40)}
+                {field("player", "baseFoodLimit", "Base food limit", 0, 1, 40)}
                 {field("player", "farmLevel", `${names.farm} level`, 1, 1, 24)}
                 {field("player", "workerLevel", `${faction === "light" ? "Worker" : "Slave"} level`, 1, 1, 24)}
                 {field("player", "barracksLevel", "Barracks level", 1, 1, 24)}
@@ -91,10 +91,10 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
             </div>
             <div className="resource-profile-column">
                 {field("player", "manaTowerLevel", "Tower of Mana level", 1, 1, 24)}
-                {field("player", "startingMana", "Starting mana", 35, 1, 100)}
-                {field("player", "baseManaLimit", "Base mana capacity", Math.min(100, Math.max(50, profile.player.startingMana)), 1, 100)}
-                {field("player", "manaAccumulation", "Mana accumulation", 10, 1, 20)}
-                {field("player", "manaFromManaWells", "Mana from mana wells", 60, 1, 100)}
+                {field("player", "startingMana", "Starting mana", 0, 1, 100)}
+                {field("player", "baseManaLimit", "Base mana capacity", profile.player.startingMana, 1, Math.max(100, profile.player.startingMana))}
+                {field("player", "manaAccumulation", "Mana accumulation", 0, 1, 20)}
+                {field("player", "manaFromManaWells", "Mana from mana wells", 0, 1, 100)}
                 {field("player", "scrollCooldownReduction", "Scroll cooldown reduction (%)", 0, 1, 20)}
             </div>
         </div>
@@ -107,7 +107,13 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         <button className="reset-profile" type="button" aria-label="Load saved profile" title={`Load the saved profile only for the current faction (${faction === "light" ? "Light" : "Dark"}). The build order is preserved.`} disabled={!hasSavedProfile} onClick={onLoad}>Load saved profile</button>
         <button className="reset-profile" type="button" aria-label="Reset basic to defaults" title="Reset the main resource and level fields, keeping advanced settings" onClick={() => onChange({
             ...profile,
-            player: { ...initialGameProfile.player, scrollLevel: profile.player.scrollLevel },
+            player: { ...initialGameProfile.player,
+                lightGoldRushLevel: profile.player.lightGoldRushLevel,
+                lightLumberGatheringLevel: profile.player.lightLumberGatheringLevel,
+                darkWhipLevel: profile.player.darkWhipLevel,
+                darkLegionsCallLevel: profile.player.darkLegionsCallLevel,
+                massConstructionCostReduction: profile.player.massConstructionCostReduction,
+            },
         })}>Reset basic to defaults</button>
         <button className="reset-profile" type="button" onClick={() => onChange({
             basic: { ...initialGameProfile.basic }, map: { ...initialGameProfile.map },

@@ -3,6 +3,7 @@ import App from "./App"
 import { initialGameProfile } from "./game/gameProfile"
 import { draftStorageKey, loadFactionDrafts } from "./game/draftStorage"
 import { loadFactionProfiles, profileStorageKey } from "./game/profileStorage"
+import { serializeBuildOrder } from "./game/buildOrderFile"
 
 beforeEach(() => window.localStorage.clear())
 afterEach(() => { window.localStorage.clear(); jest.restoreAllMocks() })
@@ -41,46 +42,38 @@ test("opening belongs to the order, persists with actions, and resource reset pr
     expect(window.localStorage.getItem(profileStorageKey("dark"))).toBeNull()
 })
 
-test("starting workers are fixed at five with no profile control, including after loading old storage", () => {
-    window.localStorage.setItem(profileStorageKey("light"), JSON.stringify({
-        ...initialGameProfile, player: { ...initialGameProfile.player, startingWorkers: 2 },
-    }))
-    const first = render(<App />)
-    expect(screen.queryByLabelText("Starting workers")).toBeNull()
-    const slider = screen.getByLabelText("Initial gold miners") as HTMLInputElement
-    expect(slider.max).toBe("4")
-    expect(slider.value).toBe("4")
-    expect(first.container.querySelector(".resource-legend")!.textContent).toContain("10 / 20")
-    expect(loadFactionProfiles().light.player).not.toHaveProperty("startingWorkers")
-    fireEvent.click(screen.getByRole("button", { name: "Save profile" }))
-    expect(JSON.parse(window.localStorage.getItem(profileStorageKey("light"))!).player).not.toHaveProperty("startingWorkers")
-    change("Initial gold miners", "2")
-    first.unmount()
-    render(<App />)
-    expect(screen.queryByLabelText("Starting workers")).toBeNull()
-    expect(screen.getByText("Initial gold miners: 2 · Initial wood gatherers: 3")).toBeTruthy()
-})
-
-test("legacy resource storage moves allocation into a draft while retaining resource settings", () => {
+test("version 1 resource storage is not loaded", () => {
     window.localStorage.setItem("wl-resource-profile-v1-light", JSON.stringify({
         ...initialGameProfile,
         map: { ...initialGameProfile.map, goldWorkers: 2, woodWorkers: 1 },
         player: { ...initialGameProfile.player, startingGold: 777 },
     }))
     const first = render(<App />)
-    expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("777")
-    expect(screen.getByText("Initial gold miners: 2 · Initial wood gatherers: 3")).toBeTruthy()
+    expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("150")
+    expect(screen.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeTruthy()
     expect(loadFactionProfiles().light.map).toEqual(initialGameProfile.map)
     first.unmount()
     render(<App />)
-    expect(screen.getByText("Initial gold miners: 2 · Initial wood gatherers: 3")).toBeTruthy()
+    expect(screen.getByText("Initial gold miners: 4 · Initial wood gatherers: 1")).toBeTruthy()
 })
 
 test("invalid stored actions fall back independently without resetting profiles", () => {
-    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify([{ type: "allocate-workers", goldWorkers: 7 }]))
-    window.localStorage.setItem(draftStorageKey("dark"), JSON.stringify([{ type: "allocate-workers", goldWorkers: 1 }, { itemId: "slave" }]))
+    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify({ ...JSON.parse(serializeBuildOrder("light", initialGameProfile, [])), buildOrder: [{ type: "allocate-workers", goldWorkers: 7 }] }))
+    window.localStorage.setItem(draftStorageKey("dark"), JSON.stringify({ ...JSON.parse(serializeBuildOrder("dark", initialGameProfile, [], false, { type: "allocate-workers", goldWorkers: 1 })), buildOrder: [{ type: "allocate-workers", goldWorkers: 1 }, { itemId: "slave" }] }))
     const drafts = loadFactionDrafts(loadFactionProfiles())
     expect(drafts.light).toMatchObject({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [] })
     expect(drafts.dark.opening.goldWorkers).toBe(1)
     expect(drafts.dark.items.map(item => item.id)).toEqual(["slave"])
+})
+
+test("array-only drafts fall back to an empty build with the personal profile or defaults", () => {
+    const legacyDraft = JSON.stringify([{ type: "allocate-workers", goldWorkers: 1 }, { itemId: "worker" }])
+    window.localStorage.setItem(draftStorageKey("light"), legacyDraft)
+    window.localStorage.setItem(draftStorageKey("dark"), legacyDraft)
+    const personalProfile = { ...initialGameProfile, player: { ...initialGameProfile.player, startingGold: 777 } }
+    window.localStorage.setItem(profileStorageKey("light"), JSON.stringify(personalProfile))
+    const drafts = loadFactionDrafts(loadFactionProfiles())
+    expect(drafts.light).toEqual({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [], gameProfile: personalProfile })
+    expect(drafts.dark).toEqual({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [], gameProfile: initialGameProfile })
+    expect(window.localStorage.getItem(draftStorageKey("light"))).toBe(legacyDraft)
 })

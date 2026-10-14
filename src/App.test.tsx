@@ -3,6 +3,7 @@ import App from "./App"
 import { createShareableLink } from "./game/shareableLink"
 import { initialGameProfile } from "./game/gameProfile"
 import { draftStorageKey } from "./game/draftStorage"
+import { serializeBuildOrder } from "./game/buildOrderFile"
 
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
@@ -101,7 +102,7 @@ test("shared imports replace their faction draft and preserve the other draft", 
 })
 
 test("resource-blocked orders are highlighted in both panels and clear when resources are available", () => {
-    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify([{ type: "allocate-workers", goldWorkers: 5 }]))
+    window.localStorage.setItem(draftStorageKey("light"), serializeBuildOrder("light", initialGameProfile, [], false, { type: "allocate-workers", goldWorkers: 5 }))
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "0" } })
     fireEvent.click(within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ }))
@@ -324,7 +325,7 @@ test("adding a second Farm inserts the needed upgrade and removal explains block
 })
 
 test("Barracks prices and resource totals update when orders are added or removed", () => {
-    window.localStorage.setItem(draftStorageKey("light"), JSON.stringify([{ type: "allocate-workers", goldWorkers: 0 }]))
+    window.localStorage.setItem(draftStorageKey("light"), serializeBuildOrder("light", initialGameProfile, [], false, { type: "allocate-workers", goldWorkers: 0 }))
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })

@@ -1,26 +1,29 @@
 import type { EconomySettings } from "./resourceSimulation"
 import { initialPlayerLevels, yieldsFromLevels, type PlayerBuildingLevels } from "./playerLevels"
 
+export const scrollLevelFields = ["lightGoldRushLevel", "lightLumberGatheringLevel", "darkWhipLevel", "darkLegionsCallLevel"] as const
+
 export type GameProfile = {
-    // manaPerMinute is retained for legacy profile migration; player.manaAccumulation drives regeneration.
-    basic: { goldGatherTime: number; woodGatherTime: number; initialGoldTravelReduction: number; manaPerMinute: number; timeBetweenScrolls: number }
+    basic: { goldGatherTime: number; woodGatherTime: number; initialGoldTravelReduction: number; timeBetweenScrolls: number }
     map: {
         goldTravelTime: number; woodTravelTime: number;
         sawmillWoodTravelTime: number
     }
     player: PlayerBuildingLevels & {
-        startingGold: number; startingWood: number; baseFoodLimit: number; startingMana: number; baseManaLimit: number; scrollLevel: number
-        manaAccumulation: number; manaFromManaWells: number; scrollCooldownReduction: number
+        startingGold: number; startingWood: number; baseFoodLimit: number; startingMana: number; baseManaLimit: number
+        lightGoldRushLevel: number; lightLumberGatheringLevel: number; darkWhipLevel: number; darkLegionsCallLevel: number
+        manaAccumulation: number; manaFromManaWells: number; scrollCooldownReduction: number; massConstructionCostReduction: number
         goldMiningTimeReduction: number; woodMiningTimeReduction: number
     }
     delays: { constructionStartDelay: number; orderDelay: number }
 }
 
 export const initialGameProfile: GameProfile = {
-    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, manaPerMinute: 10, timeBetweenScrolls: 10 },
+    basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, timeBetweenScrolls: 10 },
     map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
-    player: { startingGold: 150, startingWood: 50, baseFoodLimit: 20, startingMana: 35, baseManaLimit: 50, scrollLevel: 1,
-        manaAccumulation: 10, manaFromManaWells: 60, scrollCooldownReduction: 0,
+    player: { startingGold: 150, startingWood: 50, baseFoodLimit: 20, startingMana: 35, baseManaLimit: 50,
+        lightGoldRushLevel: 1, lightLumberGatheringLevel: 1, darkWhipLevel: 1, darkLegionsCallLevel: 1,
+        manaAccumulation: 10, manaFromManaWells: 60, scrollCooldownReduction: 0, massConstructionCostReduction: 0,
         goldMiningTimeReduction: 0, woodMiningTimeReduction: 0, ...initialPlayerLevels },
     delays: { constructionStartDelay: 4, orderDelay: 1 },
 }

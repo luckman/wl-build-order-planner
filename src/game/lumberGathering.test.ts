@@ -65,8 +65,8 @@ test("overlapping effects do not stack and levels one through six have the same 
     const overlap = simulate([lumber(0), lumber(10)], economy)
     expect(overlap.plan.every(action => !action.blocked)).toBe(true)
     expect(Math.max(...overlap.deliveries.map(({ wood }) => wood))).toBe(65)
-    for (let scrollLevel = 1; scrollLevel <= 6; scrollLevel++) {
-        expect(simulate([lumber(0)], { ...economy, scrollLevel }).deliveries).toEqual(simulate([lumber(0)], economy).deliveries)
+    for (let level = 1; level <= 6; level++) {
+        expect(simulate([lumber(0)], { ...economy, lightLumberGatheringLevel: level }).deliveries).toEqual(simulate([lumber(0)], economy).deliveries)
     }
 })
 

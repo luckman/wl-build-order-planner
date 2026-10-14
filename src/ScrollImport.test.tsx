@@ -110,7 +110,11 @@ test("Gold Rush shares the heroes row and automatic insertion fixes its timestam
     expect(draft[1].commandTime).toBe(46)
     const profile = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).gameProfile
     expect(profile.basic.timeBetweenScrolls).toBe(10)
-    expect(profile.player.scrollLevel).toBe(1)
+    expect(profile.player.lightGoldRushLevel).toBe(1)
+    expect(profile.player.lightLumberGatheringLevel).toBe(1)
+    expect(profile.player.darkWhipLevel).toBe(1)
+    expect(profile.player.darkLegionsCallLevel).toBe(1)
+    expect(profile.player).not.toHaveProperty("scrollLevel")
     expect(draft[1].level).toBeUndefined()
     expect(screen.queryByLabelText(/time between scrolls/i)).toBeNull()
 })

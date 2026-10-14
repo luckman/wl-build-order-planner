@@ -1,5 +1,5 @@
 import { earliestScrollTime } from "./scrollTiming"
-import { economyFromProfile, initialGameProfile } from "./gameProfile"
+import { economyFromProfile, initialGameProfile, scrollLevelFields } from "./gameProfile"
 import { simulateBuildOrder } from "./buildSimulation"
 import { createScrollAction, scrollCooldown } from "./scrolls"
 import { parseBuildOrder, serializeBuildOrder } from "./buildOrderFile"
@@ -76,20 +76,21 @@ test("the hidden cooldown defaults for old profiles, validates, and round-trips"
     }
 })
 
-test("hidden player scroll level defaults to one and validates levels one through six", () => {
+test.each(scrollLevelFields)("hidden %s defaults to one and validates levels one through six", field => {
     const doc = JSON.parse(serializeBuildOrder("light", initialGameProfile, []))
-    delete doc.gameProfile.player.scrollLevel
-    expect(parseBuildOrder(JSON.stringify(doc)).gameProfile.player.scrollLevel).toBe(1)
-    doc.gameProfile.player.scrollLevel = 6
-    doc.buildOrder.push({ type: "use-scroll", scrollId: "gold-rush", commandTime: 90, level: 4 })
+    delete doc.gameProfile.player[field]
+    expect(parseBuildOrder(JSON.stringify(doc)).gameProfile.player[field]).toBe(1)
+    doc.gameProfile.player[field] = 6
+    doc.buildOrder.push({ type: "use-scroll", scrollId: "gold-rush", commandTime: 90 })
     const parsed = parseBuildOrder(JSON.stringify(doc))
-    expect(parsed.gameProfile.player.scrollLevel).toBe(6)
-    expect(parsed.buildOrder[0].level).toBeUndefined()
-    for (const value of [0, 7, 1.5, null, "1"]) {
-        doc.gameProfile.player.scrollLevel = value
-        expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("scrollLevel")
+    expect(parsed.gameProfile.player[field]).toBe(6)
+    expect(parseBuildOrder(serializeBuildOrder("light", parsed.gameProfile, [])).gameProfile).toEqual(parsed.gameProfile)
+    for (const value of [-1, 0, 7, 1.5, null, "1"]) {
+        doc.gameProfile.player[field] = value
+        expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(field)
     }
 })
+
 
 test("fixed timestamps inside cooldown are blocked without effects, including imported commands", () => {
     const settings = { ...economy, startingMana: 1000, baseManaLimit: 1000, timeBetweenScrolls: 10, orderDelay: 0 }

@@ -38,14 +38,6 @@ test("empty order links support profile sharing", () => {
     expect(parseShareableLink(url.hash)!.buildOrder).toEqual([])
 })
 
-test.each([0, 2])("obsolete startingWorkers=%s cannot override the fixed five workers", startingWorkers => {
-    const profile = { ...initialGameProfile, player: { ...initialGameProfile.player, startingWorkers } }
-    const url = new URL(createShareableLink("https://example.com", "light", profile, []))
-    expect(parseShareableLink(url.hash)!.opening.goldWorkers).toBe(4)
-    const imported = parseShareableLink(url.hash)!
-    expect(imported.gameProfile.player).not.toHaveProperty("startingWorkers")
-    expect(economyFromProfile(imported.gameProfile, imported.opening).workerCount).toBe(5)
-})
 
 test("unrelated fragments do not import", () => {
     expect(parseShareableLink("")).toBeNull()
