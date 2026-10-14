@@ -1,4 +1,5 @@
 import { initialPlayerLevels } from "./game/playerLevels"
+import { trackEvent } from "./analytics"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import App from "./App"
 import { GAME_RULES_VERSION } from "./game/buildOrderFile"
@@ -9,6 +10,9 @@ import { simulateBuildOrder } from "./game/buildSimulation"
 import { economyFromProfile } from "./game/gameProfile"
 import { draftStorageKey } from "./game/draftStorage"
 import { profileStorageKey } from "./game/profileStorage"
+
+jest.mock("./analytics", () => ({ trackEvent: jest.fn() }))
+beforeEach(() => jest.clearAllMocks())
 
 afterEach(() => window.history.replaceState(null, "", window.location.pathname))
 beforeEach(() => window.localStorage.clear())
@@ -73,7 +77,7 @@ test.each([
         expect(confirm).not.toHaveBeenCalled()
         const expected = [{ type: "allocate-workers", goldWorkers: 3 }, ...ids.map(itemId => ({ itemId }))]
         expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).buildOrder).toEqual(expected)
-        expect(JSON.parse(window.localStorage.getItem(profileStorageKey("light"))!)).toEqual(profile)
+        expect(JSON.parse(window.localStorage.getItem(profileStorageKey("light"))!).gameProfile).toEqual(profile)
         expect((screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement).value).toBe("3")
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
         unmount()
@@ -128,12 +132,17 @@ test("opening a shared link restores the plan and recalculates it; invalid hash 
     expect(screen.getByRole("button", { name: "Dark", exact: true }).classList.contains("selected")).toBe(true)
     expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
     expect(screen.getByText("Command 0:02.5")).toBeTruthy()
+    expect(trackEvent).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenLastCalledWith("open-build-link")
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "333" } })
     expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("333")
     window.history.replaceState(null, "", "#build=2.invalid!")
     fireEvent(window, new Event("hashchange"))
     expect(screen.getByRole("alert").textContent).toContain("invalid")
     expect(window.location.hash).toBe("#build=2.invalid!")
+    expect(trackEvent).toHaveBeenCalledTimes(2)
+    fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "334" } })
+    expect(trackEvent).toHaveBeenCalledTimes(2)
     expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
     window.history.replaceState(null, "", createShareableLink(window.location.href, "light", initialGameProfile, []))
     fireEvent(window, new Event("hashchange"))
@@ -141,6 +150,7 @@ test("opening a shared link restores the plan and recalculates it; invalid hash 
     expect(screen.queryByRole("button", { name: "Remove Slave" })).toBeNull()
     expect(screen.queryByRole("alert")).toBeNull()
     expect(window.location.hash).toBe("")
+    expect(trackEvent).toHaveBeenCalledTimes(3)
 })
 
 test.each(["light", "dark"] as const)("opening a %s shared link, editing, and remounting restores the saved draft and profile", faction => {
@@ -196,6 +206,8 @@ test("Copy link copies the current profile without timings and closes the menu",
         fireEvent.click(screen.getByRole("button", { name: "Copy link" }))
         await waitFor(() => expect(screen.getByRole("status").textContent).toContain("copied"))
         expect(screen.getByRole("status").classList.contains("file-notice-success")).toBe(true)
+        expect(trackEvent).toHaveBeenCalledTimes(1)
+        expect(trackEvent).toHaveBeenLastCalledWith("copy-link")
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
         const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
         expect(result.gameProfile.player.startingGold).toBe(777)
@@ -205,6 +217,7 @@ test("Copy link copies the current profile without timings and closes the menu",
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name: "Copy link" }))
         await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Copy the link below"))
+        expect(trackEvent).toHaveBeenCalledTimes(1)
         expect((screen.getByLabelText("Shareable link") as HTMLInputElement).value).toBe(writeText.mock.calls[1][0])
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(true)
     } finally {

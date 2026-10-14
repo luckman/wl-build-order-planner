@@ -12,24 +12,28 @@ export type BuildDraft = { opening: OpeningAction; items: PlannerItem[] }
 export type FactionDrafts = Record<FactionId, BuildDraft>
 export const draftStorageKey = (faction: FactionId) => `wl-build-draft-v2-${faction}`
 
-type LoadedDraft = BuildDraft & { gameProfile: GameProfile }
+type LoadedDraft = BuildDraft & { gameProfile: GameProfile; reset?: true }
 
 function loadDraft(faction: FactionId, profile: GameProfile): LoadedDraft {
+    const fallback = { opening: { ...initialOpeningAction }, items: [], gameProfile: profile }
+    let text: string | null
+    try { text = window.localStorage.getItem(draftStorageKey(faction)) } catch { return fallback }
+    if (text === null) return fallback
     try {
-        const text = window.localStorage.getItem(draftStorageKey(faction))
-        if (text) {
-            const result = parseBuildOrder(text)
-            if (result.faction !== faction) throw new Error("Draft faction mismatch")
-            return { opening: result.opening, items: result.buildOrder, gameProfile: result.gameProfile }
-        }
+        const result = parseBuildOrder(text)
+        if (result.faction !== faction) throw new Error("Draft faction mismatch")
+        return { opening: result.opening, items: result.buildOrder, gameProfile: result.gameProfile }
     } catch {
-        // A damaged draft or unavailable storage must not prevent using the planner.
+        return { ...fallback, reset: true }
     }
-    return { opening: { ...initialOpeningAction }, items: [], gameProfile: profile }
 }
 
 export function loadFactionDrafts(profiles: FactionProfiles): Record<FactionId, LoadedDraft> {
     return { light: loadDraft("light", profiles.light), dark: loadDraft("dark", profiles.dark) }
+}
+
+export function discardFactionDraft(faction: FactionId): void {
+    try { window.localStorage.removeItem(draftStorageKey(faction)) } catch { /* Keep editing in memory. */ }
 }
 
 export function saveFactionDrafts(drafts: FactionDrafts, profiles: FactionProfiles, factions: FactionId[] = ["light", "dark"]): void {

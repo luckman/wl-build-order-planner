@@ -30,7 +30,7 @@ import {
 import { manaAt, resourceAt, workerAllocationAt } from "./game/resourceSimulation"
 import { economyFromProfile, type GameProfile } from "./game/gameProfile"
 import { loadFactionProfiles, loadSavedProfile, saveProfile } from "./game/profileStorage"
-import { loadActiveFaction, saveActiveFaction, loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
+import { discardFactionDraft, loadActiveFaction, saveActiveFaction, loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
 import type { BuildDraft } from "./game/draftStorage"
 import { actionDuration } from "./game/playerLevels"
 import "./index.css"
@@ -174,6 +174,15 @@ export default function App() {
         ? item as PlannerItem & { orderId: string }
         : { ...item, orderId: `action-${nextOrderId.current++}` }), [])
     const [initialDrafts] = useState(() => loadFactionDrafts(loadFactionProfiles()))
+    useEffect(() => {
+        for (const faction of ["light", "dark"] as const) {
+            if (initialDrafts[faction].reset) discardFactionDraft(faction)
+        }
+    }, [initialDrafts])
+    const [draftNotices, setDraftNotices] = useState(() => ({ light: !!initialDrafts.light.reset, dark: !!initialDrafts.dark.reset }))
+    const draftNotice = useMemo<NotificationMessage | null>(() => draftNotices[factionId]
+        ? { text: "Your previous draft could not be restored. Starting a new build.", kind: "warning" } : null, [draftNotices, factionId])
+    const dismissDraftNotice = useCallback(() => setDraftNotices(current => ({ ...current, [factionId]: false })), [factionId])
     const [gameProfiles, updateGameProfiles] = useState(() => ({ light: initialDrafts.light.gameProfile, dark: initialDrafts.dark.gameProfile }))
     const [savedProfiles, setSavedProfiles] = useState(() => ({ light: loadSavedProfile("light"), dark: loadSavedProfile("dark") }))
     const [profileNotice, setProfileNotice] = useState<NotificationMessage | null>(null)
@@ -387,6 +396,7 @@ export default function App() {
                     <BuildOrderFiles faction={factionId} profile={gameProfile} plan={plan} opening={opening} onImport={applyImport} onSelectTemplate={applyTemplate} />
                 </nav>
             </header>
+            <Notification notice={draftNotice} onDismiss={dismissDraftNotice} />
             <Notification notice={limitError} onDismiss={dismissLimitError} />
             <main>
                 <div className="workspace">

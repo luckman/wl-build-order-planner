@@ -54,18 +54,9 @@ function number(value: unknown, path: string, positive = false, integer = false)
     return value
 }
 
-/** Transport-independent parsing for files and future shareable links. Timings are never read. */
-export function parseBuildOrder(text: string): {
-    faction: FactionId; buildOrder: PlannerItem[]; opening: OpeningAction; gameProfile: GameProfile; warning: string | null
-} {
-    let value: unknown
-    try { value = JSON.parse(text) } catch { throw new Error("The file is not valid JSON.") }
-    const doc = object(value, "Build order")
-    if (doc.format !== "wl-build-order") throw new Error("Choose a WL build-order JSON file.")
-    if (doc.version !== FILE_VERSION) throw new Error(`Unsupported JSON format version: ${String(doc.version)}.`)
-    if (doc.faction !== "light" && doc.faction !== "dark") throw new Error("Faction must be light or dark.")
-    if (typeof doc.gameRulesVersion !== "string" || !doc.gameRulesVersion.trim()) throw new Error("Missing gameRulesVersion.")
-    const profile = object(doc.gameProfile === undefined ? {} : doc.gameProfile, "gameProfile")
+/** Shared field validation, independent of document/storage framing. */
+export function parseGameProfile(value: unknown): GameProfile {
+    const profile = object(value === undefined ? {} : value, "gameProfile")
     const parsed: Record<string, Record<string, number>> = {}
     for (const block of Object.keys(initialGameProfile) as Array<keyof GameProfile>) {
         const raw = object(profile[block] === undefined ? {} : profile[block], `gameProfile.${block}`)
@@ -100,6 +91,21 @@ export function parseBuildOrder(text: string): {
     }
     validateEconomyDurations({ ...gameProfile.basic, ...gameProfile.map, ...gameProfile.delays })
     validateEconomyDurations(economyFromProfile(gameProfile))
+    return gameProfile
+}
+
+/** Transport-independent parsing for files and future shareable links. Timings are never read. */
+export function parseBuildOrder(text: string): {
+    faction: FactionId; buildOrder: PlannerItem[]; opening: OpeningAction; gameProfile: GameProfile; warning: string | null
+} {
+    let value: unknown
+    try { value = JSON.parse(text) } catch { throw new Error("The file is not valid JSON.") }
+    const doc = object(value, "Build order")
+    if (doc.format !== "wl-build-order") throw new Error("Choose a WL build-order JSON file.")
+    if (doc.version !== FILE_VERSION) throw new Error(`Unsupported JSON format version: ${String(doc.version)}.`)
+    if (doc.faction !== "light" && doc.faction !== "dark") throw new Error("Faction must be light or dark.")
+    if (typeof doc.gameRulesVersion !== "string" || !doc.gameRulesVersion.trim()) throw new Error("Missing gameRulesVersion.")
+    const gameProfile = parseGameProfile(doc.gameProfile)
     if (!Array.isArray(doc.buildOrder) || doc.buildOrder.length < 1) throw new Error("buildOrder must start with a worker allocation.")
     validateActionCount(doc.buildOrder.length - 1)
     const first = object(doc.buildOrder[0], "Opening action")

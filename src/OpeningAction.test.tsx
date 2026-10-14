@@ -73,7 +73,7 @@ test("array-only drafts fall back to an empty build with the personal profile or
     const personalProfile = { ...initialGameProfile, player: { ...initialGameProfile.player, startingGold: 777 } }
     window.localStorage.setItem(profileStorageKey("light"), JSON.stringify(personalProfile))
     const drafts = loadFactionDrafts(loadFactionProfiles())
-    expect(drafts.light).toEqual({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [], gameProfile: personalProfile })
-    expect(drafts.dark).toEqual({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [], gameProfile: initialGameProfile })
+    expect(drafts.light).toEqual({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [], gameProfile: personalProfile, reset: true })
+    expect(drafts.dark).toEqual({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [], gameProfile: initialGameProfile, reset: true })
     expect(window.localStorage.getItem(draftStorageKey("light"))).toBe(legacyDraft)
 })

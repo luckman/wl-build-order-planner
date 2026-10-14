@@ -1,4 +1,5 @@
 import Notification, { type NotificationMessage } from "./Notification"
+import { trackEvent } from "./analytics"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createShareableLink, parseShareableLink } from "./game/shareableLink"
 import { saveJson } from "./saveJson"
@@ -22,6 +23,7 @@ type Props = {
 export default function BuildOrderFiles({ faction, profile, plan, opening, onImport, onSelectTemplate }: Props) {
     const input = useRef<HTMLInputElement>(null)
     const menu = useRef<HTMLDetailsElement>(null)
+    const trackedHash = useRef<string | null>(null)
     const closeMenu = () => {
         if (menu.current) {
             menu.current.open = false
@@ -45,6 +47,13 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     }, [])
     useEffect(() => {
         const loadLink = () => {
+            const hash = window.location.hash
+            if (new URLSearchParams(hash.slice(1)).has("build")) {
+                if (trackedHash.current !== hash) {
+                    trackedHash.current = hash
+                    trackEvent("open-build-link")
+                }
+            } else trackedHash.current = null
             try {
                 const result = parseShareableLink(window.location.hash)
                 if (!result) return
@@ -74,6 +83,7 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
             const link = createShareableLink(window.location.href, faction, profile, plan, opening)
             try {
                 await navigator.clipboard.writeText(link)
+                trackEvent("copy-link")
                 setNotice({ text: "Shareable link copied to clipboard.", kind: "success" })
                 closeMenu()
             } catch {
