@@ -5,8 +5,8 @@ import { SCROLLS, type ScrollId } from "./game/scrolls"
 import DurationInput from "./DurationInput"
 import { formatDuration, parseDuration, MAX_DURATION_SECONDS } from "./durationTime"
 
-export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "gold-rush", onAdd, onClose }: {
-    minimumTime: number; automaticTime: number | null; scrollId?: ScrollId
+export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "gold-rush", onAdd, onClose, validationError }: {
+    minimumTime: number; automaticTime: number | null; scrollId?: ScrollId; validationError?: string | null
     onAdd: (time: number) => void; onClose: () => void
 }) {
     const scroll = SCROLLS[scrollId]
@@ -34,7 +34,7 @@ export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "g
             <h2 id="scroll-dialog-title">Use {scroll.name}</h2>
             <p>{scroll.description}</p>
             <p>All scroll levels (1–6) currently use the same effect.</p>
-            <form onSubmit={event => { event.preventDefault(); if (valid) onAdd(commandTime!) }}>
+            <form onSubmit={event => { event.preventDefault(); if (valid && !validationError) onAdd(commandTime!) }}>
                 <label className="scroll-automatic"><input type="checkbox" checked={automatic}
                     onChange={event => setAutomatic(event.target.checked)} /> Use after the last scroll as soon as enough mana is available</label>
                 <DurationInput label="Command time (mm:ss)" disabled={automatic}
@@ -42,9 +42,10 @@ export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "g
                     onChange={setManualTime} />
                 <p className="scroll-time-hint">The timestamp is fixed when added. Click its Build order row to change it.</p>
                 {automatic && automaticTime === null && <p role="alert">Enough mana cannot be reached with the current plan. Choose a manual timestamp to add a blocked command.</p>}
-                {!automatic && !valid && <p role="alert">Enter a valid mm:ss time between {formatDuration(minimumTime)} and 99:59.</p>}
-                {automatic && automaticTime !== null && automaticTime > MAX_DURATION_SECONDS && <p role="alert">The earliest available command exceeds the maximum time of 99:59.</p>}
-                <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid}>Add scroll</button></div>
+                {!automatic && !valid && <p role="alert">Enter a valid mm:ss time between {formatDuration(minimumTime)} and 29:59.</p>}
+                {automatic && automaticTime !== null && automaticTime > MAX_DURATION_SECONDS && <p role="alert">The earliest available command exceeds the maximum time of 29:59.</p>}
+                {validationError && <p role="alert">{validationError}</p>}
+                <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid || !!validationError}>Add scroll</button></div>
             </form>
         </div>
     </div>

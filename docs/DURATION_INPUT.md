@@ -13,9 +13,9 @@ const seconds = parseDuration(time)
 <DurationInput label="Command time (mm:ss)" value={time} onChange={setTime} />
 ```
 
-The controlled value is formatted text so an incomplete or invalid edit can stay visible. `parseDuration` returns seconds or null; use that result to validate or submit an event. `formatDuration` converts seconds for initial values and calculated previews. `MAX_DURATION_SECONDS` is 5999 (99:59).
+The controlled value is formatted text so an incomplete or invalid edit can stay visible. `parseDuration` returns seconds or null; use that result to validate or submit an event. `formatDuration` converts seconds for initial values and calculated previews. `MAX_DURATION_SECONDS` is 5999 (29:59).
 
-The field keeps the colon visible and shifts digits from the right: 2 → 00:02, then 1 → 00:21, then 5 → 02:15. It accepts 215, 0215, or 02:15, preserves up to three fractional second digits, caps typed/pasted values at 99:59, and rejects seconds 60 or greater. It selects its contents on focus and maintains the cursor during editing.
+The field keeps the colon visible and shifts digits from the right: 2 → 00:02, then 1 → 00:21, then 5 → 02:15. It accepts 215, 0215, or 02:15, preserves up to three fractional second digits, caps typed/pasted values at 29:59, and rejects seconds 60 or greater. It selects its contents on focus and maintains the cursor during editing.
 
 Standard input props such as disabled, id, name, required, aria-invalid, and aria-describedby can be supplied. Disabled calculated previews should be passed as formatted text. Domain rules such as mana availability, cooldown, minimum command time, and warnings belong to the event dialog rather than the input.
 `src/EventTimeDialog.tsx` provides the shared manual timestamp editor for existing scrolls and future fixed-time events. Supply the event name, stored commandTime, onSave, and onClose. Save updates the existing event by identity; simulation remains responsible for reporting mana, cooldown, and other timing conflicts.

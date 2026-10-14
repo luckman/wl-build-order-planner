@@ -1,4 +1,5 @@
-import { initialGameProfile, type GameProfile } from "./game/gameProfile"
+import { MAX_PLAN_SECONDS, validateEconomyDurations } from "./game/plannerLimits"
+import { economyFromProfile, initialGameProfile, type GameProfile } from "./game/gameProfile"
 import { useState, type ReactNode } from "react"
 import { playerLevelFields, yieldsFromLevels } from "./game/playerLevels"
 import type { FactionId } from "./game/gameData"
@@ -13,6 +14,7 @@ export default function GameProfileEditor({ faction, profile, onChange, children
     faction: FactionId; profile: GameProfile; onChange: (profile: GameProfile) => void; children?: ReactNode
 }) {
     const [advanced, setAdvanced] = useState(false)
+    const [durationError, setDurationError] = useState<string | null>(null)
     const yields = yieldsFromLevels(profile.player)
     const names = buildingNames[faction]
     const fieldHelp: Record<string, string> = {
@@ -28,6 +30,7 @@ export default function GameProfileEditor({ faction, profile, onChange, children
         orderDelay: "This delay applies before the first build-order command and the second and later initial wood gathering commands. It also applies after a recruitment building or prerequisites complete, before their first eligible command. Subsequent recruitment uses the normal queue. The first initial wood gatherer starts immediately.",
     }
     function field<Block extends keyof GameProfile>(block: Block, key: keyof GameProfile[Block], label: string, min = 0, step = 1, max?: number, decimalPlaces?: number) {
+        if (block === "map" || block === "delays") max = MAX_PLAN_SECONDS
         const isLevel = playerLevelFields.some(level => level === key)
         const id = `profile-${block}-${String(key)}`
         const help = fieldHelp[String(key)]
@@ -56,11 +59,18 @@ export default function GameProfileEditor({ faction, profile, onChange, children
                         startingMana: Math.min(profile.player.startingMana, bounded) } })
                     return
                 }
-                onChange({ ...profile, [block]: { ...profile[block], [key]: bounded } })
+                const next = { ...profile, [block]: { ...profile[block], [key]: bounded } }
+                try { validateEconomyDurations(economyFromProfile(next)) } catch (reason) {
+                    setDurationError((reason as Error).message)
+                    return
+                }
+                setDurationError(null)
+                onChange(next)
             }} />
         </div>
     }
     return <div className="profile-blocks">
+        {durationError && <p role="alert">{durationError}</p>}
         <div className="economy-grid resource-profile-grid">
             <div className="resource-profile-column">
                 {field("player", "startingGold", "Starting gold", 150)}

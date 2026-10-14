@@ -1,3 +1,4 @@
+import { validateCommandTime } from "./plannerLimits"
 import type { FactionId, PlannerItem } from "./gameData"
 
 export type ScrollId = "gold-rush" | "lumber-gathering"
@@ -36,6 +37,7 @@ export function createScrollAction(command: ScrollCommand, faction: FactionId): 
         !Number.isFinite(command.commandTime + scroll.startDelay + scroll.duration)) {
         throw new Error("Scroll commandTime must be a finite non-negative number.")
     }
+    validateCommandTime(command.commandTime)
     return {
         id: command.scrollId, name: scroll.name, kind: "scroll", icon: scroll.icon,
         gold: 0, wood: 0, food: 0, seconds: scroll.duration,

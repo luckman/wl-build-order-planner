@@ -1,3 +1,4 @@
+import { validateCommandTime } from "./plannerLimits"
 import { factions, isRecruitable, type FactionId, type PlannerItem } from "./gameData"
 
 export type UnitLossCommand = { type: "lose-unit"; commandTime: number; unitId: string }
@@ -5,6 +6,7 @@ export type UnitLossAction = PlannerItem & { kind: "unit-loss"; commandTime: num
 export function createUnitLossAction(command: UnitLossCommand, faction: FactionId): UnitLossAction {
     if (command.type !== "lose-unit" || !Number.isFinite(command.commandTime) || command.commandTime < 0)
         throw new Error("Lose unit commandTime must be a finite non-negative number.")
+    validateCommandTime(command.commandTime)
     const unit = factions[faction].items.find(item => item.id === command.unitId && isRecruitable(item))
     if (!unit) throw new Error(`Unknown unit ID ${String(command.unitId)} for ${faction}.`)
     return { id: "lose-unit", name: "Lose unit", kind: "unit-loss", unitId: unit.id,

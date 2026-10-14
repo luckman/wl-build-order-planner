@@ -133,12 +133,45 @@ test("opening a shared link restores the plan and recalculates it; invalid hash 
     window.history.replaceState(null, "", "#build=2.invalid!")
     fireEvent(window, new Event("hashchange"))
     expect(screen.getByRole("alert").textContent).toContain("invalid")
+    expect(window.location.hash).toBe("#build=2.invalid!")
     expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
     window.history.replaceState(null, "", createShareableLink(window.location.href, "light", initialGameProfile, []))
     fireEvent(window, new Event("hashchange"))
     expect(screen.getByRole("button", { name: "Light", exact: true }).classList.contains("selected")).toBe(true)
     expect(screen.queryByRole("button", { name: "Remove Slave" })).toBeNull()
     expect(screen.queryByRole("alert")).toBeNull()
+    expect(window.location.hash).toBe("")
+})
+
+test.each(["light", "dark"] as const)("opening a %s shared link, editing, and remounting restores the saved draft and profile", faction => {
+    const url = new URL(createShareableLink(window.location.href, faction, initialGameProfile, []))
+    url.search = "?view=planner"
+    url.hash += "&section=orders"
+    const state = { planner: true }
+    window.history.replaceState(state, "", url.href)
+    const { unmount } = render(<App />)
+    expect(window.location.pathname).toBe(url.pathname)
+    expect(window.location.search).toBe("?view=planner")
+    expect(window.location.hash).toBe("#section=orders")
+    expect(window.history.state).toEqual(state)
+
+    fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "777" } })
+    const worker = faction === "light" ? "Worker" : "Slave"
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${worker} \\d+ gold`) }))
+    const draft = window.localStorage.getItem(draftStorageKey(faction))
+    const profile = window.localStorage.getItem(profileStorageKey(faction))
+    expect(JSON.parse(draft!)).toContainEqual({ itemId: faction === "light" ? "worker" : "slave" })
+    expect(JSON.parse(profile!).player.startingGold).toBe(777)
+
+    // A fresh app mount at the same URL models reload with storage retained.
+    unmount()
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction === "light" ? "Light" : "Dark", exact: true }))
+    expect(screen.getByRole("button", { name: `Remove ${worker}`, exact: true })).toBeTruthy()
+    expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("777")
+    expect(window.localStorage.getItem(draftStorageKey(faction))).toBe(draft)
+    expect(window.localStorage.getItem(profileStorageKey(faction))).toBe(profile)
+    expect(screen.queryByRole("status")).toBeNull()
 })
 
 test("Copy link copies the current profile without timings and closes the menu", async () => {

@@ -1,3 +1,4 @@
+import { validateActionCount, validateCommandTime } from "./plannerLimits"
 import { unitLossCommand } from "./unitLosses"
 import { manaWellCommand } from "./manaWells"
 import { resourceCommand } from "./resourceEvents"
@@ -45,6 +46,10 @@ export function saveFactionDrafts(drafts: FactionDrafts): void {
     for (const faction of ["light", "dark"] as const) {
         try {
             const draft = drafts[faction]
+            validateActionCount(draft.items.length)
+            for (const item of draft.items) {
+                if ("commandTime" in item) validateCommandTime(item.commandTime)
+            }
             window.localStorage.setItem(draftStorageKey(faction), JSON.stringify([
                 draft.opening, ...draft.items.map(item => isScrollAction(item) ? scrollCommand(item) : item.kind === "resource" ? resourceCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-loss" ? unitLossCommand(item) : ({ itemId: item.id })),
             ]))

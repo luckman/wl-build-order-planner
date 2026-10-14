@@ -1,3 +1,4 @@
+import { validateCommandTime } from "./plannerLimits"
 import type { PlannerItem } from "./gameData"
 
 export type ManaWellEventType = "capture-mana-well" | "lose-mana-well"
@@ -11,6 +12,7 @@ export const MANA_WELL_EVENTS = {
 export function createManaWellAction(command: ManaWellCommand): ManaWellAction {
     if (command.type !== "capture-mana-well" && command.type !== "lose-mana-well") throw new Error("Unknown mana well event.")
     if (!Number.isFinite(command.commandTime) || command.commandTime < 0) throw new Error("Mana well commandTime must be a finite non-negative number.")
+    validateCommandTime(command.commandTime)
     return { id: command.type, ...MANA_WELL_EVENTS[command.type], kind: "mana-well", wellEvent: command.type,
         commandTime: command.commandTime, gold: 0, wood: 0, food: 0, seconds: 0, producer: "", prerequisites: [] }
 }

@@ -1,3 +1,4 @@
+import { MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
 import { createUnitLossAction, unitLossCommand, foodUsedAt } from "./unitLosses"
 import { evaluateManaWells } from "./manaWells"
 import { createResourceAction, resourceCommand, isTimedEvent } from "./resourceEvents"
@@ -33,8 +34,10 @@ export function simulateBuildOrder(
     baseFoodLimit: number,
     foodPerFarm: number,
     initialTownHall: string,
-    until = 600,
+    until = MAX_PLAN_SECONDS,
 ) {
+    validateActionCount(buildOrder.length)
+    validatePlanTime(until, "Simulation horizon")
     const simulation = new WorkerEconomy(economy)
     const plan: ScheduledAction[] = []
     const spending: Array<{ time: number; gold: number; wood: number }> = []
@@ -72,6 +75,7 @@ export function simulateBuildOrder(
         return action
     })
     until = Math.max(until, ...wellPlan.map(action => action.commandTime!))
+    until = Math.min(MAX_PLAN_SECONDS, until)
     const initial = catalog.find(item => item.name === initialTownHall)!
     const namesById = new Map([...catalog, ...buildOrder].map(item => [item.id, item.name]))
     const buildings = [newBuilding(initial)]
@@ -131,13 +135,16 @@ export function simulateBuildOrder(
                 const cooldownBlocked = eventTime < cooldownUntil
                 const manaBlocked = availableMana + 1e-9 < scroll.manaCost
                 const orderDelayBlocked = eventTime < economy.orderDelay || readyMana + 1e-9 < scroll.manaCost
-                const blocked = cooldownBlocked || manaBlocked || orderDelayBlocked
                 const startTime = eventTime + scroll.startDelay
                 const finishTime = startTime + scroll.duration
+                const horizonBlocked = finishTime > MAX_PLAN_SECONDS
+                const blocked = cooldownBlocked || manaBlocked || orderDelayBlocked || horizonBlocked
                 scrollPlan.push({ item, cost: { gold: 0, wood: 0 }, commandTime: eventTime,
                     startTime: blocked ? null : startTime, finishTime: blocked ? null : finishTime,
                     workerReturnTime: null, workerId: null, manaCost: scroll.manaCost, blocked,
-                    ...(blocked ? { blockedReason: cooldownBlocked
+                    ...(blocked ? { blockedReason: horizonBlocked
+                        ? "Scroll effect would exceed the 30:00 plan limit"
+                        : cooldownBlocked
                         ? `Scroll cooldown: next scroll can be used at ${cooldownUntil} seconds`
                         : manaBlocked ? `Insufficient mana for ${scroll.name}: requires ${scroll.manaCost}, available ${availableMana.toFixed(1)}`
                         : `Scroll order delay: ${scroll.manaCost} mana must be available for ${economy.orderDelay} seconds before the command` } : {}),
@@ -249,6 +256,10 @@ export function simulateBuildOrder(
                 const duration = actionDuration(item, economy)
                 const finishTime = startTime + duration
                 const workerReturnTime = builder ? finishTime + economy.constructionStartDelay : null
+                if ((workerReturnTime ?? finishTime) > MAX_PLAN_SECONDS) {
+                    blockedReason = "Action would exceed the 30:00 plan limit"
+                    break
+                }
                 plan.push({
                     item,
                     cost,
@@ -313,11 +324,11 @@ export function simulateBuildOrder(
         }
     }
     advanceTo(
-        Math.max(
+        Math.min(MAX_PLAN_SECONDS, Math.max(
             until,
             simulation.time,
             ...plan.map(({ finishTime, workerReturnTime }) => workerReturnTime ?? finishTime ?? 0),
-        ),
+        )),
     )
     // Preserve source row identity for existing consumers; orderedPlan is the chronological view.
     const catalogPlan = [...plan]

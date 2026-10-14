@@ -8,9 +8,9 @@ import type { AddResourcesCommand, ResourceAction } from "./game/resourceEvents"
 
 
 
-export default function ResourceDialog({ defaultTime, action, onSave, onClose }: {
+export default function ResourceDialog({ defaultTime, action, onSave, onClose, validationError }: {
 
-    defaultTime: number; action?: ResourceAction
+    defaultTime: number; action?: ResourceAction; validationError?: string | null
 
     onSave: (command: AddResourcesCommand) => void; onClose: () => void
 
@@ -64,7 +64,7 @@ export default function ResourceDialog({ defaultTime, action, onSave, onClose }:
 
             <p>Gold and wood are added instantly at the command time, with no delays.</p>
 
-            <form onSubmit={event => { event.preventDefault(); if (valid) onSave({ type: "add-resources", commandTime: commandTime!, gold: Number(gold), wood: Number(wood) }) }}>
+            <form onSubmit={event => { event.preventDefault(); if (valid && !validationError) onSave({ type: "add-resources", commandTime: commandTime!, gold: Number(gold), wood: Number(wood) }) }}>
 
                 <DurationInput wholeSeconds label="Command time (mm:ss)" value={time} onChange={setTime} />
 
@@ -72,9 +72,11 @@ export default function ResourceDialog({ defaultTime, action, onSave, onClose }:
 
                 <label>Wood<input type="number" min="0" step="any" value={wood} onChange={event => setWood(event.target.value)} /></label>
 
-                {!valid && <p role="alert">Enter a valid time from 00:00 to 99:59 and non-negative resource amounts.</p>}
+                {!valid && <p role="alert">Enter a valid time from 00:00 to 29:59 and non-negative resource amounts.</p>}
 
-                <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid}>{action ? "Save event" : "Add resources"}</button></div>
+                {validationError && <p role="alert">{validationError}</p>}
+
+                <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid || !!validationError}>{action ? "Save event" : "Add resources"}</button></div>
 
             </form>
 

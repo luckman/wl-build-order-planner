@@ -15,7 +15,7 @@ export default function UnitLossDialog({ faction, defaultTime, action, validate,
     const commandTime = parseDuration(time)
     const timeValid = commandTime !== null && Number.isInteger(commandTime)
     const command: UnitLossCommand = { type: "lose-unit", commandTime: commandTime ?? 0, unitId }
-    const error = timeValid ? validate(command) : "Enter a valid whole-second time from 00:00 to 99:59."
+    const error = timeValid ? validate(command) : "Enter a valid whole-second time from 00:00 to 29:59."
     useEffect(() => {
         const previousFocus = document.activeElement as HTMLElement | null
         dialog.current?.querySelector<HTMLInputElement>("input")?.focus()

@@ -46,21 +46,21 @@ test.each(["215", "0215", "02:15"])("keyboard time %s normalizes to 02:15 and st
     expect(onAdd).toHaveBeenCalledWith(135)
 })
 
-test("command time caps larger keyboard and pasted values at 99:59", () => {
+test("command time caps larger keyboard and pasted values at 29:59", () => {
     const onAdd = jest.fn()
     render(<ScrollDialog minimumTime={0} automaticTime={91} onAdd={onAdd} onClose={() => {}} />)
     fireEvent.click(screen.getByRole("checkbox"))
     const input = screen.getByLabelText("Command time (mm:ss)") as HTMLInputElement
     const add = screen.getByRole("button", { name: "Add scroll" }) as HTMLButtonElement
-    for (const value of ["10000", "100:00", "99:59.001"]) {
+    for (const value of ["10000", "100:00", "29:59.001"]) {
         fireEvent.change(input, { target: { value } })
-        expect(input.value).toBe("99:59")
+        expect(input.value).toBe("29:59")
         expect(add.disabled).toBe(false)
     }
     fireEvent.change(input, { target: { value: "9959" } })
     expect(add.disabled).toBe(false)
     fireEvent.click(add)
-    expect(onAdd).toHaveBeenCalledWith(5999)
+    expect(onAdd).toHaveBeenCalledWith(1799)
 })
 
 test("shared scroll commands appear chronologically after recruitment lanes and remove the correct row", () => {

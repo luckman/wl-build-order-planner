@@ -1016,7 +1016,7 @@ The Light Lumber Gathering scroll costs 25 mana, activates at command time + 1 s
 
 ## Add resources events
 
-Both factions can add gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 99:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
+Both factions can add gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 29:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
 
 ## Mana well ownership
 

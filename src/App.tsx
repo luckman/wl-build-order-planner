@@ -1,3 +1,5 @@
+import Notification, { type NotificationMessage } from "./Notification"
+import { ACTION_LIMIT_MESSAGE, MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, MAX_COMMAND_SECONDS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
 import UnitLossDialog from "./UnitLossDialog"
 import { createUnitLossAction, foodUsedAt } from "./game/unitLosses"
 import { createManaWellAction, evaluateManaWells, MANA_WELL_EVENTS, manaWellCountAt, type ManaWellEventType } from "./game/manaWells"
@@ -183,12 +185,18 @@ export default function App() {
         setHoverTime(null)
     }
     useEffect(() => saveFactionDrafts(buildOrders), [buildOrders])
+    const [limitError, setLimitError] = useState<NotificationMessage | null>(null)
+    const dismissLimitError = useCallback(() => setLimitError(null), [])
     const setBuildOrder = useCallback((update: SetStateAction<PlannerItem[]>) => {
-        updateBuildOrders(current => {
-            const items = typeof update === "function" ? update(current[factionId].items) : update
-            return { ...current, [factionId]: { ...current[factionId], items: withOrderIds(items) } }
-        })
-    }, [factionId, withOrderIds])
+        const items = typeof update === "function" ? update(buildOrder) : update
+        if (items.length > MAX_PLAN_ACTIONS) {
+            setLimitError({ text: ACTION_LIMIT_MESSAGE, kind: "error" })
+            return false
+        }
+        setLimitError(null)
+        updateBuildOrders(current => ({ ...current, [factionId]: { ...current[factionId], items: withOrderIds(items) } }))
+        return true
+    }, [buildOrder, factionId, withOrderIds])
     const [dependencyError, setDependencyError] = useState<string | null>(null)
     const gameProfile = gameProfiles[factionId]
     const setGameProfile = useCallback((profile: GameProfile) => {
@@ -199,6 +207,13 @@ export default function App() {
     const { baseFoodLimit } = gameProfile.player
     const { foodPerFarm } = economy
     const faction = factions[factionId]
+    const additionError = buildOrder.length >= MAX_PLAN_ACTIONS ? ACTION_LIMIT_MESSAGE : null
+    const addCatalogItem = (item: PlannerItem) => {
+        setDependencyError(null)
+        if (additionError) { setLimitError({ text: additionError, kind: "error" }); return }
+        try { setBuildOrder(buildOrderWithDependencies(faction, buildOrder, item)) }
+        catch (error) { setLimitError(null); setDependencyError((error as Error).message) }
+    }
     const initialWorkerCount = economy.goldWorkers + economy.woodWorkers
     const initialFoodUsed = initialWorkerCount * 2
     const [hoverTime, setHoverTime] = useState<number | null>(null)
@@ -218,6 +233,7 @@ export default function App() {
         setHoverTime(null)
     }
     const applyImport = useCallback((result: ReturnType<typeof parseBuildOrder>) => {
+        setLimitError(null)
         setFactionId(result.faction)
         updateBuildOrders(current => ({ ...current, [result.faction]: { opening: result.opening, items: withOrderIds(result.buildOrder) } }))
         updateGameProfiles(current => ({ ...current, [result.faction]: result.gameProfile }))
@@ -225,6 +241,7 @@ export default function App() {
         setHoverTime(null)
     }, [withOrderIds])
     const applyTemplate = (draft: BuildDraft) => {
+        setLimitError(null)
         updateBuildOrders(current => ({ ...current, [factionId]: { opening: draft.opening, items: withOrderIds(draft.items) } }))
         setDependencyError(null)
         setHoverTime(null)
@@ -248,15 +265,15 @@ export default function App() {
     const minimumScrollTime = scrollTimes.length ? Math.max(...scrollTimes) + scrollCooldown(economy) + economy.orderDelay : 0
     const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime, scrollDialogOpen ?? "gold-rush")
     const displayPlan = buildOrder.some(isTimedEvent) ? scheduled.orderedPlan : plan
-    const defaultEventTime = Math.ceil(Math.max(0, ...plan.filter(action => !action.blocked).map(action => action.commandTime ?? 0)) + 1)
+    const defaultEventTime = Math.min(MAX_COMMAND_SECONDS, Math.ceil(Math.max(0, ...plan.filter(action => !action.blocked).map(action => action.commandTime ?? 0)) + 1))
     const spending = plan.flatMap(({ cost, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
     )
     const lastCompletionTime = Math.max(0, ...plan.map(({ finishTime, commandTime }) => finishTime ?? commandTime ?? 0))
-    const endTime = Math.max(TIMELINE_WINDOW_SECONDS, lastCompletionTime + 30)
+    const endTime = Math.min(MAX_PLAN_SECONDS, Math.max(TIMELINE_WINDOW_SECONDS, lastCompletionTime + 30))
     const samples = useMemo(
         () =>
-            Array.from({ length: Math.ceil(endTime / 5) + 1 }, (_, index) =>
+            Array.from({ length: Math.min(MAX_TIMELINE_SAMPLES, Math.ceil(endTime / 5) + 1) }, (_, index) =>
                 resourceAt(economy, deliveries, spending, Math.min(endTime, index * 5)),
             ),
         [deliveries, economy, endTime, spending],
@@ -342,6 +359,7 @@ export default function App() {
                     <BuildOrderFiles faction={factionId} profile={gameProfile} plan={plan} opening={opening} onImport={applyImport} onSelectTemplate={applyTemplate} />
                 </nav>
             </header>
+            <Notification notice={limitError} onDismiss={dismissLimitError} />
             <main>
                 <div className="workspace">
                     <section className="title-row">
@@ -370,14 +388,7 @@ export default function App() {
                                 {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
                                     <section key={kind} aria-label={kind === "hero" ? "heroes" : `${kind}s`}>
                                         {kind === "upgrade" ? <UpgradeCards key={faction.id} faction={faction} buildOrder={buildOrder} iconSources={iconSources}
-                                            onAdd={item => {
-                                                try {
-                                                    setBuildOrder(buildOrderWithDependencies(faction, buildOrder, item))
-                                                    setDependencyError(null)
-                                                } catch (error) {
-                                                    setDependencyError((error as Error).message)
-                                                }
-                                            }} /> : <div className={`action-grid${kind === "hero" ? ` hero-scroll-grid${factionId === "dark" ? " dark-events-grid" : ""}` : ""}`}>
+                                            onAdd={addCatalogItem} /> : <div className={`action-grid${kind === "hero" ? ` hero-scroll-grid${factionId === "dark" ? " dark-events-grid" : ""}` : ""}`}>
                                             {faction.items
                                                 .filter((item) => item.kind === kind)
                                                 .map((item) => {
@@ -390,14 +401,7 @@ export default function App() {
                                                             key={item.id}
                                                             aria-label={`${item.name} ${cost.gold} gold · ${cost.wood} wood · ${food} food · ${duration}s`}
                                                             title={`${item.name}\nGold: ${cost.gold}\nWood: ${cost.wood}\nFood: ${food}\nTime: ${duration}s`}
-                                                            onClick={() => {
-                                                                try {
-                                                                    setBuildOrder(buildOrderWithDependencies(faction, buildOrder, item))
-                                                                    setDependencyError(null)
-                                                                } catch (error) {
-                                                                    setDependencyError((error as Error).message)
-                                                                }
-                                                            }}
+                                                            onClick={() => addCatalogItem(item)}
                                                         >
                                                             <img src={iconSources[item.icon]} alt="" />
                                                             <small>
@@ -656,13 +660,14 @@ export default function App() {
                 {(resourceDialogOpen || editingEvent?.kind === "resource") && <ResourceDialog
                     key={editingEvent?.orderId ?? "new-resource-event"}
                     defaultTime={defaultEventTime}
+                    validationError={editingEvent?.kind === "resource" ? null : additionError}
                     action={editingEvent?.kind === "resource" ? editingEvent : undefined}
                     onClose={() => { setResourceDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {
                         const action = createResourceAction(command)
-                        setBuildOrder(current => editingEvent?.kind === "resource"
+                        if (!setBuildOrder(current => editingEvent?.kind === "resource"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
-                            : [...current, action])
+                            : [...current, action])) return
                         setResourceDialogOpen(false)
                         setEditingEventId(null)
                         setDependencyError(null)
@@ -675,15 +680,16 @@ export default function App() {
                         const item = createUnitLossAction(command, factionId)
                         const proposed = editingEvent?.kind === "unit-loss"
                             ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
+                        if (proposed.length > MAX_PLAN_ACTIONS) return ACTION_LIMIT_MESSAGE
                         return simulateBuildOrder(proposed, economy, initialFoodUsed, baseFoodLimit, foodPerFarm, faction.startingTownHall)
                             .plan.find(action => action.item === item)?.blockedReason ?? null
                     }}
                     onClose={() => { setUnitLossDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {
                         const action = createUnitLossAction(command, factionId)
-                        setBuildOrder(current => editingEvent?.kind === "unit-loss"
+                        if (!setBuildOrder(current => editingEvent?.kind === "unit-loss"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
-                            : [...current, action])
+                            : [...current, action])) return
                         setUnitLossDialogOpen(false)
                         setEditingEventId(null)
                         setDependencyError(null)
@@ -696,6 +702,7 @@ export default function App() {
                     submitLabel={editingEvent?.kind === "mana-well" ? "Save event" : "Add event"} wholeSeconds
                     commandTime={editingEvent?.kind === "mana-well" ? editingEvent.commandTime : defaultEventTime}
                     validateTime={commandTime => {
+                        if (editingEvent?.kind !== "mana-well" && additionError) return additionError
                         const item = createManaWellAction({ type: editingEvent?.kind === "mana-well" ? editingEvent.wellEvent : wellDialogOpen!, commandTime })
                         const proposed = editingEvent?.kind === "mana-well"
                             ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
@@ -704,9 +711,9 @@ export default function App() {
                     onClose={() => { setWellDialogOpen(null); setEditingEventId(null) }}
                     onSave={commandTime => {
                         const action = createManaWellAction({ type: editingEvent?.kind === "mana-well" ? editingEvent.wellEvent : wellDialogOpen!, commandTime })
-                        setBuildOrder(current => editingEvent?.kind === "mana-well"
+                        if (!setBuildOrder(current => editingEvent?.kind === "mana-well"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
-                            : [...current, action])
+                            : [...current, action])) return
                         setWellDialogOpen(null)
                         setEditingEventId(null)
                         setDependencyError(null)
@@ -720,9 +727,9 @@ export default function App() {
                         setDependencyError(null)
                         setHoverTime(null)
                     }} />}
-                {scrollDialogOpen && <ScrollDialog scrollId={scrollDialogOpen} minimumTime={minimumScrollTime} automaticTime={automaticScrollTime}
+                {scrollDialogOpen && <ScrollDialog validationError={additionError} scrollId={scrollDialogOpen} minimumTime={minimumScrollTime} automaticTime={automaticScrollTime}
                     onClose={() => setScrollDialogOpen(null)} onAdd={commandTime => {
-                        setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime }, factionId)])
+                        if (!setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime }, factionId)])) return
                         setScrollDialogOpen(null)
                         setDependencyError(null)
                         setHoverTime(null)

@@ -1,5 +1,6 @@
+import { MAX_COMMAND_SECONDS } from "./game/plannerLimits"
 /** Shared duration entry rules for planner events, in seconds. */
-export const MAX_DURATION_SECONDS = 99 * 60 + 59
+export const MAX_DURATION_SECONDS = MAX_COMMAND_SECONDS
 
 const padSeconds = (value: string) => { const [whole, fraction] = value.split("."); return whole.padStart(2, "0") + (fraction === undefined ? "" : `.${fraction}`) }
 const timeParts = (time: number) => {
@@ -11,7 +12,7 @@ export function maskDuration(value: string) {
     const [whole, ...fractions] = value.replace(/[^\d.]/g, "").split(".")
     const digits = (whole.replace(/^0+(?=\d)/, "") || "0").padStart(4, "0")
     const seconds = Number(digits.slice(-2) + (fractions.length ? `.${fractions.join("").slice(0, 3)}` : ""))
-    if (Number(digits.slice(0, -2)) * 60 + seconds > MAX_DURATION_SECONDS) return "99:59"
+    if (Number(digits.slice(0, -2)) * 60 + seconds > MAX_DURATION_SECONDS) return formatDuration(MAX_DURATION_SECONDS)
     return `${digits.slice(0, -2)}:${digits.slice(-2)}${fractions.length ? `.${fractions.join("").slice(0, 3)}` : ""}`
 }
 export function parseDuration(value: string): number | null {

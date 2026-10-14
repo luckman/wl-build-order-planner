@@ -1,8 +1,9 @@
+import { validateActionCount, validateEconomyDurations } from "./plannerLimits"
 import { createUnitLossAction, unitLossCommand, type UnitLossCommand } from "./unitLosses"
 import { createManaWellAction, manaWellCommand, type ManaWellCommand } from "./manaWells"
 import { createResourceAction, resourceCommand, type AddResourcesCommand } from "./resourceEvents"
 import { factions, type FactionId, type PlannerItem } from "./gameData"
-import { STARTING_WORKER_COUNT, initialGameProfile, initialOpeningAction, type OpeningAction, type GameProfile } from "./gameProfile"
+import { economyFromProfile, STARTING_WORKER_COUNT, initialGameProfile, initialOpeningAction, type OpeningAction, type GameProfile } from "./gameProfile"
 export type { GameProfile } from "./gameProfile"
 import { type ScheduledAction } from "./buildSimulation"
 import { playerLevelFields, playerLevelTier } from "./playerLevels"
@@ -10,7 +11,7 @@ import { createScrollAction, isScrollAction, scrollCommand, type ScrollCommand }
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-14.6"
+export const GAME_RULES_VERSION = "2026-10-14.7"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -27,6 +28,7 @@ export type BuildOrderDocument = {
 
 export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile, actions: ScheduledAction[], includeTimings = false,
     opening: OpeningAction = initialOpeningAction) {
+    validateActionCount(actions.length)
     const document: BuildOrderDocument = {
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
@@ -35,7 +37,9 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
             ...(includeTimings ? { timings: { commandTime, startTime, finishTime, workerReturnTime } } : {}),
         }))],
     }
-    return JSON.stringify(document, null, 2)
+    const text = JSON.stringify(document, null, 2)
+    parseBuildOrder(text)
+    return text
 }
 
 function object(value: unknown, path: string): Record<string, unknown> {
@@ -106,7 +110,10 @@ export function parseBuildOrder(text: string): {
     if (gameProfile.player.baseManaLimit < gameProfile.player.startingMana) {
         throw new Error("gameProfile.player.baseManaLimit (base mana capacity) must be greater than or equal to startingMana (starting mana).")
     }
-    if (!Array.isArray(doc.buildOrder) || doc.buildOrder.length < 1 || doc.buildOrder.length > 1001) throw new Error("buildOrder must start with a worker allocation and contain at most 1,000 subsequent actions.")
+    validateEconomyDurations({ ...gameProfile.basic, ...gameProfile.map, ...gameProfile.delays })
+    validateEconomyDurations(economyFromProfile(gameProfile))
+    if (!Array.isArray(doc.buildOrder) || doc.buildOrder.length < 1) throw new Error("buildOrder must start with a worker allocation.")
+    validateActionCount(doc.buildOrder.length - 1)
     const first = object(doc.buildOrder[0], "Opening action")
     if (first.type !== "allocate-workers") throw new Error("The first action must allocate starting workers.")
     const goldWorkers = number(first.goldWorkers, "Opening action.goldWorkers", false, true)

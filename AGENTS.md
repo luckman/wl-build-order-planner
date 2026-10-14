@@ -53,7 +53,7 @@ Use only these values unless new values are provided by the project owner.
 
 ## Verification
 
-- Use `src/DurationInput.tsx` as the default command-time control for all planner events. Shared formatting, parsing, and the 99:59 limit live in `src/durationTime.ts`; keep event-specific validation in the caller. See `docs/DURATION_INPUT.md` for usage.
+- Use `src/DurationInput.tsx` as the default command-time control for all planner events. Shared formatting, parsing, and the 29:59 limit live in `src/durationTime.ts`; keep event-specific validation in the caller. See `docs/DURATION_INPUT.md` for usage.
 
 - For source changes, run `npm run build` and `npm run typecheck` when dependencies are available.
 - Run Jest without watch mode: `npm run testAll -- --runInBand` (add `--silent` if existing React deprecation warnings obscure the results).

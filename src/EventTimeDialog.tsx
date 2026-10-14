@@ -34,7 +34,7 @@ export default function EventTimeDialog({ name, commandTime, onSave, onClose, ti
             <form onSubmit={event => { event.preventDefault(); if (valid) onSave(seconds!) }}>
                 <DurationInput wholeSeconds={wholeSeconds} label="Command time (mm:ss)" value={time} onChange={setTime} aria-invalid={!valid} />
                 <p className="scroll-time-hint">The plan recalculates when saved and shows any timing conflicts.</p>
-                {!timeValid && <p role="alert">Enter a valid mm:ss time between 00:00 and 99:59.</p>}
+                {!timeValid && <p role="alert">Enter a valid mm:ss time between 00:00 and 29:59.</p>}
                 {validationError && <p role="alert">{validationError}</p>}
                 <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid}>{submitLabel}</button></div>
             </form>

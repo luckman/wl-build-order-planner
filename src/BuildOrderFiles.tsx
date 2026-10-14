@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react"
+import Notification, { type NotificationMessage } from "./Notification"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { createShareableLink, parseShareableLink } from "./game/shareableLink"
 import { saveJson } from "./saveJson"
 import { MAX_FILE_BYTES, parseBuildOrder, serializeBuildOrder, type GameProfile } from "./game/buildOrderFile"
@@ -29,14 +30,10 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     }
     const [includeTimings, setIncludeTimings] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [notice, setNotice] = useState<{ text: string; kind: "success" | "warning" | "error" } | null>(null)
+    const [notice, setNotice] = useState<NotificationMessage | null>(null)
     const [busy, setBusy] = useState(false)
     const [manualLink, setManualLink] = useState<string | null>(null)
-    useEffect(() => {
-        if (!notice) return
-        const timeout = window.setTimeout(() => setNotice(null), 5000)
-        return () => window.clearTimeout(timeout)
-    }, [notice])
+    const dismissNotice = useCallback(() => setNotice(null), [])
     useEffect(() => {
         const dismissOutside = (event: MouseEvent) => {
             if (menu.current?.open && event.target instanceof Node && !menu.current.contains(event.target)) {
@@ -52,6 +49,12 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
                 const result = parseShareableLink(window.location.hash)
                 if (!result) return
                 onImport(result)
+                // Consume this import so reloads restore the latest saved draft.
+                const url = new URL(window.location.href)
+                const fragment = new URLSearchParams(url.hash.slice(1))
+                fragment.delete("build")
+                url.hash = fragment.toString()
+                window.history.replaceState(window.history.state, "", url.href)
                 setNotice({ text: result.warning ?? "Shared build order and game profile loaded. Timings recalculated.", kind: result.warning ? "warning" : "success" })
                 if (menu.current) menu.current.open = false
             } catch (reason) {
@@ -88,7 +91,7 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
         try {
             const saved = await saveJson(serializeBuildOrder(faction, profile, plan, includeTimings, opening), `${faction}-build-order.wl-build-order.json`)
             if (saved) closeMenu()
-        } catch { setError("Could not save the build order. Please try again.") }
+        } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save the build order. Please try again.") }
         finally { setBusy(false) }
     }
     return <><details ref={menu} className="file-menu" onKeyDown={event => {
@@ -144,9 +147,6 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
         </section>}
         </div>
     </details>
-    {notice && <div className={`file-notice file-notice-${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"}>
-        <span>{notice.text}</span>
-        <button type="button" aria-label="Dismiss message" onClick={() => setNotice(null)}>×</button>
-    </div>}
+    <Notification notice={notice} onDismiss={dismissNotice} />
     </>
 }

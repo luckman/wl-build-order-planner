@@ -1,3 +1,6 @@
+import { MAX_SAWMILL_WOOD_TRAVEL_TIME, SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE } from "./gatheringRules"
+export { MAX_SAWMILL_WOOD_TRAVEL_TIME, SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE } from "./gatheringRules"
+import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
 import type { PlayerBuildingLevels } from "./playerLevels"
 import { GOLD_RUSH, LUMBER_GATHERING, type ScrollId } from "./scrolls"
 
@@ -82,9 +85,6 @@ export type WorkerAllocation = {
     busyOrIdle: number
 }
 
-export const SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE = 0.5
-export const MAX_SAWMILL_WOOD_TRAVEL_TIME = 4
-
 type WorkerStateAction = {
     item: { id: string; kind: string }
     commandTime: number | null
@@ -100,6 +100,7 @@ export class WorkerEconomy {
     workers: GatheringWorker[] = []
     deliveries: ResourceDelivery[] = []
     time = 0
+    private steps = 0
     private mineWorker: number | null = null
     private delayedInitialWoodWorkerIds: number[] = []
     private sawmillCompletions: number[] = []
@@ -107,6 +108,10 @@ export class WorkerEconomy {
     private goldRushWindows: Array<{ startTime: number; finishTime: number; bonus: number }> = []
 
     constructor(private settings: EconomySettings) {
+        validateEconomyDurations(settings, Math.max(settings.workerCount, settings.goldWorkers + settings.woodWorkers))
+        for (const count of [settings.workerCount, settings.goldWorkers, settings.woodWorkers]) {
+            if (!Number.isInteger(count) || count < 0 || count > MAX_PLAN_ACTIONS + 5) throw new Error("Unsupported worker count.")
+        }
         for (let i = 0; i < settings.goldWorkers; i++) {
             this.addWorker("gold", true)
         }
@@ -122,6 +127,7 @@ export class WorkerEconomy {
     }
 
     addWorker(assignment: GatheringWorker["assignment"], isInitialGoldWorker = false) {
+        if (this.workers.length >= MAX_PLAN_ACTIONS + 5) throw new Error("Unsupported worker count.")
         const worker: GatheringWorker = {
             id: this.workers.length,
             assignment,
@@ -230,7 +236,9 @@ export class WorkerEconomy {
     }
 
     advanceTo(time: number) {
+        validatePlanTime(time, "Simulation time")
         while (this.nextEventTime <= time) {
+            if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
             this.time = this.nextEventTime
             if (this.delayedInitialWoodWorkerIds.length && this.time === this.settings.orderDelay) {
                 for (const workerId of this.delayedInitialWoodWorkerIds) {
@@ -242,6 +250,7 @@ export class WorkerEconomy {
             }
             // Process simultaneous arrivals/departures before assigning the mine slot.
             for (const worker of this.workers.filter((candidate) => candidate.nextAt === this.time)) {
+                if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
                 if (worker.state === "outbound" || worker.state === "construction") {
                     this.arrive(worker)
                 } else if (worker.state === "gathering") {

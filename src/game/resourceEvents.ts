@@ -1,3 +1,4 @@
+import { validateCommandTime } from "./plannerLimits"
 import type { PlannerItem } from "./gameData"
 
 export type AddResourcesCommand = { type: "add-resources"; commandTime: number; gold: number; wood: number }
@@ -8,6 +9,7 @@ export function createResourceAction(command: AddResourcesCommand): ResourceActi
         if (typeof command[field] !== "number" || !Number.isFinite(command[field]) || command[field] < 0)
             throw new Error(`Add resources ${field} must be a finite non-negative number.`)
     }
+    validateCommandTime(command.commandTime)
     return { id: "add-resources", name: "Add resources", kind: "resource", icon: "addResources",
         gold: 0, wood: 0, food: 0, seconds: 0, producer: "", prerequisites: [],
         commandTime: command.commandTime, resourceGold: command.gold, resourceWood: command.wood }

@@ -41,6 +41,10 @@ export function loadFactionProfiles(): FactionProfiles {
 export function saveFactionProfiles(profiles: FactionProfiles): void {
     for (const faction of ["light", "dark"] as const) {
         try {
+            parseBuildOrder(JSON.stringify({
+                format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
+                faction, gameProfile: profiles[faction], buildOrder: [{ type: "allocate-workers", goldWorkers: 0 }],
+            }))
             window.localStorage.setItem(profileStorageKey(faction), JSON.stringify(profiles[faction]))
         } catch {
             // Keep edits working in React state if browser storage is unavailable or full.
