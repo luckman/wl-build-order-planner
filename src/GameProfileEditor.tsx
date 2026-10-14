@@ -10,8 +10,9 @@ const buildingNames = {
     dark: { townHall: "Citadel", farm: "Pigsty", industrial: "Workshop", arcane: "Dark Gate" },
 }
 
-export default function GameProfileEditor({ faction, profile, onChange, children }: {
+export default function GameProfileEditor({ faction, profile, onChange, onSave, onLoad, hasSavedProfile, children }: {
     faction: FactionId; profile: GameProfile; onChange: (profile: GameProfile) => void; children?: ReactNode
+    onSave: () => void; onLoad: () => void; hasSavedProfile: boolean
 }) {
     const [advanced, setAdvanced] = useState(false)
     const [durationError, setDurationError] = useState<string | null>(null)
@@ -102,6 +103,8 @@ export default function GameProfileEditor({ faction, profile, onChange, children
             {` · Mana capacity per Tower of Mana: +${yields.manaPerTower}`}
         </p>
         <div className="profile-actions">
+        <button className="reset-profile" type="button" aria-label="Save profile" title={`Save the full profile only for the current faction (${faction === "light" ? "Light" : "Dark"}).`} onClick={onSave}>Save profile</button>
+        <button className="reset-profile" type="button" aria-label="Load saved profile" title={`Load the saved profile only for the current faction (${faction === "light" ? "Light" : "Dark"}). The build order is preserved.`} disabled={!hasSavedProfile} onClick={onLoad}>Load saved profile</button>
         <button className="reset-profile" type="button" aria-label="Reset basic to defaults" title="Reset the main resource and level fields, keeping advanced settings" onClick={() => onChange({
             ...profile,
             player: { ...initialGameProfile.player, scrollLevel: profile.player.scrollLevel },

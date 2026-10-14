@@ -113,7 +113,7 @@ test("required scroll timestamps round-trip through files, links, and faction dr
     const url = createShareableLink("https://example.com/", "light", initialGameProfile, plan)
     expect(parseShareableLink(new URL(url).hash)!.buildOrder).toEqual([scroll(90)])
     const opening = { type: "allocate-workers" as const, goldWorkers: 4 }
-    saveFactionDrafts({ light: { opening, items: [scroll(90)] }, dark: { opening, items: [] } })
+    saveFactionDrafts({ light: { opening, items: [scroll(90)] }, dark: { opening, items: [] } }, { light: initialGameProfile, dark: initialGameProfile })
     expect(loadFactionDrafts({ light: initialGameProfile, dark: initialGameProfile }).light.items).toEqual([scroll(90)])
     window.localStorage.clear()
 })

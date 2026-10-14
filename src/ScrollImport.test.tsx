@@ -22,7 +22,7 @@ test("Lumber Gathering uses its own affordability, supports timestamp editing, a
     fireEvent.click(dialog.getByRole("button", { name: "Add scroll" }))
     expect(container.querySelector("button.event.scroll")?.getAttribute("title")).toContain("start 0:02")
     expect(screen.getByRole("button", { name: "Remove Lumber Gathering" })).toBeTruthy()
-    const draft = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!)
+    const draft = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder
     expect(draft[1]).toMatchObject({ scrollId: "lumber-gathering", commandTime: 1 })
     fireEvent.click(screen.getByRole("button", { name: "Change Lumber Gathering timestamp, action 1" }))
     const editor = within(screen.getByRole("dialog"))
@@ -106,9 +106,9 @@ test("Gold Rush shares the heroes row and automatic insertion fixes its timestam
     expect(container.querySelector(".order li")?.getAttribute("data-rfd-drag-handle-draggable-id")).toBeNull()
     fireEvent.change(screen.getByLabelText("Mana accumulation"), { target: { value: "10" } })
     expect(container.querySelector(".order-blocked")?.textContent).toContain("Insufficient mana")
-    const draft = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!)
+    const draft = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder
     expect(draft[1].commandTime).toBe(46)
-    const profile = JSON.parse(window.localStorage.getItem("wl-resource-profile-v2-light")!)
+    const profile = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).gameProfile
     expect(profile.basic.timeBetweenScrolls).toBe(10)
     expect(profile.player.scrollLevel).toBe(1)
     expect(draft[1].level).toBeUndefined()
@@ -174,7 +174,7 @@ test("manual timestamps can add insufficient-mana commands; cancellation does no
     expect(screen.getByText("All scroll levels (1–6) currently use the same effect.")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Add scroll" }))
     expect(container.querySelector(".order-blocked")?.textContent).toContain("Insufficient mana")
-    expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!)[1]).toMatchObject({ commandTime: 1.5 })
+    expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder[1]).toMatchObject({ commandTime: 1.5 })
     fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
     expect(screen.queryByRole("button", { name: /^Gold Rush/ })).toBeNull()
 })
@@ -200,7 +200,7 @@ test("clicking a scroll row edits its timestamp by identity, reorders and persis
     expect(rows[0].getAttribute("data-rfd-draggable-id")).toBe(originalIds[1])
     expect(rows[1].getAttribute("data-rfd-draggable-id")).toBe(originalIds[0])
     expect(rows[0].textContent).toContain("Insufficient mana")
-    const draft = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!)
+    const draft = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder
     expect(draft.slice(1).map((item: { commandTime: number }) => item.commandTime)).toEqual([135, 60.5])
     expect(screen.queryByRole("button", { name: /^Reorder Gold Rush/ })).toBeNull()
 })

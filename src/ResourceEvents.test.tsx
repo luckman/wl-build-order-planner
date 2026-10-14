@@ -54,7 +54,7 @@ test("resource dialog defaults reset, allows any valid timestamp, edits amounts 
 
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
 
-    expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!)[1]).toMatchObject({
+    expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder[1]).toMatchObject({
 
         type: "add-resources", commandTime: 20, gold: 700, wood: 300 })
 

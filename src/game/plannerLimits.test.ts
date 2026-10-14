@@ -38,7 +38,7 @@ test("100 actions round trip through files, links and drafts; 101 cannot be expo
     const link = createShareableLink("https://example.com/", "light", initialGameProfile, plan)
     expect(parseShareableLink(new URL(link).hash)?.buildOrder).toHaveLength(MAX_PLAN_ACTIONS)
     const draft = { opening: initialOpeningAction, items }
-    saveFactionDrafts({ light: draft, dark: { ...draft, items: [] } })
+    saveFactionDrafts({ light: draft, dark: { ...draft, items: [] } }, profiles)
     expect(loadFactionDrafts(profiles).light.items).toHaveLength(MAX_PLAN_ACTIONS)
     const previous = window.localStorage.getItem(draftStorageKey("light"))
     const oversized = [...items, resource(0)]
@@ -48,7 +48,7 @@ test("100 actions round trip through files, links and drafts; 101 cannot be expo
     const doc = JSON.parse(json)
     doc.buildOrder.push(doc.buildOrder[1])
     expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("100")
-    saveFactionDrafts({ light: { ...draft, items: oversized }, dark: { ...draft, items: [] } })
+    saveFactionDrafts({ light: { ...draft, items: oversized }, dark: { ...draft, items: [] } }, profiles)
     expect(window.localStorage.getItem(draftStorageKey("light"))).toBe(previous)
     window.localStorage.setItem(draftStorageKey("light"), JSON.stringify(doc.buildOrder))
     expect(loadFactionDrafts(profiles).light.items).toEqual([])

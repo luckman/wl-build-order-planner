@@ -27,6 +27,7 @@ test("opening belongs to the order, persists with actions, and resource reset pr
     fireEvent.click(actions.getByRole("button", { name: /^Slave / }))
     first.unmount()
     render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
     fireEvent.click(screen.getByRole("button", { name: "Clear" }))
@@ -35,9 +36,9 @@ test("opening belongs to the order, persists with actions, and resource reset pr
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("3")
     expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
-    const stored = JSON.parse(window.localStorage.getItem(draftStorageKey("dark"))!)
+    const stored = JSON.parse(window.localStorage.getItem(draftStorageKey("dark"))!).buildOrder
     expect(stored).toEqual([{ type: "allocate-workers", goldWorkers: 3 }, { itemId: "slave" }])
-    expect(JSON.parse(window.localStorage.getItem(profileStorageKey("dark"))!).map.goldWorkers).toBeUndefined()
+    expect(window.localStorage.getItem(profileStorageKey("dark"))).toBeNull()
 })
 
 test("starting workers are fixed at five with no profile control, including after loading old storage", () => {
@@ -51,6 +52,7 @@ test("starting workers are fixed at five with no profile control, including afte
     expect(slider.value).toBe("4")
     expect(first.container.querySelector(".resource-legend")!.textContent).toContain("10 / 20")
     expect(loadFactionProfiles().light.player).not.toHaveProperty("startingWorkers")
+    fireEvent.click(screen.getByRole("button", { name: "Save profile" }))
     expect(JSON.parse(window.localStorage.getItem(profileStorageKey("light"))!).player).not.toHaveProperty("startingWorkers")
     change("Initial gold miners", "2")
     first.unmount()
@@ -78,7 +80,7 @@ test("invalid stored actions fall back independently without resetting profiles"
     window.localStorage.setItem(draftStorageKey("light"), JSON.stringify([{ type: "allocate-workers", goldWorkers: 7 }]))
     window.localStorage.setItem(draftStorageKey("dark"), JSON.stringify([{ type: "allocate-workers", goldWorkers: 1 }, { itemId: "slave" }]))
     const drafts = loadFactionDrafts(loadFactionProfiles())
-    expect(drafts.light).toEqual({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [] })
+    expect(drafts.light).toMatchObject({ opening: { type: "allocate-workers", goldWorkers: 4 }, items: [] })
     expect(drafts.dark.opening.goldWorkers).toBe(1)
     expect(drafts.dark.items.map(item => item.id)).toEqual(["slave"])
 })

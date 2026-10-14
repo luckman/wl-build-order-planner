@@ -99,7 +99,7 @@ test("Lumber Gathering round-trips through files, shared links, and saved drafts
     const url = createShareableLink("https://example.com/", "light", initialGameProfile, plan)
     expect(parseShareableLink(new URL(url).hash)!.buildOrder).toEqual([lumber(0)])
     const opening = { type: "allocate-workers" as const, goldWorkers: 4 }
-    saveFactionDrafts({ light: { opening, items: [lumber(0)] }, dark: { opening, items: [] } })
+    saveFactionDrafts({ light: { opening, items: [lumber(0)] }, dark: { opening, items: [] } }, { light: initialGameProfile, dark: initialGameProfile })
     expect(loadFactionDrafts({ light: initialGameProfile, dark: initialGameProfile }).light.items).toEqual([lumber(0)])
     window.localStorage.clear()
     expect(() => createScrollAction({ type: "use-scroll", scrollId: "lumber-gathering", commandTime: 0 }, "dark")).toThrow("Light")

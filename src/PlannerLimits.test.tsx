@@ -63,7 +63,7 @@ test.each(["Add resources", "Capture mana well", "Lose mana well", "Gold Rush", 
             expect((dialog.getByLabelText("Gold") as HTMLInputElement).value).toBe("123")
             expect((dialog.getByLabelText("Wood") as HTMLInputElement).value).toBe("456")
         }
-        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)).toHaveLength(MAX_PLAN_ACTIONS + 1)
+        expect(storedOrder()).toHaveLength(MAX_PLAN_ACTIONS + 1)
     },
 )
 
@@ -84,7 +84,7 @@ test("panel additions repeatedly explain the limit and existing event edits rema
     fireEvent.change(dialog.getByLabelText("Gold"), { target: { value: "123" } })
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
     expect(screen.queryByRole("dialog")).toBeNull()
-    const saved = JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)
+    const saved = JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).buildOrder
     expect(saved).toHaveLength(MAX_PLAN_ACTIONS + 1)
     expect(saved[1].gold).toBe(123)
     expect(screen.queryByRole("alert")).toBeNull()
@@ -96,7 +96,7 @@ test("editor rejects additions with dependencies atomically at the action limit 
         ...Array.from({ length: MAX_PLAN_ACTIONS - 1 }, () => ({ type: "add-resources", commandTime: 0, gold: 0, wood: 0 })),
     ]))
     render(<App />)
-    const count = () => JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).length - 1
+    const count = () => storedOrder().length - 1
     fireEvent.click(screen.getByRole("button", { name: /^Swordsman 150 gold/ }))
     expect(count()).toBe(99)
     expect(screen.getByRole("alert").textContent).toContain("100 actions")
@@ -120,7 +120,7 @@ test("event time entry caps at 29:59 and its timeline samples remain bounded", (
     fireEvent.change(time, { target: { value: "99:59" } })
     expect(time.value).toBe("29:59")
     fireEvent.click(dialog.getByRole("button", { name: "Add resources" }))
-    const saved = JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)
+    const saved = JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).buildOrder
     expect(saved[1].commandTime).toBe(1799)
     const lines = container.querySelectorAll("polyline")
     expect(lines.length).toBeGreaterThan(0)
@@ -128,3 +128,8 @@ test("event time entry caps at 29:59 and its timeline samples remain bounded", (
         expect(line.getAttribute("points")!.trim().split(/\s+/).length).toBeLessThanOrEqual(2 * (MAX_TIMELINE_SAMPLES + 2) - 1)
     }
 })
+
+function storedOrder() {
+    const stored = JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)
+    return Array.isArray(stored) ? stored : stored.buildOrder
+}

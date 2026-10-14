@@ -29,8 +29,8 @@ import {
 } from "./game/gameData"
 import { manaAt, resourceAt, workerAllocationAt } from "./game/resourceSimulation"
 import { economyFromProfile, type GameProfile } from "./game/gameProfile"
-import { loadFactionProfiles, saveFactionProfiles } from "./game/profileStorage"
-import { loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
+import { loadFactionProfiles, loadSavedProfile, saveProfile } from "./game/profileStorage"
+import { loadActiveFaction, saveActiveFaction, loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
 import type { BuildDraft } from "./game/draftStorage"
 import { actionDuration } from "./game/playerLevels"
 import "./index.css"
@@ -162,7 +162,8 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
 }
 
 export default function App() {
-    const [factionId, setFactionId] = useState<FactionId>("light")
+    const [factionId, setFactionId] = useState<FactionId>(loadActiveFaction)
+    useEffect(() => saveActiveFaction(factionId), [factionId])
     const [scrollDialogOpen, setScrollDialogOpen] = useState<ScrollId | null>(null)
     const [unitLossDialogOpen, setUnitLossDialogOpen] = useState(false)
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
@@ -172,9 +173,13 @@ export default function App() {
     const withOrderIds = useCallback((items: PlannerItem[]) => items.map(item => "orderId" in item
         ? item as PlannerItem & { orderId: string }
         : { ...item, orderId: `action-${nextOrderId.current++}` }), [])
-    const [gameProfiles, updateGameProfiles] = useState(loadFactionProfiles)
+    const [initialDrafts] = useState(() => loadFactionDrafts(loadFactionProfiles()))
+    const [gameProfiles, updateGameProfiles] = useState(() => ({ light: initialDrafts.light.gameProfile, dark: initialDrafts.dark.gameProfile }))
+    const [savedProfiles, setSavedProfiles] = useState(() => ({ light: loadSavedProfile("light"), dark: loadSavedProfile("dark") }))
+    const [profileNotice, setProfileNotice] = useState<NotificationMessage | null>(null)
+    const dismissProfileNotice = useCallback(() => setProfileNotice(null), [])
     const [buildOrders, updateBuildOrders] = useState(() => {
-        const drafts = loadFactionDrafts(gameProfiles)
+        const drafts = initialDrafts
         return { light: { ...drafts.light, items: withOrderIds(drafts.light.items) }, dark: { ...drafts.dark, items: withOrderIds(drafts.dark.items) } }
     })
     const buildOrder = buildOrders[factionId].items
@@ -184,7 +189,12 @@ export default function App() {
         updateBuildOrders(current => ({ ...current, [factionId]: { ...current[factionId], opening: { type: "allocate-workers", goldWorkers } } }))
         setHoverTime(null)
     }
-    useEffect(() => saveFactionDrafts(buildOrders), [buildOrders])
+    const initialOrders = useRef(buildOrders)
+    useEffect(() => {
+        const changed = (["light", "dark"] as const).filter(faction =>
+            buildOrders[faction] !== initialOrders.current[faction] || gameProfiles[faction] !== initialDrafts[faction].gameProfile)
+        if (changed.length) saveFactionDrafts(buildOrders, gameProfiles, changed)
+    }, [buildOrders, gameProfiles, initialDrafts])
     const [limitError, setLimitError] = useState<NotificationMessage | null>(null)
     const dismissLimitError = useCallback(() => setLimitError(null), [])
     const setBuildOrder = useCallback((update: SetStateAction<PlannerItem[]>) => {
@@ -202,7 +212,25 @@ export default function App() {
     const setGameProfile = useCallback((profile: GameProfile) => {
         updateGameProfiles(current => ({ ...current, [factionId]: profile }))
     }, [factionId])
-    useEffect(() => saveFactionProfiles(gameProfiles), [gameProfiles])
+    const savePersonalProfile = () => {
+        try {
+            saveProfile(factionId, gameProfile)
+            setSavedProfiles(current => ({ ...current, [factionId]: gameProfile }))
+            setProfileNotice({ text: `${factions[factionId].name} profile saved.`, kind: "success" })
+        } catch {
+            setProfileNotice({ text: "Could not save the profile. Browser storage may be unavailable or full.", kind: "error" })
+        }
+    }
+    const loadPersonalProfile = () => {
+        const profile = loadSavedProfile(factionId)
+        if (!profile) {
+            setSavedProfiles(current => ({ ...current, [factionId]: null }))
+            setProfileNotice({ text: "No saved profile is available for this faction.", kind: "error" })
+            return
+        }
+        setGameProfile(profile)
+        setProfileNotice({ text: `${factions[factionId].name} saved profile loaded. Timings recalculated.`, kind: "success" })
+    }
     const economy = useMemo(() => economyFromProfile(gameProfile, opening), [gameProfile, opening])
     const { baseFoodLimit } = gameProfile.player
     const { foodPerFarm } = economy
@@ -560,7 +588,9 @@ export default function App() {
                                 <h2>Resource collection</h2>
                                 <span>Editable game profile</span>
                             </div>
-                            <GameProfileEditor faction={factionId} profile={gameProfile} onChange={setGameProfile}>
+                            <Notification notice={profileNotice} onDismiss={dismissProfileNotice} />
+                            <GameProfileEditor faction={factionId} profile={gameProfile} onChange={setGameProfile}
+                                onSave={savePersonalProfile} onLoad={loadPersonalProfile} hasSavedProfile={savedProfiles[factionId] !== null}>
                             <div className="economy-grid">
                                 <div className="worker-state">
                                     <b>{initialWorkerCount}</b>

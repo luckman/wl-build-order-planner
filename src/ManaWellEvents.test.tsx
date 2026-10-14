@@ -36,7 +36,7 @@ test("well dialogs select only whole-second timestamps, validate ownership, edit
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0030" } })
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
     expect(view.container.querySelector(".order-blocked")).toBeNull()
-    expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).slice(1)).toEqual([
+    expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder.slice(1)).toEqual([
         { type: "capture-mana-well", commandTime: 20 }, { type: "lose-mana-well", commandTime: 30 } ])
     view.unmount()
     render(<App />)

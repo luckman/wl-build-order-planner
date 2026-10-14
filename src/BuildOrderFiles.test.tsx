@@ -72,7 +72,7 @@ test.each([
         fireEvent.click(screen.getByRole("button", { name, exact: true }))
         expect(confirm).not.toHaveBeenCalled()
         const expected = [{ type: "allocate-workers", goldWorkers: 3 }, ...ids.map(itemId => ({ itemId }))]
-        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)).toEqual(expected)
+        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).buildOrder).toEqual(expected)
         expect(JSON.parse(window.localStorage.getItem(profileStorageKey("light"))!)).toEqual(profile)
         expect((screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement).value).toBe("3")
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
@@ -80,7 +80,7 @@ test.each([
         render(<App />)
         expect(screen.getAllByRole("button", { name: "Remove Worker", exact: true })).toHaveLength(5)
         expect(screen.getByRole("button", { name: "Remove Castle lvl 2" })).toBeTruthy()
-        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!)).toEqual(expected)
+        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).buildOrder).toEqual(expected)
     } finally { confirm.mockRestore() }
 })
 
@@ -160,8 +160,9 @@ test.each(["light", "dark"] as const)("opening a %s shared link, editing, and re
     fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${worker} \\d+ gold`) }))
     const draft = window.localStorage.getItem(draftStorageKey(faction))
     const profile = window.localStorage.getItem(profileStorageKey(faction))
-    expect(JSON.parse(draft!)).toContainEqual({ itemId: faction === "light" ? "worker" : "slave" })
-    expect(JSON.parse(profile!).player.startingGold).toBe(777)
+    expect(JSON.parse(draft!).buildOrder).toContainEqual({ itemId: faction === "light" ? "worker" : "slave" })
+    expect(profile).toBeNull()
+    expect(JSON.parse(draft!).gameProfile.player.startingGold).toBe(777)
 
     // A fresh app mount at the same URL models reload with storage retained.
     unmount()

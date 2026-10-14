@@ -82,7 +82,7 @@ test("reset basic restores main fields while preserving advanced settings, hidde
     fireEvent.click(screen.getByRole("button", { name: "Reset basic to defaults" }))
 
     expect(loadFactionProfiles()).toEqual({
-        light: { ...editedProfile, player: { ...initialGameProfile.player, scrollLevel: 5 } },
+        light: editedProfile,
         dark: initialGameProfile,
     })
     expect(value("Starting gold")).toBe("150")
@@ -153,6 +153,8 @@ test("resource settings persist independently for each faction across remounts, 
     first.unmount()
 
     render(<App />)
+    expect(value("Starting gold")).toBe("888")
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(value("Starting gold")).toBe("777")
     expect(value("Starting wood")).toBe("321")
     expect(value("Base food limit")).toBe("40")
@@ -178,12 +180,12 @@ test("resource settings persist independently for each faction across remounts, 
     expect(value("Order delay (seconds)")).toBe("4.5")
     fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
     expect(loadFactionProfiles().dark).toEqual(initialGameProfile)
-    expect(loadFactionProfiles().light.player.startingGold).toBe(777)
+    expect(loadFactionProfiles().light.player.startingGold).toBe(150)
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(value("Starting gold")).toBe("777")
 })
 
-test("a shared import overrides and persists only its faction's saved profile, including hidden basic settings", () => {
+test("a shared import persists its draft profile without overwriting either personal profile", () => {
     saveFactionProfiles({
         light: { ...initialGameProfile, player: { ...initialGameProfile.player, startingGold: 777 } },
         dark: { ...initialGameProfile, player: { ...initialGameProfile.player, startingGold: 888 } },
@@ -196,7 +198,7 @@ test("a shared import overrides and persists only its faction's saved profile, i
     window.history.replaceState(null, "", createShareableLink(window.location.href, "dark", imported, []))
     const first = render(<App />)
     expect(value("Starting gold")).toBe("999")
-    expect(loadFactionProfiles().dark).toEqual(imported)
+    expect(loadFactionProfiles().dark.player.startingGold).toBe(888)
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(value("Starting gold")).toBe("777")
     first.unmount()
@@ -204,7 +206,7 @@ test("a shared import overrides and persists only its faction's saved profile, i
     render(<App />)
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     expect(value("Starting gold")).toBe("999")
-    expect(loadFactionProfiles().dark.basic).toEqual(imported.basic)
+    expect(loadFactionProfiles().dark.basic).toEqual(initialGameProfile.basic)
 })
 
 test("malformed or invalid stored profiles fall back independently to defaults", () => {
