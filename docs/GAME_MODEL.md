@@ -104,11 +104,10 @@ Worker items can reduce this time.
 Example:
 
 ```text
-effectiveMiningTime =
-    baseGoldMiningTime * workerGoldMiningTimeMultiplier
+effectiveMiningTime = baseGoldMiningTime - goldMiningTimeReduction
 ```
 
-The exact item modifiers should come from manually entered game data.
+`gameProfile.player.goldMiningTimeReduction` is entered in seconds, defaults to 0.0, and accepts values from 0.0 to 1.0. The editor displays one decimal digit and steps by 0.1 seconds. It reduces every mine visit, including the opening trip, and affects mine queues and worker saturation. Gold travel time and yield are unchanged. The simulator keeps gathering duration at least 0.001 seconds if a custom base time is smaller than the reduction.
 
 ### Travel Time
 
@@ -288,9 +287,10 @@ Worker items can reduce this time.
 Example:
 
 ```text
-effectiveWoodGatherTime =
-    baseWoodGatherTime * workerWoodGatherTimeMultiplier
+effectiveWoodGatherTime = baseWoodGatherTime - woodMiningTimeReduction
 ```
+
+`gameProfile.player.woodMiningTimeReduction` is entered in seconds, defaults to 0.0, and accepts values from 0.0 to 5.0. The editor displays one decimal digit and steps by 0.1 seconds. It reduces every wood gathering phase, including after a Sawmill completes. Wood travel time and yield are unchanged. The simulator keeps gathering duration at least 0.001 seconds if a custom base time is smaller than the reduction.
 
 ### Travel Time
 
@@ -1008,3 +1008,22 @@ Potential future features:
 - gold-mine queue visualization;
 - shareable build-order URLs;
 - patch/versioned game data.
+
+## Lumber Gathering Scroll
+
+The Light Lumber Gathering scroll costs 25 mana, activates at command time + 1 second, and lasts 30 seconds. Levels 1–6 currently share a +15 wood cargo bonus (65 rather than 50 at default yield). The forest effect checks each worker's gathering-completion time: start is inclusive and expiry exclusive. This applies to workers already gathering, travelling to the forest, recruited later, or returning from construction. A returning worker's existing cargo is unchanged; its next gathering completion can receive the bonus. Cargo is fixed at gathering completion and retains any bonus when delivered after expiry. Overlapping casts do not stack; interrupted loads are discarded. Timing uses the configured travel and effective gathering durations, including Sawmill travel and equipment reductions.
+
+
+## Add resources events
+
+Both factions can add gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 99:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
+
+## Mana well ownership
+
+Ownership starts at zero. Capture mana well increases ownership by one at its exact command timestamp; Lose mana well decreases it by one only when at least one well is owned. There are no costs or delays. Evaluate in timestamp order and use source order for ties, including simultaneous captures and losses. Invalid losses remain blocked and do not change ownership or mana.
+
+Mana regenerates at `manaAccumulation + ownedWells * manaFromManaWells` per minute. Integrate separately across each capture/loss, capacity completion and scroll spend. Capacity still limits regeneration and capped income is discarded. Automatic scroll suggestions use the changing rate and retain scroll order-delay rules.
+
+## Lose unit
+
+Both factions can lose one worker, unit or hero at a selected timestamp. Only completed, living units are eligible; starting workers exist at 00:00. Loss releases food immediately, and lost workers stop gathering. Construction workers are excluded; wood gatherers are lost before gold miners. The dialog accepts whole seconds and defaults to one second after the latest active command. Invalid events have no effect and show a warning. Events are editable and included in drafts, JSON and share links.

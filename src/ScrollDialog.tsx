@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react"
 
+import { SCROLLS, type ScrollId } from "./game/scrolls"
+
 import DurationInput from "./DurationInput"
 import { formatDuration, parseDuration, MAX_DURATION_SECONDS } from "./durationTime"
 
-export default function ScrollDialog({ minimumTime, automaticTime, onAdd, onClose }: {
-    minimumTime: number; automaticTime: number | null
+export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "gold-rush", onAdd, onClose }: {
+    minimumTime: number; automaticTime: number | null; scrollId?: ScrollId
     onAdd: (time: number) => void; onClose: () => void
 }) {
+    const scroll = SCROLLS[scrollId]
     const dialog = useRef<HTMLDivElement>(null)
     const [automatic, setAutomatic] = useState(true)
     const [manualTime, setManualTime] = useState(() => formatDuration(automaticTime ?? minimumTime))
@@ -28,9 +31,9 @@ export default function ScrollDialog({ minimumTime, automaticTime, onAdd, onClos
                     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
                 }
             }}>
-            <h2 id="scroll-dialog-title">Use Gold Rush</h2>
-            <p>50 mana · starts after 1 second · +10 gold per mine exit for 30 seconds.</p>
-            <p>Only level 1 scroll effects are currently supported.</p>
+            <h2 id="scroll-dialog-title">Use {scroll.name}</h2>
+            <p>{scroll.description}</p>
+            <p>All scroll levels (1–6) currently use the same effect.</p>
             <form onSubmit={event => { event.preventDefault(); if (valid) onAdd(commandTime!) }}>
                 <label className="scroll-automatic"><input type="checkbox" checked={automatic}
                     onChange={event => setAutomatic(event.target.checked)} /> Use after the last scroll as soon as enough mana is available</label>

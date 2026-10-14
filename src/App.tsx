@@ -1,3 +1,8 @@
+import UnitLossDialog from "./UnitLossDialog"
+import { createUnitLossAction, foodUsedAt } from "./game/unitLosses"
+import { createManaWellAction, evaluateManaWells, MANA_WELL_EVENTS, manaWellCountAt, type ManaWellEventType } from "./game/manaWells"
+import ResourceDialog from "./ResourceDialog"
+import { createResourceAction, isTimedEvent } from "./game/resourceEvents"
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd"
 import { type parseBuildOrder } from "./game/buildOrderFile"
@@ -5,7 +10,7 @@ import BuildOrderFiles from "./BuildOrderFiles"
 import ScrollDialog from "./ScrollDialog"
 import UpgradeCards from "./UpgradeCards"
 import EventTimeDialog from "./EventTimeDialog"
-import { createScrollAction, GOLD_RUSH, isScrollAction } from "./game/scrolls"
+import { createScrollAction, SCROLLS, type ScrollId, isScrollAction, scrollCooldown } from "./game/scrolls"
 import { earliestScrollTime } from "./game/scrollTiming"
 import GameProfileEditor from "./GameProfileEditor"
 import warLegendsLogo from "./icons/war-legends-logo.png"
@@ -34,6 +39,12 @@ import "./build-order-files.css"
 import "./scrolls.css"
 
 const iconSources: Record<string, string> = {
+    lightLoseUnit: require("./icons/events/light-lose-unit.png"),
+    darkLoseUnit: require("./icons/events/dark-lose-unit.png"),
+    captureManaWell: require("./icons/events/capture-mana-well.png"),
+    loseManaWell: require("./icons/events/lose-mana-well.png"),
+    addResources: require("./icons/events/add-resources.png"),
+    lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     lightCastle: require("./icons/buildings/light-castle.png"),
     lightSawmill: require("./icons/buildings/light-sawmill.png"),
@@ -127,7 +138,7 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
         if (action.blocked || action.commandTime === null || action.finishTime === null) {
             return
         }
-        const group = action.item.kind === "scroll" ? "Scrolls and events"
+        const group = isTimedEvent(action.item) ? "Scrolls and events"
             : isRecruitable(action.item) ? action.item.producer : "Construction"
         const lanes = availableLanes.get(group) ?? []
         let lane = lanes.find((candidate) => candidate.availableAt <= action.commandTime!)
@@ -150,7 +161,10 @@ function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
 
 export default function App() {
     const [factionId, setFactionId] = useState<FactionId>("light")
-    const [scrollDialogOpen, setScrollDialogOpen] = useState(false)
+    const [scrollDialogOpen, setScrollDialogOpen] = useState<ScrollId | null>(null)
+    const [unitLossDialogOpen, setUnitLossDialogOpen] = useState(false)
+    const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
+    const [resourceDialogOpen, setResourceDialogOpen] = useState(false)
     const [editingEventId, setEditingEventId] = useState<string | null>(null)
     const nextOrderId = useRef(0)
     const withOrderIds = useCallback((items: PlannerItem[]) => items.map(item => "orderId" in item
@@ -190,7 +204,7 @@ export default function App() {
     const [hoverTime, setHoverTime] = useState<number | null>(null)
     const reorderActions = ({ source, destination }: DropResult) => {
         if (!destination || source.index === destination.index) return
-        if (displayPlan[source.index].item.kind === "scroll") return
+        if (isTimedEvent(displayPlan[source.index].item)) return
         setBuildOrder(current => {
             const reordered = [...current]
             const sourceIndex = current.indexOf(displayPlan[source.index].item as typeof current[number])
@@ -216,12 +230,6 @@ export default function App() {
         setHoverTime(null)
         setEditingEventId(null)
     }
-    const maxGoldWorkers = Math.max(
-        1,
-        Math.ceil(
-            (2 * economy.goldTravelTime + economy.goldGatherTime) / economy.goldGatherTime,
-        ),
-    )
     const scheduled = useMemo(
         () =>
             simulateBuildOrder(
@@ -237,9 +245,10 @@ export default function App() {
     const deliveries = scheduled.deliveries
     const plan = scheduled.plan
     const scrollTimes = plan.filter(action => action.item.kind === "scroll").map(action => action.commandTime!)
-    const minimumScrollTime = scrollTimes.length ? Math.max(...scrollTimes) + gameProfile.basic.timeBetweenScrolls + economy.orderDelay : 0
-    const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime)
-    const displayPlan = buildOrder.some(item => item.kind === "scroll") ? scheduled.orderedPlan : plan
+    const minimumScrollTime = scrollTimes.length ? Math.max(...scrollTimes) + scrollCooldown(economy) + economy.orderDelay : 0
+    const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime, scrollDialogOpen ?? "gold-rush")
+    const displayPlan = buildOrder.some(isTimedEvent) ? scheduled.orderedPlan : plan
+    const defaultEventTime = Math.ceil(Math.max(0, ...plan.filter(action => !action.blocked).map(action => action.commandTime ?? 0)) + 1)
     const spending = plan.flatMap(({ cost, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
     )
@@ -261,11 +270,7 @@ export default function App() {
                 ...plan.flatMap(({ commandTime, finishTime }) => [commandTime, finishTime].filter((time): time is number => time !== null)),
             ])).sort((a, b) => a - b).map(time => {
                 const completed = plan.filter(({ item, finishTime }) => finishTime !== null && finishTime <= time)
-                const units = plan
-                    .filter(
-                        ({ item, commandTime }) => isRecruitable(item) && commandTime !== null && commandTime <= time,
-                    )
-                    .reduce((total, { item }) => total + item.food, initialFoodUsed)
+                const units = foodUsedAt(plan, initialFoodUsed, time)
                 const farms = completed.filter(({ item }) => item.id === "farm" || item.id === "pigsty").length
                 return { time, used: units, limit: baseFoodLimit + farms * foodPerFarm }
             }),
@@ -278,18 +283,12 @@ export default function App() {
     const manaSampleTimes = Array.from(new Set([
         ...samples.map(({ time }) => time),
         ...plan.flatMap(({ item, finishTime }) => item.id === "tower-of-mana" && finishTime !== null ? [finishTime] : []),
-        ...plan.flatMap(({ item, commandTime }) => item.kind === "scroll" && commandTime !== null ? [commandTime] : []),
+        ...plan.flatMap(({ item, commandTime }) => (item.kind === "scroll" || item.kind === "mana-well") && commandTime !== null ? [commandTime] : []),
     ])).sort((a, b) => a - b)
     const manaSamples = manaSampleTimes.map(time => manaAt(economy, plan, time))
     const inspectedMana = manaAt(economy, plan, inspectedTime)
     const latestMana = latestCommandTime === null ? null : manaAt(economy, plan, latestCommandTime)
-    const inspectedFood =
-        initialFoodUsed +
-        plan
-            .filter(
-                ({ item, commandTime }) => isRecruitable(item) && commandTime !== null && commandTime <= inspectedTime,
-            )
-            .reduce((total, { item }) => total + item.food, 0)
+    const inspectedFood = foodUsedAt(plan, initialFoodUsed, inspectedTime)
     const inspectedLimit =
         baseFoodLimit +
         plan.filter(
@@ -317,13 +316,7 @@ export default function App() {
     const latestFoodUsed =
         latestCommandTime === null
             ? null
-            : initialFoodUsed +
-              plan
-                  .filter(
-                      ({ item, commandTime }) =>
-                          isRecruitable(item) && commandTime !== null && commandTime <= latestCommandTime,
-                  )
-                  .reduce((total, { item }) => total + item.food, 0)
+            : foodUsedAt(plan, initialFoodUsed, latestCommandTime)
     const latestFoodLimit =
         latestCommandTime === null
             ? null
@@ -371,6 +364,7 @@ export default function App() {
                     <section className="planner-area">
                         <section className="action-panel panel" aria-label="Actions">
                             <div className="panel-title"><h2>Actions</h2></div>
+                            {factionId === "dark" && <p className="faction-implementation-note">Dark faction is in implementation.</p>}
                             <div className="action-groups">
                                 {dependencyError && <p role="alert">{dependencyError}</p>}
                                 {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
@@ -383,7 +377,7 @@ export default function App() {
                                                 } catch (error) {
                                                     setDependencyError((error as Error).message)
                                                 }
-                                            }} /> : <div className={`action-grid${kind === "hero" && factionId === "light" ? " hero-scroll-grid" : ""}`}>
+                                            }} /> : <div className={`action-grid${kind === "hero" ? ` hero-scroll-grid${factionId === "dark" ? " dark-events-grid" : ""}` : ""}`}>
                                             {faction.items
                                                 .filter((item) => item.kind === kind)
                                                 .map((item) => {
@@ -414,10 +408,33 @@ export default function App() {
                                                 })}
                                             {kind === "hero" && factionId === "light" && <>
                                                 <span className="scroll-card-delimiter" aria-hidden="true" />
-                                                <button className="action scroll-card" aria-label="Gold Rush 50 mana · 30s"
-                                                    title="Gold Rush: 50 mana, +10 gold per mine exit for 30 seconds" onClick={() => setScrollDialogOpen(true)}>
-                                                    <img src={iconSources.lightGoldRush} alt="" />
-                                                    <small><span className="action-stat">{GOLD_RUSH.manaCost} mana</span></small>
+                                                {(Object.keys(SCROLLS) as ScrollId[]).map(scrollId => {
+                                                    const scroll = SCROLLS[scrollId]
+                                                    return <button key={scrollId} className="action scroll-card"
+                                                        aria-label={`${scroll.name} ${scroll.manaCost} mana · ${scroll.duration}s`}
+                                                        title={scroll.description} onClick={() => setScrollDialogOpen(scrollId)}>
+                                                        <img src={iconSources[scroll.icon]} alt="" />
+                                                        <small><span className="action-stat">{scroll.manaCost} mana</span></small>
+                                                    </button>
+                                                })}
+                                            </>}
+                                            {kind === "hero" && <>
+                                                <span className="scroll-card-delimiter" aria-hidden="true" />
+                                                <button className="action resource-card" aria-label="Add resources" title="Add gold and wood instantly at a chosen timestamp"
+                                                    onClick={() => setResourceDialogOpen(true)}>
+                                                    <span className="action-name">Add resources</span>
+                                                    <img src={iconSources.addResources} alt="" />
+                                                </button>
+                                                {(Object.keys(MANA_WELL_EVENTS) as ManaWellEventType[]).map(type => <button key={type}
+                                                    className="action resource-card" aria-label={MANA_WELL_EVENTS[type].name}
+                                                    title={MANA_WELL_EVENTS[type].name} onClick={() => setWellDialogOpen(type)}>
+                                                    <span className="action-name">{MANA_WELL_EVENTS[type].name}</span>
+                                                    <img src={iconSources[MANA_WELL_EVENTS[type].icon]} alt="" />
+                                                </button>)}
+                                                <button className="action resource-card" aria-label="Lose unit" title="Lose a worker, unit or hero at a chosen timestamp"
+                                                    onClick={() => setUnitLossDialogOpen(true)}>
+                                                    <span className="action-name">Lose unit</span>
+                                                    <img src={iconSources[factionId === "light" ? "lightLoseUnit" : "darkLoseUnit"]} alt="" />
                                                 </button>
                                             </>}
                                         </div>}
@@ -544,20 +561,10 @@ export default function App() {
                                 <div className="worker-state">
                                     <b>{initialWorkerCount}</b>
                                     <span>
-                                        initial workers · {initialFoodUsed} food · gold saturation {maxGoldWorkers}
+                                        initial workers · {initialFoodUsed} food
                                     </span>
                                 </div>
                             </div>
-                            <p className="mechanics-note">
-                                New workers automatically mine gold until the calculated
-                                saturation of {maxGoldWorkers}, then gather wood. Wood trips run independently.
-                                Each completed Sawmill resets wood travel to {Math.min(4, economy.sawmillWoodTravelTime)} seconds each way, increasing by
-                                0.5 seconds per full minute afterward, up to 4 seconds.
-                                Builders stop gathering during travel, construction, and return. The construction delay
-                                applies to travel in each direction.
-                                The first build-order command and the second and later initial wood gathering commands
-                                become available at {economy.orderDelay} seconds. The same delay applies after a recruitment building or prerequisites complete, before their first eligible command. Subsequent recruitment uses the normal queue. The first initial wood gatherer starts immediately.
-                            </p>
                             </GameProfileEditor>
                         </section>
                     </section>
@@ -588,15 +595,17 @@ export default function App() {
                             <Droppable droppableId="build-order">
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
                                 {displayPlan.map(({ item, commandTime, startTime, finishTime, workerReturnTime, blocked, blockedReason }, index) => (
-                                    <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={item.kind === "scroll"} disableInteractiveElementBlocking>
-                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", item.kind === "scroll" && "order-timed-event"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })}
-                                        onClick={item.kind === "scroll" ? () => setEditingEventId((item as typeof buildOrder[number]).orderId) : undefined}>
-                                        {item.kind === "scroll" ? <button className="scroll-order-marker" aria-label={`Change ${item.name} timestamp, action ${index + 1}`} title="Click to change timestamp">◷</button>
+                                    <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
+                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })}
+                                        onClick={isTimedEvent(item) ? () => setEditingEventId((item as typeof buildOrder[number]).orderId) : undefined}>
+                                        {isTimedEvent(item) ? <button className="scroll-order-marker" aria-label={`Change ${item.name} timestamp, action ${index + 1}`} title="Click to change timestamp">◷</button>
                                             : <button className="order-drag-handle" {...drag.dragHandleProps} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>}
                                         <span className="order-number">{index + 1}</span>
                                         <img src={iconSources[item.icon]} alt="" />
                                         <div>
                                             <b>{item.name}</b>
+                                            {item.kind === "unit-loss" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}</small>}
+                                            {item.kind === "resource" && <small>+{item.resourceGold} gold · +{item.resourceWood} wood</small>}
                                             <small>
                                                 {blocked || commandTime === null
                                                     ? blockedReason
@@ -634,6 +643,7 @@ export default function App() {
                                     <span>Wood <b>{Math.round(latestResources.wood)}</b></span>
                                     <span>Food <b>{latestFoodUsed} / {latestFoodLimit}</b></span>
                                     {latestMana && <span>Mana <b>{Math.floor(latestMana.mana)} / {latestMana.limit}</b></span>}
+                                    <span>Mana wells <b>{manaWellCountAt(plan, latestCommandTime)}</b></span>
                                     <span>Total workers <b>{latestWorkers.total}</b></span>
                                     <span>Gathering gold <b>{latestWorkers.gold}</b></span>
                                     <span>Gathering wood <b>{latestWorkers.wood}</b></span>
@@ -643,6 +653,65 @@ export default function App() {
                         </div>
                     </aside>
                 </div>
+                {(resourceDialogOpen || editingEvent?.kind === "resource") && <ResourceDialog
+                    key={editingEvent?.orderId ?? "new-resource-event"}
+                    defaultTime={defaultEventTime}
+                    action={editingEvent?.kind === "resource" ? editingEvent : undefined}
+                    onClose={() => { setResourceDialogOpen(false); setEditingEventId(null) }}
+                    onSave={command => {
+                        const action = createResourceAction(command)
+                        setBuildOrder(current => editingEvent?.kind === "resource"
+                            ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
+                            : [...current, action])
+                        setResourceDialogOpen(false)
+                        setEditingEventId(null)
+                        setDependencyError(null)
+                        setHoverTime(null)
+                    }} />}
+                {(unitLossDialogOpen || editingEvent?.kind === "unit-loss") && <UnitLossDialog
+                    key={editingEvent?.orderId ?? "new-unit-loss"} faction={factionId} defaultTime={defaultEventTime}
+                    action={editingEvent?.kind === "unit-loss" ? editingEvent : undefined}
+                    validate={command => {
+                        const item = createUnitLossAction(command, factionId)
+                        const proposed = editingEvent?.kind === "unit-loss"
+                            ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
+                        return simulateBuildOrder(proposed, economy, initialFoodUsed, baseFoodLimit, foodPerFarm, faction.startingTownHall)
+                            .plan.find(action => action.item === item)?.blockedReason ?? null
+                    }}
+                    onClose={() => { setUnitLossDialogOpen(false); setEditingEventId(null) }}
+                    onSave={command => {
+                        const action = createUnitLossAction(command, factionId)
+                        setBuildOrder(current => editingEvent?.kind === "unit-loss"
+                            ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
+                            : [...current, action])
+                        setUnitLossDialogOpen(false)
+                        setEditingEventId(null)
+                        setDependencyError(null)
+                        setHoverTime(null)
+                    }} />}
+                {(wellDialogOpen || editingEvent?.kind === "mana-well") && <EventTimeDialog
+                    key={editingEvent?.orderId ?? wellDialogOpen!}
+                    name={MANA_WELL_EVENTS[editingEvent?.kind === "mana-well" ? editingEvent.wellEvent : wellDialogOpen!].name}
+                    title={MANA_WELL_EVENTS[editingEvent?.kind === "mana-well" ? editingEvent.wellEvent : wellDialogOpen!].name}
+                    submitLabel={editingEvent?.kind === "mana-well" ? "Save event" : "Add event"} wholeSeconds
+                    commandTime={editingEvent?.kind === "mana-well" ? editingEvent.commandTime : defaultEventTime}
+                    validateTime={commandTime => {
+                        const item = createManaWellAction({ type: editingEvent?.kind === "mana-well" ? editingEvent.wellEvent : wellDialogOpen!, commandTime })
+                        const proposed = editingEvent?.kind === "mana-well"
+                            ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
+                        return evaluateManaWells(proposed).find(event => event.item === item)?.blockedReason ?? null
+                    }}
+                    onClose={() => { setWellDialogOpen(null); setEditingEventId(null) }}
+                    onSave={commandTime => {
+                        const action = createManaWellAction({ type: editingEvent?.kind === "mana-well" ? editingEvent.wellEvent : wellDialogOpen!, commandTime })
+                        setBuildOrder(current => editingEvent?.kind === "mana-well"
+                            ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
+                            : [...current, action])
+                        setWellDialogOpen(null)
+                        setEditingEventId(null)
+                        setDependencyError(null)
+                        setHoverTime(null)
+                    }} />}
                 {editingEvent && isScrollAction(editingEvent) && <EventTimeDialog key={editingEvent.orderId}
                     name={editingEvent.name} commandTime={editingEvent.commandTime}
                     onClose={() => setEditingEventId(null)} onSave={commandTime => {
@@ -651,17 +720,13 @@ export default function App() {
                         setDependencyError(null)
                         setHoverTime(null)
                     }} />}
-                {scrollDialogOpen && <ScrollDialog minimumTime={minimumScrollTime} automaticTime={automaticScrollTime}
-                    onClose={() => setScrollDialogOpen(false)} onAdd={commandTime => {
-                        setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: "gold-rush", commandTime }, factionId)])
-                        setScrollDialogOpen(false)
+                {scrollDialogOpen && <ScrollDialog scrollId={scrollDialogOpen} minimumTime={minimumScrollTime} automaticTime={automaticScrollTime}
+                    onClose={() => setScrollDialogOpen(null)} onAdd={commandTime => {
+                        setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime }, factionId)])
+                        setScrollDialogOpen(null)
                         setDependencyError(null)
                         setHoverTime(null)
                     }} />}
-                <footer>
-                    Trip timings follow the documented War Legends model. Starting state, worker allocation, and yields
-                    are visible inputs—not assumed game facts.
-                </footer>
             </main>
         </div>
     )

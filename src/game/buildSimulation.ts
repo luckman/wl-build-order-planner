@@ -1,7 +1,10 @@
+import { createUnitLossAction, unitLossCommand, foodUsedAt } from "./unitLosses"
+import { evaluateManaWells } from "./manaWells"
+import { createResourceAction, resourceCommand, isTimedEvent } from "./resourceEvents"
 import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
 import { type EconomySettings, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
-import { createScrollAction, GOLD_RUSH, isScrollAction, scrollCommand } from "./scrolls"
+import { createScrollAction, SCROLLS, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
 import { actionDuration } from "./playerLevels"
 
 export type ScheduledAction = {
@@ -15,6 +18,7 @@ export type ScheduledAction = {
     finishTime: number | null
     workerReturnTime: number | null
     workerId: number | null
+    foodReleased?: number
     manaCost?: number
 }
 
@@ -41,11 +45,33 @@ export function simulateBuildOrder(
         createScrollAction(scrollCommand(item), faction)
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
+    const pendingResources = buildOrder.flatMap((item, index) => {
+        if (item.kind !== "resource") return []
+        createResourceAction(resourceCommand(item))
+        return [{ item, index }]
+    }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
+    const pendingLosses = buildOrder.flatMap((item, index) => {
+        if (item.kind !== "unit-loss") return []
+        createUnitLossAction(unitLossCommand(item), faction)
+        return [{ item, index }]
+    }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
+    const lossPlan: ScheduledAction[] = []
+    const workerItem = catalog.find(item => item.id === (faction === "light" ? "worker" : "slave"))!
+    const unitInstances: Array<{ item: PlannerItem; readyAt: number; lost: boolean }> =
+        simulation.workers.map(() => ({ item: workerItem, readyAt: 0, lost: false }))
     // Timed commands are processed independently of their position among catalog rows.
-    until = Math.max(until, ...pendingScrolls.map(({ item }) => item.commandTime + GOLD_RUSH.startDelay + GOLD_RUSH.duration))
+    until = Math.max(until, ...pendingLosses.map(({ item }) => item.commandTime), ...pendingResources.map(({ item }) => item.commandTime), ...pendingScrolls.map(({ item }) => item.commandTime + SCROLLS[item.scrollId].startDelay + SCROLLS[item.scrollId].duration))
     const scrollPlan: ScheduledAction[] = []
     let lastScrollCommand = -Infinity
-    const scrollsByIndex = new Map<number, ScheduledAction>()
+    const timedEventsByIndex = new Map<number, ScheduledAction>()
+    const wellPlan: ScheduledAction[] = evaluateManaWells(buildOrder).map(({ item, index, blocked, blockedReason }) => {
+        const action: ScheduledAction = { item, cost: { gold: 0, wood: 0 }, blocked, blockedReason,
+            commandTime: item.commandTime, startTime: blocked ? null : item.commandTime,
+            finishTime: blocked ? null : item.commandTime, workerReturnTime: null, workerId: null }
+        timedEventsByIndex.set(index, action)
+        return action
+    })
+    until = Math.max(until, ...wellPlan.map(action => action.commandTime!))
     const initial = catalog.find(item => item.name === initialTownHall)!
     const namesById = new Map([...catalog, ...buildOrder].map(item => [item.id, item.name]))
     const buildings = [newBuilding(initial)]
@@ -60,37 +86,66 @@ export function simulateBuildOrder(
 
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
-        while (Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity) <= time) {
-            const eventTime = Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity)
+        while (Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResources[0]?.item.commandTime ?? Infinity, pendingLosses[0]?.item.commandTime ?? Infinity) <= time) {
+            const eventTime = Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResources[0]?.item.commandTime ?? Infinity, pendingLosses[0]?.item.commandTime ?? Infinity)
             simulation.advanceTo(eventTime)
             while (workerCompletions[0] === eventTime) {
                 workerCompletions.shift()
                 const goldCount = simulation.workers.filter(({ assignment }) => assignment === "gold").length
                 simulation.addWorker(goldCount < saturation ? "gold" : "wood")
             }
+            while (pendingLosses[0]?.item.commandTime === eventTime) {
+                const { item, index } = pendingLosses.shift()!
+                const target = catalog.find(unit => unit.id === item.unitId)!
+                const isWorker = target.id === workerItem.id
+                const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.lost && unit.readyAt <= eventTime)
+                const worker = isWorker ? simulation.selectLossWorker() : undefined
+                const blocked = !instance || (isWorker && !worker)
+                if (!blocked) {
+                    instance!.lost = true
+                    if (worker) simulation.loseWorker(worker.id)
+                }
+                const action: ScheduledAction = { item, cost: { gold: 0, wood: 0 }, blocked,
+                    commandTime: eventTime, startTime: blocked ? null : eventTime, finishTime: blocked ? null : eventTime,
+                    workerReturnTime: null, workerId: blocked ? null : worker?.id ?? null,
+                    foodReleased: blocked ? 0 : target.food,
+                    ...(blocked ? { blockedReason: isWorker && instance
+                        ? `Lose unit: no available ${target.name}; workers assigned to construction cannot be lost.`
+                        : `Lose unit requires a living ${target.name} at this timestamp (recruitment must be complete).` } : {}) }
+                lossPlan.push(action)
+                timedEventsByIndex.set(index, action)
+            }
+            while (pendingResources[0]?.item.commandTime === eventTime) {
+                const { item, index } = pendingResources.shift()!
+                simulation.deliveries.push({ time: eventTime, gold: item.resourceGold, wood: item.resourceWood, worker: -1 })
+                timedEventsByIndex.set(index, { item, cost: { gold: 0, wood: 0 }, blocked: false,
+                    commandTime: eventTime, startTime: eventTime, finishTime: eventTime,
+                    workerReturnTime: null, workerId: null })
+            }
             while (pendingScrolls[0]?.item.commandTime === eventTime) {
                 const { item, index } = pendingScrolls.shift()!
-                const availableMana = manaAt(economy, [...plan, ...scrollPlan], eventTime).mana
-                const readyMana = manaAt(economy, [...plan, ...scrollPlan], Math.max(0, eventTime - economy.orderDelay)).mana
-                const cooldownUntil = lastScrollCommand + (economy.timeBetweenScrolls ?? 10) + economy.orderDelay
+                const scroll = SCROLLS[item.scrollId]
+                const availableMana = manaAt(economy, [...plan, ...scrollPlan, ...wellPlan], eventTime).mana
+                const readyMana = manaAt(economy, [...plan, ...scrollPlan, ...wellPlan], Math.max(0, eventTime - economy.orderDelay)).mana
+                const cooldownUntil = lastScrollCommand + scrollCooldown(economy) + economy.orderDelay
                 const cooldownBlocked = eventTime < cooldownUntil
-                const manaBlocked = availableMana + 1e-9 < GOLD_RUSH.manaCost
-                const orderDelayBlocked = eventTime < economy.orderDelay || readyMana + 1e-9 < GOLD_RUSH.manaCost
+                const manaBlocked = availableMana + 1e-9 < scroll.manaCost
+                const orderDelayBlocked = eventTime < economy.orderDelay || readyMana + 1e-9 < scroll.manaCost
                 const blocked = cooldownBlocked || manaBlocked || orderDelayBlocked
-                const startTime = eventTime + GOLD_RUSH.startDelay
-                const finishTime = startTime + GOLD_RUSH.duration
+                const startTime = eventTime + scroll.startDelay
+                const finishTime = startTime + scroll.duration
                 scrollPlan.push({ item, cost: { gold: 0, wood: 0 }, commandTime: eventTime,
                     startTime: blocked ? null : startTime, finishTime: blocked ? null : finishTime,
-                    workerReturnTime: null, workerId: null, manaCost: GOLD_RUSH.manaCost, blocked,
+                    workerReturnTime: null, workerId: null, manaCost: scroll.manaCost, blocked,
                     ...(blocked ? { blockedReason: cooldownBlocked
                         ? `Scroll cooldown: next scroll can be used at ${cooldownUntil} seconds`
-                        : manaBlocked ? `Insufficient mana for Gold Rush: requires 50, available ${availableMana.toFixed(1)}`
-                        : `Scroll order delay: 50 mana must be available for ${economy.orderDelay} seconds before the command` } : {}),
+                        : manaBlocked ? `Insufficient mana for ${scroll.name}: requires ${scroll.manaCost}, available ${availableMana.toFixed(1)}`
+                        : `Scroll order delay: ${scroll.manaCost} mana must be available for ${economy.orderDelay} seconds before the command` } : {}),
                 })
-                scrollsByIndex.set(index, scrollPlan[scrollPlan.length - 1])
+                timedEventsByIndex.set(index, scrollPlan[scrollPlan.length - 1])
                 if (!blocked) {
                     lastScrollCommand = eventTime
-                    simulation.scheduleGoldRush(startTime, finishTime, GOLD_RUSH.goldBonus)
+                    simulation.scheduleScroll(item.scrollId, startTime, finishTime)
                 }
             }
         }
@@ -117,11 +172,9 @@ export function simulateBuildOrder(
     }
 
     for (const item of buildOrder) {
-        if (isScrollAction(item)) continue
+        if (isTimedEvent(item)) continue
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)
         const needsProducer = item.kind !== "building"
-        const requiredAltarLevel = item.kind === "hero"
-            ? heroAltarLevel(plan.filter(action => !action.blocked).map(action => action.item)) : 1
         let scheduled = false
         let blockedReason = "Waiting for resources, food, producer, or worker"
         // Only earlier successful orders can unlock this action. Detect impossible
@@ -146,10 +199,13 @@ export function simulateBuildOrder(
             advanceTo(simulation.time)
             const time = simulation.time
             const unlockedBuildings = unlockedBuildingsAt(time)
-            if (item.maxCount !== undefined && plan.filter(action => !action.blocked && action.item.id === item.id).length >= item.maxCount) {
+            const maxCountReached = item.maxCount !== undefined && unitInstances.filter(unit => unit.item.id === item.id && !unit.lost).length >= item.maxCount
+            if (maxCountReached && !pendingLosses.some(loss => loss.item.unitId === item.id)) {
                 blockedReason = `${item.name} limit reached (maximum ${item.maxCount}, including queued recruitment)`
                 break
             }
+            const requiredAltarLevel = item.kind === "hero"
+                ? heroAltarLevel(unitInstances.filter(unit => !unit.lost).map(unit => unit.item)) : 1
             const completed = plan.filter(({ finishTime }) => finishTime !== null && finishTime <= time)
             const completedNames = new Set([initialTownHall, ...completed.filter(action => action.finishTime! + economy.orderDelay <= time).map(({ item }) => item.name)])
             const matching = buildings.filter(building => item.kind === "upgrade"
@@ -160,12 +216,7 @@ export function simulateBuildOrder(
                 { item: item.producerBuildingId!, count: 1, minLevel: requiredAltarLevel }, time) >= 1
             const builder = requiresConstructionWorker(item) ? simulation.selectBuilder() : undefined
             const state = resourceAt(economy, simulation.deliveries, spending, time)
-            const foodUsed =
-                initialFoodUsed +
-                plan.reduce(
-                    (sum, action) => sum + (!action.blocked && isRecruitable(action.item) ? action.item.food : 0),
-                    0,
-                )
+            const foodUsed = foodUsedAt([...plan, ...lossPlan], initialFoodUsed, time)
             const foodLimit =
                 baseFoodLimit +
                 completed.filter(({ item }) => item.id === "farm" || item.id === "pigsty").length * foodPerFarm
@@ -173,7 +224,8 @@ export function simulateBuildOrder(
                 requirementCount(unlockedBuildings, requirement, time) < requirement.count)
             const withinLimit = item.kind !== "building" || buildings.filter(building =>
                 building.buildingId === (item.buildingId ?? item.id)).length < buildingLimit(item, unlockedBuildings, time)
-            blockedReason = item.kind === "upgrade" && !matching.length
+            blockedReason = maxCountReached ? `${item.name} limit reached (maximum ${item.maxCount}, including queued recruitment)`
+                : item.kind === "upgrade" && !matching.length
                 ? `Requires an available ${item.producer} to upgrade`
                 : missingRequirement
                     ? `Requires ${missingRequirement.count} × ${namesById.get(missingRequirement.item) ?? missingRequirement.item}${missingRequirement.minLevel ? ` at level ${missingRequirement.minLevel} or higher` : ""}`
@@ -188,7 +240,7 @@ export function simulateBuildOrder(
                 (!needsProducer || producer) &&
                 (!requiresConstructionWorker(item) || builder) &&
                 item.prerequisites.every((name) => completedNames.has(name)) &&
-                !missingRequirement && withinLimit && heroTierUnlocked &&
+                !missingRequirement && withinLimit && heroTierUnlocked && !maxCountReached &&
                 state.gold >= cost.gold &&
                 state.wood >= cost.wood &&
                 (!isRecruitable(item) || foodUsed + item.food <= foodLimit)
@@ -208,6 +260,7 @@ export function simulateBuildOrder(
                     workerId: builder?.id ?? null,
                     buildingInstanceId: producer ? buildings.indexOf(producer) : item.kind === "building" ? buildings.length : undefined,
                 })
+                if (isRecruitable(item)) unitInstances.push({ item, readyAt: finishTime, lost: false })
                 spending.push({ time, gold: -cost.gold, wood: -cost.wood })
                 if (builder) {
                     simulation.construct(builder, duration)
@@ -230,6 +283,8 @@ export function simulateBuildOrder(
                 ...[
                     simulation.nextEventTime,
                     pendingScrolls[0]?.item.commandTime ?? Infinity,
+                    pendingResources[0]?.item.commandTime ?? Infinity,
+                    pendingLosses[0]?.item.commandTime ?? Infinity,
                     ...workerCompletions,
                     ...buildings.map(({ availableAt }) => availableAt),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime])),
@@ -266,8 +321,8 @@ export function simulateBuildOrder(
     )
     // Preserve source row identity for existing consumers; orderedPlan is the chronological view.
     const catalogPlan = [...plan]
-    const inputPlan = buildOrder.map((item, index) => isScrollAction(item)
-        ? scrollsByIndex.get(index)!
+    const inputPlan = buildOrder.map((item, index) => isTimedEvent(item)
+        ? timedEventsByIndex.get(index)!
         : catalogPlan.shift()!)
     const orderedPlan = inputPlan.map((action, index) => ({ action, index }))
         .sort((a, b) => (a.action.commandTime ?? Infinity) - (b.action.commandTime ?? Infinity) || a.index - b.index)

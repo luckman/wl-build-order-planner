@@ -2,6 +2,7 @@ import { initialGameProfile, type GameProfile } from "./game/gameProfile"
 import { useState, type ReactNode } from "react"
 import { playerLevelFields, yieldsFromLevels } from "./game/playerLevels"
 import type { FactionId } from "./game/gameData"
+import { MAX_SAWMILL_WOOD_TRAVEL_TIME, SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE } from "./game/resourceSimulation"
 
 const buildingNames = {
     light: { townHall: "Castle", farm: "Farm", industrial: "Factory", arcane: "Sanctuary" },
@@ -14,55 +15,117 @@ export default function GameProfileEditor({ faction, profile, onChange, children
     const [advanced, setAdvanced] = useState(false)
     const yields = yieldsFromLevels(profile.player)
     const names = buildingNames[faction]
-    function field<Block extends keyof GameProfile>(block: Block, key: keyof GameProfile[Block], label: string, min = 0, step = 1, max?: number) {
+    const fieldHelp: Record<string, string> = {
+        goldMiningTimeReduction: "Set a non-zero value if your worker has equipment that improves Gold Mining.",
+        woodMiningTimeReduction: "Set a non-zero value if your worker has equipment that improves Wood Harvesting.",
+        manaAccumulation: "Mana regenerated per minute, up to the current mana capacity.",
+        manaFromManaWells: "Extra mana regenerated per minute for each owned mana well, up to mana capacity. Capture mana well adds one well; Lose mana well removes one at the selected timestamp, with no delays.",
+        scrollCooldownReduction: `Reduces the ${profile.basic.timeBetweenScrolls}-second scroll cooldown by this percentage. Order delay applies afterward.`,
+        goldTravelTime: "Travel time each way to mine gold.",
+        woodTravelTime: "Travel time each way to gather wood before a Sawmill completes. Wood trips run independently. The first initial wood gatherer starts immediately; later initial wood gatherers wait for the order delay.",
+        sawmillWoodTravelTime: `Each completed Sawmill resets wood travel to ${Math.min(MAX_SAWMILL_WOOD_TRAVEL_TIME, profile.map.sawmillWoodTravelTime)} seconds each way. Travel increases by ${SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE} seconds per full minute afterward, up to ${MAX_SAWMILL_WOOD_TRAVEL_TIME} seconds.`,
+        constructionStartDelay: "Builders stop gathering during travel, construction, and return. This delay applies to their travel in each direction.",
+        orderDelay: "This delay applies before the first build-order command and the second and later initial wood gathering commands. It also applies after a recruitment building or prerequisites complete, before their first eligible command. Subsequent recruitment uses the normal queue. The first initial wood gatherer starts immediately.",
+    }
+    function field<Block extends keyof GameProfile>(block: Block, key: keyof GameProfile[Block], label: string, min = 0, step = 1, max?: number, decimalPlaces?: number) {
         const isLevel = playerLevelFields.some(level => level === key)
-        return <label key={String(key)}>{label}<input type="number" min={min} max={max} step={step} value={profile[block][key] as number}
+        const id = `profile-${block}-${String(key)}`
+        const help = fieldHelp[String(key)]
+        const fieldValue = profile[block][key] as number
+        return <div className="profile-field" key={String(key)}>
+            <div className="profile-field-caption">
+                <label htmlFor={id}>{label}</label>
+                {help && <ProfileFieldHelp id={`${id}-help`} label={label} text={help} />}
+            </div>
+            <input id={id} aria-describedby={help ? `${id}-help` : undefined} type="number" min={min} max={max} step={step}
+            value={decimalPlaces === undefined ? fieldValue : fieldValue.toFixed(decimalPlaces)}
             onChange={event => {
                 const value = event.target.valueAsNumber
                 if (!Number.isFinite(value)) return
-                const normalized = isLevel ? Math.floor(value) : value
-                onChange({ ...profile, [block]: { ...profile[block], [key]: Math.min(max ?? Infinity, Math.max(min, normalized)) } })
-            }} /></label>
+                const normalized = isLevel ? Math.floor(value) : decimalPlaces === undefined ? value : Number(value.toFixed(decimalPlaces))
+                const bounded = Math.min(max ?? Infinity, Math.max(min, normalized))
+                // Number inputs can retain "1" when React considers it equal to "1.0".
+                if (decimalPlaces !== undefined) event.currentTarget.value = bounded.toFixed(decimalPlaces)
+                if (block === "player" && key === "startingMana") {
+                    onChange({ ...profile, player: { ...profile.player, startingMana: bounded,
+                        baseManaLimit: Math.max(50, profile.player.baseManaLimit, bounded) } })
+                    return
+                }
+                if (block === "player" && key === "baseManaLimit") {
+                    onChange({ ...profile, player: { ...profile.player, baseManaLimit: bounded,
+                        startingMana: Math.min(profile.player.startingMana, bounded) } })
+                    return
+                }
+                onChange({ ...profile, [block]: { ...profile[block], [key]: bounded } })
+            }} />
+        </div>
     }
     return <div className="profile-blocks">
-        <div className="economy-grid">
-            {field("player", "startingGold", "Starting gold")}
-            {field("player", "startingWood", "Starting wood")}
-            {field("player", "baseFoodLimit", "Base food limit")}
-            {field("player", "startingMana", "Starting mana")}
-            {field("player", "baseManaLimit", "Base mana capacity")}
-            {field("player", "townHallLevel", `${names.townHall} level`, 1, 1, 24)}
-            {field("player", "sawmillLevel", "Sawmill level", 1, 1, 24)}
-            {field("player", "farmLevel", `${names.farm} level`, 1, 1, 24)}
-            {field("player", "manaTowerLevel", "Tower of Mana level", 1, 1, 24)}
-            {field("player", "barracksLevel", "Barracks level", 1, 1, 24)}
-            {field("player", "industrialBuildingLevel", `${names.industrial} level`, 1, 1, 24)}
-            {field("player", "arcaneBuildingLevel", `${names.arcane} level`, 1, 1, 24)}
-            {field("player", "workerLevel", `${faction === "light" ? "Worker" : "Slave"} level`, 1, 1, 24)}
+        <div className="economy-grid resource-profile-grid">
+            <div className="resource-profile-column">
+                {field("player", "startingGold", "Starting gold", 150)}
+                {field("player", "startingWood", "Starting wood", 50)}
+                {field("player", "townHallLevel", `${names.townHall} level`, 1, 1, 24)}
+                {field("player", "sawmillLevel", "Sawmill level", 1, 1, 24)}
+                {field("player", "goldMiningTimeReduction", "Gold mining time reduction (seconds)", 0, 0.1, 1, 1)}
+                {field("player", "woodMiningTimeReduction", "Wood gathering time reduction (seconds)", 0, 0.1, 5, 1)}
+            </div>
+            <div className="resource-profile-column">
+                {field("player", "baseFoodLimit", "Base food limit", 20, 1, 40)}
+                {field("player", "farmLevel", `${names.farm} level`, 1, 1, 24)}
+                {field("player", "workerLevel", `${faction === "light" ? "Worker" : "Slave"} level`, 1, 1, 24)}
+                {field("player", "barracksLevel", "Barracks level", 1, 1, 24)}
+                {field("player", "industrialBuildingLevel", `${names.industrial} level`, 1, 1, 24)}
+                {field("player", "arcaneBuildingLevel", `${names.arcane} level`, 1, 1, 24)}
+            </div>
+            <div className="resource-profile-column">
+                {field("player", "manaTowerLevel", "Tower of Mana level", 1, 1, 24)}
+                {field("player", "startingMana", "Starting mana", 35, 1, 100)}
+                {field("player", "baseManaLimit", "Base mana capacity", Math.min(100, Math.max(50, profile.player.startingMana)), 1, 100)}
+                {field("player", "manaAccumulation", "Mana accumulation", 10, 1, 20)}
+                {field("player", "manaFromManaWells", "Mana from mana wells", 60, 1, 100)}
+                {field("player", "scrollCooldownReduction", "Scroll cooldown reduction (%)", 0, 1, 20)}
+            </div>
         </div>
         <p className="initial-allocation">
             Gold per trip: {yields.goldPerTrip} · Wood per trip: {yields.woodPerTrip} · Food per {names.farm}: {yields.foodPerFarm}
-            {` · Mana capacity per Tower of Mana: +${yields.manaPerTower} · Mana regeneration: ${profile.basic.manaPerMinute}/minute`}
+            {` · Mana capacity per Tower of Mana: +${yields.manaPerTower}`}
         </p>
         <div className="profile-actions">
-        <button className="advanced-toggle" type="button" aria-expanded={advanced} aria-controls="advanced-profile"
-            onClick={() => setAdvanced(current => !current)}>{advanced ? "Hide advanced" : "Advanced"}</button>
+        <button className="reset-profile" type="button" aria-label="Reset basic to defaults" title="Reset the main resource and level fields, keeping advanced settings" onClick={() => onChange({
+            ...profile,
+            player: { ...initialGameProfile.player, scrollLevel: profile.player.scrollLevel },
+        })}>Reset basic to defaults</button>
         <button className="reset-profile" type="button" onClick={() => onChange({
             basic: { ...initialGameProfile.basic }, map: { ...initialGameProfile.map },
             player: { ...initialGameProfile.player }, delays: { ...initialGameProfile.delays },
-        })}>Reset to defaults</button>
+        })}>Reset all</button>
         </div>
+        <button className="advanced-toggle profile-advanced-toggle" type="button" aria-expanded={advanced} aria-controls="advanced-profile"
+            onClick={() => setAdvanced(current => !current)}>{advanced ? "Hide advanced" : "Advanced"}</button>
         {advanced && <div id="advanced-profile">
-        <div className="economy-grid">
+        <div className="economy-grid resource-profile-grid">
             {field("map", "goldTravelTime", "Gold travel time (seconds each way)", 0, 0.1)}
             {field("map", "woodTravelTime", "Wood travel time (seconds each way)", 0, 0.1)}
             {field("map", "sawmillWoodTravelTime", "Sawmill wood travel time (seconds)", 0, 0.1)}
         </div>
-        <div className="economy-grid">
+        <div className="economy-grid resource-profile-grid">
             {field("delays", "constructionStartDelay", "Construction start delay (seconds)", 0, 0.1)}
             {field("delays", "orderDelay", "Order delay (seconds)", 0, 0.1)}
         </div>
         {children}
         </div>}
     </div>
+}
+
+function ProfileFieldHelp({ id, label, text }: { id: string; label: string; text: string }) {
+    const [hovered, setHovered] = useState(false)
+    const [focused, setFocused] = useState(false)
+    return <span className="profile-help-trigger" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+        <button type="button" className="timeline-help-button" aria-label={`${label} help`} aria-describedby={id}
+            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+            onKeyDown={event => { if (event.key === "Escape") { setHovered(false); setFocused(false) } }}
+        >?</button>
+        <span id={id} className="timeline-help-tooltip profile-help-tooltip" role="tooltip" hidden={!hovered && !focused}>{text}</span>
+    </span>
 }

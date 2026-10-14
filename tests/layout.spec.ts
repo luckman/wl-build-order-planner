@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-test("Reset to defaults restores main and hidden advanced settings without clearing orders", async ({ page }) => {
+test("Reset all restores main and hidden advanced settings without clearing orders", async ({ page }) => {
     await page.goto("http://localhost:2987")
     await page.getByLabel("Starting gold", { exact: true }).fill("2000")
     await page.locator(".action-panel").getByRole("button", { name: /^Worker / }).click()
@@ -8,7 +8,7 @@ test("Reset to defaults restores main and hidden advanced settings without clear
     await page.getByLabel("Gold travel time (seconds each way)").fill("8")
     await page.getByLabel("Order delay (seconds)").fill("3")
     await page.getByRole("button", { name: "Hide advanced" }).click()
-    await page.getByRole("button", { name: "Reset to defaults" }).click()
+    await page.getByRole("button", { name: "Reset all" }).click()
     await expect(page.getByLabel("Starting gold", { exact: true })).toHaveValue("150")
     await expect(page.getByLabel("Starting wood", { exact: true })).toHaveValue("50")
     await expect(page.getByRole("slider", { name: "Initial gold miners" })).toHaveValue("4")
@@ -179,7 +179,7 @@ test("resource collection has four columns and the fixed opening action supports
     await expect(slider).toBeVisible()
     await expect(slider).toHaveValue("4")
     await page.locator(".action-panel").getByRole("button", { name: /^Worker \d/ }).click()
-    await page.getByRole("button", { name: "Reset to defaults" }).click()
+    await page.getByRole("button", { name: "Reset all" }).click()
     await expect(slider).toHaveValue("4")
     await page.reload()
     await expect(slider).toHaveValue("4")

@@ -1,11 +1,24 @@
 import { earliestScrollTime } from "./scrollTiming"
 import { economyFromProfile, initialGameProfile } from "./gameProfile"
 import { simulateBuildOrder } from "./buildSimulation"
-import { createScrollAction } from "./scrolls"
+import { createScrollAction, scrollCooldown } from "./scrolls"
 import { parseBuildOrder, serializeBuildOrder } from "./buildOrderFile"
 
 const economy = economyFromProfile(initialGameProfile)
 const scroll = (commandTime: number) => createScrollAction({ type: "use-scroll", scrollId: "gold-rush", commandTime }, "light")
+
+test.each([0, 5, 100])("%s percent reduction applies to automatic timing and fixed command validation", reduction => {
+    const profile = { ...initialGameProfile, player: { ...initialGameProfile.player,
+        startingMana: 1000, baseManaLimit: 1000, scrollCooldownReduction: reduction } }
+    const settings = economyFromProfile(profile)
+    const cooldown = 10 * (1 - reduction / 100)
+    expect(scrollCooldown(settings)).toBe(cooldown)
+    const first = simulateBuildOrder([scroll(20)], settings, 10, 20, 20, "Castle").plan
+    const next = 20 + cooldown + settings.orderDelay
+    expect(earliestScrollTime(settings, first, 0)).toBe(next)
+    const plan = simulateBuildOrder([scroll(20), scroll(next - 0.001), scroll(next)], settings, 10, 20, 20, "Castle").plan
+    expect(plan.map(action => action.blocked)).toEqual([false, true, false])
+})
 
 test("mana readiness waits for orderDelay before command, then one second before effect", () => {
     const settings = { ...economy, startingMana: 30, manaPerMinute: 15 }

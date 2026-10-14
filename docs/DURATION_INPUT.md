@@ -19,3 +19,7 @@ The field keeps the colon visible and shifts digits from the right: 2 → 00:02,
 
 Standard input props such as disabled, id, name, required, aria-invalid, and aria-describedby can be supplied. Disabled calculated previews should be passed as formatted text. Domain rules such as mana availability, cooldown, minimum command time, and warnings belong to the event dialog rather than the input.
 `src/EventTimeDialog.tsx` provides the shared manual timestamp editor for existing scrolls and future fixed-time events. Supply the event name, stored commandTime, onSave, and onClose. Save updates the existing event by identity; simulation remains responsible for reporting mana, cooldown, and other timing conflicts.
+
+Set `wholeSeconds` for an integer-second field (Add resources, mana well and Lose unit events). It uses a numeric keyboard and discards fractional seconds on entry. Other callers retain fractional-second support.
+
+`EventTimeDialog` also accepts `title`, `submitLabel`, `wholeSeconds`, and `validateTime`. Mana well dialogs use these for creation/editing with a timestamp-only form and immediate ownership validation.

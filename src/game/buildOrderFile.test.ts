@@ -7,7 +7,9 @@ import { economyFromProfile } from "./gameProfile"
 const profile: GameProfile = {
     basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, manaPerMinute: 10, timeBetweenScrolls: 10 },
     map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
-    player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 24, startingMana: 35, baseManaLimit: 50, scrollLevel: 1, ...initialPlayerLevels },
+    player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 24, startingMana: 35, baseManaLimit: 50, scrollLevel: 1,
+        manaAccumulation: 10, manaFromManaWells: 60, scrollCooldownReduction: 0,
+        goldMiningTimeReduction: 0, woodMiningTimeReduction: 0, ...initialPlayerLevels },
     delays: { constructionStartDelay: 2.5, orderDelay: 1 },
 }
 function sample(faction: FactionId = "light", timings = false) {

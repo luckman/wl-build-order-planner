@@ -20,7 +20,7 @@ test("opening belongs to the order, persists with actions, and resource reset pr
     const actions = within(first.container.querySelector(".action-panel") as HTMLElement)
     fireEvent.click(actions.getByRole("button", { name: /^Worker / }))
     change("Starting gold", "777")
-    fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }))
+    fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     change("Initial gold miners", "3")

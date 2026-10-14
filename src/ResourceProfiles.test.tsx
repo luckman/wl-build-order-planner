@@ -14,13 +14,127 @@ afterEach(() => {
 const value = (label: string) => (screen.getByLabelText(label) as HTMLInputElement).value
 const change = (label: string, next: string) => fireEvent.change(screen.getByLabelText(label), { target: { value: next } })
 
+test("mana capacity never falls below starting mana during edits or after reload", () => {
+    const first = render(<App />)
+    change("Starting mana", "75")
+    expect(value("Base mana capacity")).toBe("75")
+    expect(screen.getByLabelText("Base mana capacity").getAttribute("min")).toBe("75")
+    change("Base mana capacity", "1")
+    expect(value("Base mana capacity")).toBe("75")
+    expect(value("Starting mana")).toBe("75")
+    change("Starting mana", "25")
+    expect(value("Base mana capacity")).toBe("75")
+    change("Base mana capacity", "25")
+    expect(value("Base mana capacity")).toBe("50")
+    first.unmount()
+    render(<App />)
+    expect(value("Starting mana")).toBe("35")
+    expect(value("Base mana capacity")).toBe("50")
+    change("Starting mana", "0")
+    change("Base mana capacity", "0")
+    expect(value("Base mana capacity")).toBe("50")
+})
+
+test("gathering reductions use one decimal, enforce bounds, and sit in the first column with food in the second", () => {
+    const { container } = render(<App />)
+    const columns = container.querySelectorAll(".resource-profile-column")
+    const gold = "Gold mining time reduction (seconds)"
+    const wood = "Wood gathering time reduction (seconds)"
+    for (const label of [gold, wood]) {
+        expect(value(label)).toBe("0.0")
+        expect(screen.getByLabelText(label).getAttribute("step")).toBe("0.1")
+        expect(screen.getByLabelText(label).closest(".resource-profile-column")).toBe(columns[0])
+    }
+    for (const label of ["Base food limit", "Farm level"]) {
+        expect(screen.getByLabelText(label).closest(".resource-profile-column")).toBe(columns[1])
+    }
+    change(gold, "1")
+    change(wood, "3")
+    expect(value(gold)).toBe("1.0")
+    expect(value(wood)).toBe("3.0")
+    change(gold, "2")
+    change(wood, "6")
+    expect(value(gold)).toBe("1.0")
+    expect(value(wood)).toBe("5.0")
+    change(gold, "-1")
+    expect(value(gold)).toBe("0.0")
+    change(gold, "0.5")
+    expect(value(gold)).toBe("0.5")
+    fireEvent.click(screen.getByRole("button", { name: "Reset basic to defaults" }))
+    expect(value(gold)).toBe("0.0")
+    expect(value(wood)).toBe("0.0")
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(screen.getByLabelText("Pigsty level").closest(".resource-profile-column")).toBe(columns[1])
+})
+
+test("reset basic restores main fields while preserving advanced settings, hidden settings, and the build", () => {
+    const editedProfile = {
+        basic: { ...initialGameProfile.basic, goldGatherTime: 5, manaPerMinute: 15 },
+        map: { goldTravelTime: 8, woodTravelTime: 9, sawmillWoodTravelTime: 2 },
+        delays: { constructionStartDelay: 6, orderDelay: 3 },
+        player: { ...initialGameProfile.player, startingGold: 2000, startingMana: 45, townHallLevel: 9, workerLevel: 9, scrollLevel: 5 },
+    }
+    saveFactionProfiles({ light: editedProfile, dark: initialGameProfile })
+    render(<App />)
+    change("Initial gold miners", "2")
+    fireEvent.click(screen.getByRole("button", { name: /^Worker / }))
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+    fireEvent.click(screen.getByRole("button", { name: "Reset basic to defaults" }))
+
+    expect(loadFactionProfiles()).toEqual({
+        light: { ...editedProfile, player: { ...initialGameProfile.player, scrollLevel: 5 } },
+        dark: initialGameProfile,
+    })
+    expect(value("Starting gold")).toBe("150")
+    expect(value("Worker level")).toBe("1")
+    expect(value("Gold travel time (seconds each way)")).toBe("8")
+    expect(value("Order delay (seconds)")).toBe("3")
+    expect(value("Initial gold miners")).toBe("2")
+    expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Hide advanced" })).toBeTruthy()
+})
+
+test("advanced help is specific to each field, appears on hover or focus, and follows edited values", () => {
+    const { container } = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+    expect(container.querySelector(".mechanics-note")).toBeNull()
+    expect(screen.queryByRole("tooltip")).toBeNull()
+
+    const sawmillHelp = screen.getByRole("button", { name: "Sawmill wood travel time (seconds) help" })
+    fireEvent.mouseEnter(sawmillHelp.parentElement!)
+    let tooltip = screen.getByRole("tooltip")
+    expect(tooltip.textContent).toContain("resets wood travel to 0.5 seconds each way")
+    expect(screen.getByLabelText("Sawmill wood travel time (seconds)").getAttribute("aria-describedby")).toBe(tooltip.id)
+    change("Sawmill wood travel time (seconds)", "2")
+    expect(screen.getByRole("tooltip").textContent).toContain("resets wood travel to 2 seconds each way")
+    fireEvent.mouseLeave(sawmillHelp.parentElement!)
+    expect(screen.queryByRole("tooltip")).toBeNull()
+
+    const orderHelp = screen.getByRole("button", { name: "Order delay (seconds) help" })
+    fireEvent.focus(orderHelp)
+    tooltip = screen.getByRole("tooltip")
+    expect(tooltip.textContent).toContain("Subsequent recruitment uses the normal queue")
+    expect(tooltip.textContent).not.toContain("Sawmill")
+    fireEvent.keyDown(orderHelp, { key: "Escape" })
+    expect(screen.queryByRole("tooltip")).toBeNull()
+})
+
 test("resource settings persist independently for each faction across remounts, including advanced settings and reset", () => {
     const first = render(<App />)
+    const manaColumn = screen.getByLabelText("Starting mana").closest(".resource-profile-column")
+    for (const label of ["Mana accumulation", "Mana from mana wells", "Scroll cooldown reduction (%)"]) {
+        expect(screen.getByLabelText(label).closest(".resource-profile-column")).toBe(manaColumn)
+    }
     change("Starting gold", "777")
     change("Starting wood", "321")
-    change("Base food limit", "60")
+    change("Base food limit", "40")
     change("Starting mana", "42")
     change("Base mana capacity", "80")
+    change("Mana accumulation", "15")
+    change("Mana from mana wells", "75")
+    change("Scroll cooldown reduction (%)", "5")
+    change("Gold mining time reduction (seconds)", "0.5")
+    change("Wood gathering time reduction (seconds)", "2.5")
     change("Tower of Mana level", "24")
     change("Initial gold miners", "2")
     change("Castle level", "15")
@@ -41,9 +155,14 @@ test("resource settings persist independently for each faction across remounts, 
     render(<App />)
     expect(value("Starting gold")).toBe("777")
     expect(value("Starting wood")).toBe("321")
-    expect(value("Base food limit")).toBe("60")
+    expect(value("Base food limit")).toBe("40")
     expect(value("Starting mana")).toBe("42")
     expect(value("Base mana capacity")).toBe("80")
+    expect(value("Mana accumulation")).toBe("15")
+    expect(value("Mana from mana wells")).toBe("75")
+    expect(value("Scroll cooldown reduction (%)")).toBe("5")
+    expect(value("Gold mining time reduction (seconds)")).toBe("0.5")
+    expect(value("Wood gathering time reduction (seconds)")).toBe("2.5")
     expect(value("Tower of Mana level")).toBe("24")
     expect(value("Initial gold miners")).toBe("2")
     expect(value("Castle level")).toBe("15")
@@ -57,7 +176,7 @@ test("resource settings persist independently for each faction across remounts, 
     expect(value("Starting gold")).toBe("888")
     expect(value("Citadel level")).toBe("9")
     expect(value("Order delay (seconds)")).toBe("4.5")
-    fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }))
+    fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
     expect(loadFactionProfiles().dark).toEqual(initialGameProfile)
     expect(loadFactionProfiles().light.player.startingGold).toBe(777)
     fireEvent.click(screen.getByRole("button", { name: "Light" }))

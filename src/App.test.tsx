@@ -26,8 +26,14 @@ test("opening upgrade cards adds nothing and selecting a higher level inserts pr
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     expect(screen.queryByRole("button", { name: "Castle upgrade" })).toBeNull()
     expect(screen.getAllByRole("button", { name: "Citadel upgrade" })).toHaveLength(1)
+    expect(within(screen.getByRole("region", { name: "Actions" })).getByText("Dark faction is in implementation.")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Citadel upgrade" }))
+    expect(screen.getAllByRole("menuitem")).toHaveLength(1)
+    expect(screen.queryByRole("menuitem", { name: /^Citadel lvl [34] / })).toBeNull()
     chooseUpgrade("Citadel lvl 2")
     expect(screen.getByRole("button", { name: "Remove Citadel lvl 2" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
+    expect(screen.queryByText("Dark faction is in implementation.")).toBeNull()
 })
 
 test("faction drafts survive switching and Clear only clears the selected draft", () => {
@@ -180,7 +186,7 @@ test("action cards expose hover costs and group upgrades in dropdown cards", () 
     expect(worker.title).toContain("Food: 2")
     expect(worker.title).toContain("Time: 17.82s")
     for (const group of Array.from(container.querySelectorAll(".action-groups > section")).slice(0, 3)) {
-        expect(group.querySelector(".action-name")).toBeNull()
+        expect(group.querySelector(".action:not(.resource-card) .action-name")).toBeNull()
     }
 })
 

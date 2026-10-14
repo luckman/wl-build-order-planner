@@ -202,7 +202,7 @@ function upload(text: string) {
     fireEvent.change(screen.getByLabelText("Import build order JSON"), { target: { files: [file] } })
 }
 
-test("Reset to defaults restores every imported profile group while retaining faction, order, and advanced visibility", async () => {
+test("Reset all restores every imported profile group while retaining faction, order, and advanced visibility", async () => {
     const original = Object.getOwnPropertyDescriptor(navigator, "clipboard")
     const writeText = jest.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
@@ -217,7 +217,7 @@ test("Reset to defaults restores every imported profile group while retaining fa
         fireEvent.click(screen.getByText("Import / Export"))
         upload(JSON.stringify(doc))
         await waitFor(() => expect(screen.getByRole("button", { name: "Dark", exact: true }).classList.contains("selected")).toBe(true))
-        fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }))
+        fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
         expect(screen.queryByLabelText("Gold travel time (seconds each way)")).toBeNull()
         expect((screen.getByLabelText("Starting gold") as HTMLInputElement).value).toBe("150")
         expect((screen.getByLabelText("Starting wood") as HTMLInputElement).value).toBe("50")
@@ -231,7 +231,7 @@ test("Reset to defaults restores every imported profile group while retaining fa
             ["Order delay (seconds)", "1"],
         ]) expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe(value)
         fireEvent.change(screen.getByLabelText("Order delay (seconds)"), { target: { value: "9" } })
-        fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }))
+        fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
         expect((screen.getByLabelText("Order delay (seconds)") as HTMLInputElement).value).toBe("1")
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name: "Copy link" }))

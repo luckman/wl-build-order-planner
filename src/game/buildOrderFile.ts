@@ -1,3 +1,6 @@
+import { createUnitLossAction, unitLossCommand, type UnitLossCommand } from "./unitLosses"
+import { createManaWellAction, manaWellCommand, type ManaWellCommand } from "./manaWells"
+import { createResourceAction, resourceCommand, type AddResourcesCommand } from "./resourceEvents"
 import { factions, type FactionId, type PlannerItem } from "./gameData"
 import { STARTING_WORKER_COUNT, initialGameProfile, initialOpeningAction, type OpeningAction, type GameProfile } from "./gameProfile"
 export type { GameProfile } from "./gameProfile"
@@ -7,7 +10,7 @@ import { createScrollAction, isScrollAction, scrollCommand, type ScrollCommand }
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-13.4"
+export const GAME_RULES_VERSION = "2026-10-14.6"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -15,7 +18,7 @@ export type BuildOrderDocument = {
     gameRulesVersion: string
     faction: FactionId
     gameProfile: GameProfile
-    buildOrder: Array<OpeningAction | ((ScrollCommand | {
+    buildOrder: Array<OpeningAction | ((ScrollCommand | AddResourcesCommand | ManaWellCommand | UnitLossCommand | {
         itemId: string
     }) & {
         timings?: Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime">
@@ -28,7 +31,7 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
         buildOrder: [opening, ...actions.map(({ item, commandTime, startTime, finishTime, workerReturnTime }) => ({
-            ...(isScrollAction(item) ? scrollCommand(item) : { itemId: item.id }),
+            ...(isScrollAction(item) ? scrollCommand(item) : item.kind === "resource" ? resourceCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-loss" ? unitLossCommand(item) : { itemId: item.id }),
             ...(includeTimings ? { timings: { commandTime, startTime, finishTime, workerReturnTime } } : {}),
         }))],
     }
@@ -62,7 +65,9 @@ export function parseBuildOrder(text: string): {
     const fields: { [Block in keyof GameProfile]: Array<keyof GameProfile[Block]> } = {
         basic: ["goldGatherTime", "woodGatherTime", "initialGoldTravelReduction", "manaPerMinute", "timeBetweenScrolls"],
         map: ["goldTravelTime", "woodTravelTime", "sawmillWoodTravelTime"],
-        player: ["startingGold", "startingWood", "baseFoodLimit", "startingMana", "baseManaLimit", "scrollLevel", ...playerLevelFields],
+        player: ["startingGold", "startingWood", "baseFoodLimit", "startingMana", "baseManaLimit", "scrollLevel",
+            "manaAccumulation", "manaFromManaWells", "scrollCooldownReduction",
+            "goldMiningTimeReduction", "woodMiningTimeReduction", ...playerLevelFields],
         delays: ["constructionStartDelay", "orderDelay"],
     }
     const parsed: Record<string, Record<string, number>> = {}
@@ -70,11 +75,23 @@ export function parseBuildOrder(text: string): {
         const raw = object(profile[block], `gameProfile.${block}`)
         parsed[block] = {}
         for (const key of fields[block]) {
-            // Older profiles have no mana fields; retain their other settings.
-            const manaField = ["startingMana", "baseManaLimit", "manaPerMinute", "manaTowerLevel", "timeBetweenScrolls", "scrollLevel"].includes(key)
-            const value = manaField && !(key in raw) ? initialGameProfile[block][key as keyof typeof initialGameProfile[typeof block]] : raw[key]
+            // Default fields added after the initial profile schema, retaining older settings.
+            const optionalField = ["startingMana", "baseManaLimit", "manaPerMinute", "manaTowerLevel", "timeBetweenScrolls", "scrollLevel",
+                "manaAccumulation", "manaFromManaWells", "scrollCooldownReduction",
+                "goldMiningTimeReduction", "woodMiningTimeReduction"].includes(key)
+            const value = key === "manaAccumulation" && !(key in raw) ? parsed.basic.manaPerMinute :
+                optionalField && !(key in raw) ? initialGameProfile[block][key as keyof typeof initialGameProfile[typeof block]] : raw[key]
             parsed[block][key] = number(value, `gameProfile.${block}.${key}`,
                 key === "goldGatherTime" || key === "woodGatherTime")
+            if (key === "scrollCooldownReduction" && parsed[block][key] > 100) {
+                throw new Error("gameProfile.player.scrollCooldownReduction must be from 0 to 100 percent.")
+            }
+            if (key === "goldMiningTimeReduction" || key === "woodMiningTimeReduction") {
+                const maximum = key === "goldMiningTimeReduction" ? 1 : 5
+                if (parsed[block][key] > maximum) {
+                    throw new Error(`gameProfile.player.${key} must be from 0 to ${maximum.toFixed(1)} seconds.`)
+                }
+            }
             if (key === "scrollLevel" && (!Number.isInteger(parsed[block][key]) || parsed[block][key] < 1 || parsed[block][key] > 6)) {
                 throw new Error("gameProfile.player.scrollLevel must be an integer from 1 to 6.")
             }
@@ -86,6 +103,9 @@ export function parseBuildOrder(text: string): {
         }
     }
     const gameProfile = parsed as unknown as GameProfile
+    if (gameProfile.player.baseManaLimit < gameProfile.player.startingMana) {
+        throw new Error("gameProfile.player.baseManaLimit (base mana capacity) must be greater than or equal to startingMana (starting mana).")
+    }
     if (!Array.isArray(doc.buildOrder) || doc.buildOrder.length < 1 || doc.buildOrder.length > 1001) throw new Error("buildOrder must start with a worker allocation and contain at most 1,000 subsequent actions.")
     const first = object(doc.buildOrder[0], "Opening action")
     if (first.type !== "allocate-workers") throw new Error("The first action must allocate starting workers.")
@@ -96,8 +116,23 @@ export function parseBuildOrder(text: string): {
     const catalog = new Map(factions[faction].items.map(item => [item.id, item]))
     const buildOrder = doc.buildOrder.slice(1).map((entry: unknown, index: number) => {
         const action = object(entry, `Action ${index + 1}`)
+        if (action.type === "lose-unit") {
+            if (typeof action.unitId !== "string") throw new Error(`Action ${index + 1}.unitId must identify a unit.`)
+            return createUnitLossAction({ type: "lose-unit", unitId: action.unitId,
+                commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`) }, faction)
+        }
+        if (action.type === "capture-mana-well" || action.type === "lose-mana-well") {
+            return createManaWellAction({ type: action.type,
+                commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`) })
+        }
+        if (action.type === "add-resources") {
+            return createResourceAction({ type: "add-resources",
+                commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
+                gold: number(action.gold, `Action ${index + 1}.gold`),
+                wood: number(action.wood, `Action ${index + 1}.wood`) })
+        }
         if (action.type === "use-scroll") {
-            if (action.scrollId !== "gold-rush") throw new Error(`Action ${index + 1}: unknown scroll ID ${String(action.scrollId)}.`)
+            if (action.scrollId !== "gold-rush" && action.scrollId !== "lumber-gathering") throw new Error(`Action ${index + 1}: unknown scroll ID ${String(action.scrollId)}.`)
             return createScrollAction({ type: "use-scroll", scrollId: action.scrollId,
                 commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`) }, faction)
         }

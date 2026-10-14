@@ -1,3 +1,6 @@
+import { unitLossCommand } from "./unitLosses"
+import { manaWellCommand } from "./manaWells"
+import { resourceCommand } from "./resourceEvents"
 import { FILE_VERSION, GAME_RULES_VERSION, parseBuildOrder } from "./buildOrderFile"
 import { initialOpeningAction, type GameProfile, type OpeningAction } from "./gameProfile"
 import type { FactionId, PlannerItem } from "./gameData"
@@ -43,7 +46,7 @@ export function saveFactionDrafts(drafts: FactionDrafts): void {
         try {
             const draft = drafts[faction]
             window.localStorage.setItem(draftStorageKey(faction), JSON.stringify([
-                draft.opening, ...draft.items.map(item => isScrollAction(item) ? scrollCommand(item) : ({ itemId: item.id })),
+                draft.opening, ...draft.items.map(item => isScrollAction(item) ? scrollCommand(item) : item.kind === "resource" ? resourceCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-loss" ? unitLossCommand(item) : ({ itemId: item.id })),
             ]))
         } catch {
             // Keep editing in memory when browser storage is unavailable or full.

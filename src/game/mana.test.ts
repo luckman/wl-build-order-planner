@@ -50,9 +50,41 @@ test("old exported profiles receive mana defaults and preserve existing settings
     expect(parsed.basic.manaPerMinute).toBe(10)
 })
 
-test.each(["startingMana", "baseManaLimit", "manaTowerLevel", "manaPerMinute"])("invalid %s cannot enter a profile", field => {
+test("profile validation rejects starting mana above capacity and accepts equality", () => {
+    const doc = JSON.parse(serializeBuildOrder("light", initialGameProfile, []))
+    doc.gameProfile.player.startingMana = 75
+    doc.gameProfile.player.baseManaLimit = 1
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("base mana capacity")
+    doc.gameProfile.player.baseManaLimit = 75
+    expect(parseBuildOrder(JSON.stringify(doc)).gameProfile.player.startingMana).toBe(75)
+    doc.gameProfile.player.startingMana = 0
+    doc.gameProfile.player.baseManaLimit = 0
+    expect(parseBuildOrder(JSON.stringify(doc)).gameProfile.player.baseManaLimit).toBe(0)
+})
+
+test.each(["startingMana", "baseManaLimit", "manaTowerLevel", "manaPerMinute", "manaAccumulation", "manaFromManaWells", "scrollCooldownReduction"])("invalid %s cannot enter a profile", field => {
     const doc = JSON.parse(serializeBuildOrder("light", initialGameProfile, []))
     const block = field === "manaPerMinute" ? "basic" : "player"
     doc.gameProfile[block][field] = -1
     expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(field)
+})
+
+test("player mana settings round-trip, control regeneration, and have no well income without captures", () => {
+    const profile = { ...initialGameProfile, player: { ...initialGameProfile.player,
+        manaAccumulation: 20, manaFromManaWells: 999, scrollCooldownReduction: 5 } }
+    const parsed = parseBuildOrder(serializeBuildOrder("light", profile, [])).gameProfile
+    expect(parsed).toEqual(profile)
+    expect(manaAt(economyFromProfile(parsed), [], 30).mana).toBe(45)
+    const doc = JSON.parse(serializeBuildOrder("light", profile, []))
+    doc.gameProfile.player.scrollCooldownReduction = 100.1
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("scrollCooldownReduction")
+})
+
+test("older profiles migrate their mana rate and default the new player settings", () => {
+    const doc = JSON.parse(serializeBuildOrder("light", initialGameProfile, []))
+    for (const key of ["manaAccumulation", "manaFromManaWells", "scrollCooldownReduction"]) delete doc.gameProfile.player[key]
+    doc.gameProfile.basic.manaPerMinute = 15
+    const parsed = parseBuildOrder(JSON.stringify(doc)).gameProfile
+    expect(parsed.player).toMatchObject({ manaAccumulation: 15, manaFromManaWells: 60, scrollCooldownReduction: 0 })
+    expect(manaAt(economyFromProfile(parsed), [], 30).mana).toBe(42.5)
 })

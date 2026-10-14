@@ -1,4 +1,4 @@
-.hero-scroll-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px var(--action-card-width); }
+.hero-scroll-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 10px repeat(4, var(--action-card-width)); }
 .scroll-card-delimiter { border-left: 1px solid #49667e; margin: 10px 4px; }
 .scroll-order-marker { color: #bda3d5; text-align: center; }
 .order-timed-event { cursor: pointer; }
@@ -22,3 +22,15 @@
 .scroll-dialog-buttons button:disabled { opacity: .5; cursor: default; }
 .scroll-dialog :focus-visible { outline: 2px solid #e1b55f; outline-offset: 2px; }
 
+
+.dark-events-grid { grid-template-columns: 10px repeat(4, var(--action-card-width)); }
+.event.resource { background: linear-gradient(#8b723a, #52421f); border-color: #e1b55f; }
+
+.action.resource-card { min-height: 64px; align-self: stretch; padding: 3px 2px; }
+.action.resource-card .action-name { text-align: center; overflow-wrap: normal; }
+.action.resource-card img { width: 28px; height: 28px; }
+
+.event.mana-well { background: linear-gradient(#3c688f, #25425f); border-color: #91bcdf; }
+
+.event.unit-loss { background: linear-gradient(#84474b, #4c272c); border-color: #d78d95; }
+.event.unit-loss img, .order li.order-timed-event img { width: 28px; height: 28px; }
