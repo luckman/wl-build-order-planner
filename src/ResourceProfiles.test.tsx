@@ -50,6 +50,13 @@ test("gathering reductions use one decimal, enforce bounds, and sit in the first
     for (const label of ["Base food limit", "Farm level"]) {
         expect(screen.getByLabelText(label).closest(".resource-profile-column")).toBe(columns[1])
     }
+    const firstLabels = Array.from(columns[0].querySelectorAll("label")).map(label => label.textContent)
+    expect(firstLabels[firstLabels.indexOf("Sawmill level") + 1]).toBe("Worker level")
+    expect(Array.from(columns[1].querySelectorAll("label")).slice(-2).map(label => label.textContent)).toEqual(["Gold Rush level", "Wood Gathering level"])
+    change("Gold Rush level", "7")
+    change("Wood Gathering level", "3.5")
+    expect(value("Gold Rush level")).toBe("6")
+    expect(value("Wood Gathering level")).toBe("3")
     change(gold, "1")
     change(wood, "3")
     expect(value(gold)).toBe("1.0")
@@ -67,6 +74,10 @@ test("gathering reductions use one decimal, enforce bounds, and sit in the first
     expect(value(wood)).toBe("0.0")
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     expect(screen.getByLabelText("Pigsty level").closest(".resource-profile-column")).toBe(columns[1])
+    const darkLabels = Array.from(columns[0].querySelectorAll("label")).map(label => label.textContent)
+    expect(darkLabels[darkLabels.indexOf("Sawmill level") + 1]).toBe("Slave level")
+    expect(screen.queryByLabelText("Gold Rush level")).toBeNull()
+    expect(screen.queryByLabelText("Wood Gathering level")).toBeNull()
 })
 
 test("reset basic restores main fields while preserving advanced settings, hidden settings, and the build", () => {
@@ -96,8 +107,9 @@ test("reset basic restores main fields while preserving advanced settings, hidde
     expect(screen.getByRole("button", { name: "Hide advanced" })).toBeTruthy()
     const draftProfile = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).gameProfile
     for (const field of scrollLevelFields) {
-        expect(draftProfile.player[field]).toBe(editedProfile.player[field])
-        expect(document.getElementById(`profile-player-${field}`)).toBeNull()
+        const visible = field === "lightGoldRushLevel" || field === "lightLumberGatheringLevel"
+        expect(draftProfile.player[field]).toBe(visible ? 1 : editedProfile.player[field])
+        expect(document.getElementById(`profile-player-${field}`) !== null).toBe(visible)
     }
     expect(draftProfile.player.massConstructionCostReduction).toBe(12.5)
     expect(document.getElementById("profile-player-massConstructionCostReduction")).toBeNull()
@@ -127,7 +139,7 @@ test("advanced help is brief and specific to each field and appears on hover or 
     expect(screen.queryByRole("tooltip")).toBeNull()
 
     for (const [label, text] of [
-        ["Wood travel increase (seconds)", "Seconds added at each wood travel increase, with or without a Sawmill."],
+        ["Wood travel increase (seconds)", "Travel time each way grows by this many seconds as the forest is logged, with or without a Sawmill."],
         ["Maximum wood travel time (seconds each way)", "Maximum wood travel time each way, with or without a Sawmill."],
     ]) {
         const help = screen.getByRole("button", { name: `${label} help` })

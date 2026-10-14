@@ -60,15 +60,28 @@ test("all forest workers, new workers, and returning builders use their gatherin
     }
 })
 
-test("overlapping effects do not stack and levels one through six have the same bonus", () => {
+test("overlapping Lumber Gathering effects do not stack", () => {
     const economy = { ...settings, startingMana: 100, baseManaLimit: 100 }
     const overlap = simulate([lumber(0), lumber(10)], economy)
     expect(overlap.plan.every(action => !action.blocked)).toBe(true)
     expect(Math.max(...overlap.deliveries.map(({ wood }) => wood))).toBe(65)
-    for (let level = 1; level <= 6; level++) {
-        expect(simulate([lumber(0)], { ...economy, lightLumberGatheringLevel: level }).deliveries).toEqual(simulate([lumber(0)], economy).deliveries)
-    }
 })
+
+test.each([[1, 30, 15], [2, 30.3, 16], [3, 30.8, 17], [4, 31.5, 18], [5, 32.4, 19], [6, 33.5, 20]])(
+    "Lumber Gathering level %s lasts %s seconds and adds %s wood at gathering completion", (level, duration, bonus) => {
+        const economy = { ...settings, lightLumberGatheringLevel: level, lightGoldRushLevel: 6 }
+        const { plan, deliveries } = simulate([lumber(0)], economy)
+        expect(plan[0].finishTime).toBeCloseTo(1 + duration)
+        for (const delivery of deliveries) {
+            const finish = delivery.time - economy.woodTravelTime
+            expect(delivery.wood).toBe(economy.woodPerTrip + (finish >= 1 && finish < 1 + duration ? bonus : 0))
+        }
+        for (const offset of [-0.01, 0]) {
+            const boundary = simulate([lumber(0)], { ...economy, woodTravelTime: 2, woodGatherTime: duration - 1 + offset })
+            expect(boundary.deliveries[0].wood).toBe(economy.woodPerTrip + (offset < 0 ? bonus : 0))
+        }
+    },
+)
 
 test("mixed scrolls share cooldown and spend their own mana cost", () => {
     const gold = createScrollAction({ type: "use-scroll", scrollId: "gold-rush", commandTime: 0 }, "light")

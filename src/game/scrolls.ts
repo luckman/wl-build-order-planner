@@ -18,6 +18,19 @@ export type ScrollAction = PlannerItem & {
 
 export const GOLD_RUSH = { manaCost: 50, startDelay: 1, duration: 30, goldBonus: 10 } as const
 export const LUMBER_GATHERING = { manaCost: 25, startDelay: 1, duration: 30, woodBonus: 15 } as const
+const SCROLL_DURATIONS = [30, 30.3, 30.8, 31.5, 32.4, 33.5] as const
+
+export function scrollEffect(id: ScrollId, settings: { lightGoldRushLevel?: number; lightLumberGatheringLevel?: number }) {
+    const level = (id === "gold-rush" ? settings.lightGoldRushLevel : settings.lightLumberGatheringLevel) ?? 1
+    if (!Number.isInteger(level) || level < 1 || level > 6) throw new Error("Scroll level must be an integer from 1 to 6.")
+    const duration = SCROLL_DURATIONS[level - 1]
+    const incomeBonus = (id === "gold-rush" ? GOLD_RUSH.goldBonus : LUMBER_GATHERING.woodBonus) + level - 1
+    const scroll = SCROLLS[id]
+    return { ...scroll, duration, incomeBonus,
+        description: id === "gold-rush"
+            ? `${scroll.manaCost} mana · starts after 1 second · +${incomeBonus} gold per mine exit for ${duration} seconds.`
+            : `${scroll.manaCost} mana · starts after 1 second · +${incomeBonus} wood per gathering stage completed in the forest during the next ${duration} seconds.` }
+}
 export const SCROLLS = {
     "gold-rush": { ...GOLD_RUSH, name: "Gold Rush", icon: "lightGoldRush",
         description: "50 mana · starts after 1 second · +10 gold per mine exit for 30 seconds." },

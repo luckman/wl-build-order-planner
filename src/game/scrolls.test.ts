@@ -81,12 +81,30 @@ test("mine exit locks bonus cargo; exact start counts and exact expiry does not"
     expect(late.deliveries[0].gold).toBe(50) // Already outside when effect begins.
 })
 
-test("overlaps do not stack and all six levels use identical effects", () => {
+test("overlapping Gold Rush effects do not stack", () => {
     const overlap = simulate([scroll(0), scroll(10)])
     expect(overlap.plan.every(action => !action.blocked)).toBe(true)
     expect(Math.max(...overlap.deliveries.map(delivery => delivery.gold))).toBe(settings.goldPerTrip + 10)
-    for (let level = 2; level <= 6; level++) expect(simulate([scroll(0)], { ...settings, lightGoldRushLevel: level }).deliveries).toEqual(simulate([scroll(0)]).deliveries)
 })
+
+test.each([[1, 30, 10], [2, 30.3, 11], [3, 30.8, 12], [4, 31.5, 13], [5, 32.4, 14], [6, 33.5, 15]])(
+    "Gold Rush level %s lasts %s seconds and adds %s gold at mine exit", (level, duration, bonus) => {
+        const economy = { ...settings, lightGoldRushLevel: level, lightLumberGatheringLevel: 6,
+            workerCount: 1, goldWorkers: 1, woodWorkers: 0, initialGoldTravelReduction: 0,
+            goldTravelTime: 2, goldGatherTime: 4 }
+        const { plan, deliveries } = simulate([scroll(0)], economy)
+        expect(plan[0].finishTime).toBeCloseTo(1 + duration)
+        for (const delivery of deliveries) {
+            const exit = delivery.time - economy.goldTravelTime
+            expect(delivery.gold).toBe(economy.goldPerTrip + (exit >= 1 && exit < 1 + duration ? bonus : 0))
+        }
+        // An exit inside the level's extended window receives the bonus; exact expiry does not.
+        for (const offset of [-0.01, 0]) {
+            const boundary = simulate([scroll(0)], { ...economy, goldGatherTime: duration - 1 + offset })
+            expect(boundary.deliveries[0].gold).toBe(economy.goldPerTrip + (offset < 0 ? bonus : 0))
+        }
+    },
+)
 
 test("scroll position does not change income or catalog scheduling; bonus can unblock an earlier row", () => {
     const worker = factions.light.items.find(item => item.id === "worker")!

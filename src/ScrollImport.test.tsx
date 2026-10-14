@@ -175,7 +175,7 @@ test("manual timestamps can add insufficient-mana commands; cancellation does no
     fireEvent.blur(screen.getByLabelText("Command time (mm:ss)"))
     expect((screen.getByLabelText("Command time (mm:ss)") as HTMLInputElement).value).toBe("00:01.5")
     expect(screen.queryByLabelText("Scroll level")).toBeNull()
-    expect(screen.getByText("All scroll levels (1–6) currently use the same effect.")).toBeTruthy()
+    expect(screen.queryByText("All scroll levels (1–6) currently use the same effect.")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Add scroll" }))
     expect(container.querySelector(".order-blocked")?.textContent).toContain("Insufficient mana")
     expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder[1]).toMatchObject({ commandTime: 1.5 })

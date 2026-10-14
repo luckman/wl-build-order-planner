@@ -1,5 +1,5 @@
 import { MAX_PLAN_SECONDS, validateEconomyDurations } from "./game/plannerLimits"
-import { economyFromProfile, initialGameProfile, type GameProfile } from "./game/gameProfile"
+import { economyFromProfile, initialGameProfile, scrollLevelFields, type GameProfile } from "./game/gameProfile"
 import { useState, type ReactNode } from "react"
 import { playerLevelFields, yieldsFromLevels } from "./game/playerLevels"
 import type { FactionId } from "./game/gameData"
@@ -26,14 +26,14 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         goldTravelTime: "Travel time each way to mine gold.",
         woodTravelTime: "Initial travel time each way to gather wood before a Sawmill completes.",
         sawmillWoodTravelTime: "Initial travel time each way to gather wood after each Sawmill completes.",
-        woodTravelTimeIncreaseBase: "Seconds added at each wood travel increase, with or without a Sawmill.",
+        woodTravelTimeIncreaseBase: "Travel time each way grows by this many seconds as the forest is logged, with or without a Sawmill.",
         maxWoodTravelTime: "Maximum wood travel time each way, with or without a Sawmill.",
         constructionStartDelay: "Builders stop gathering during travel, construction, and return. This delay applies to their travel in each direction.",
         orderDelay: "This delay applies before the first build-order command and the second and later initial wood gathering commands. It also applies after a recruitment building or prerequisites complete, before their first eligible command. Subsequent recruitment uses the normal queue. The first initial wood gatherer starts immediately.",
     }
     function field<Block extends keyof GameProfile>(block: Block, key: keyof GameProfile[Block], label: string, min = 0, step = 1, max?: number, decimalPlaces?: number) {
         if (block === "map" || block === "delays") max = MAX_PLAN_SECONDS
-        const isLevel = playerLevelFields.some(level => level === key)
+        const isLevel = playerLevelFields.some(level => level === key) || scrollLevelFields.some(level => level === key)
         const id = `profile-${block}-${String(key)}`
         const help = fieldHelp[String(key)]
         const fieldValue = profile[block][key] as number
@@ -79,16 +79,20 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
                 {field("player", "startingWood", "Starting wood")}
                 {field("player", "townHallLevel", `${names.townHall} level`, 1, 1, 24)}
                 {field("player", "sawmillLevel", "Sawmill level", 1, 1, 24)}
+                {field("player", "workerLevel", `${faction === "light" ? "Worker" : "Slave"} level`, 1, 1, 24)}
                 {field("player", "goldMiningTimeReduction", "Gold mining time reduction (seconds)", 0, 0.1, 1, 1)}
                 {field("player", "woodMiningTimeReduction", "Wood gathering time reduction (seconds)", 0, 0.1, 5, 1)}
             </div>
             <div className="resource-profile-column">
                 {field("player", "baseFoodLimit", "Base food limit", 0, 1, 40)}
                 {field("player", "farmLevel", `${names.farm} level`, 1, 1, 24)}
-                {field("player", "workerLevel", `${faction === "light" ? "Worker" : "Slave"} level`, 1, 1, 24)}
                 {field("player", "barracksLevel", "Barracks level", 1, 1, 24)}
                 {field("player", "industrialBuildingLevel", `${names.industrial} level`, 1, 1, 24)}
                 {field("player", "arcaneBuildingLevel", `${names.arcane} level`, 1, 1, 24)}
+                {faction === "light" && <>
+                    {field("player", "lightGoldRushLevel", "Gold Rush level", 1, 1, 6)}
+                    {field("player", "lightLumberGatheringLevel", "Wood Gathering level", 1, 1, 6)}
+                </>}
             </div>
             <div className="resource-profile-column">
                 {field("player", "manaTowerLevel", "Tower of Mana level", 1, 1, 24)}
@@ -109,8 +113,8 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         <button className="reset-profile" type="button" aria-label="Reset basic to defaults" title="Reset the main resource and level fields, keeping advanced settings" onClick={() => onChange({
             ...profile,
             player: { ...initialGameProfile.player,
-                lightGoldRushLevel: profile.player.lightGoldRushLevel,
-                lightLumberGatheringLevel: profile.player.lightLumberGatheringLevel,
+                lightGoldRushLevel: faction === "light" ? initialGameProfile.player.lightGoldRushLevel : profile.player.lightGoldRushLevel,
+                lightLumberGatheringLevel: faction === "light" ? initialGameProfile.player.lightLumberGatheringLevel : profile.player.lightLumberGatheringLevel,
                 darkWhipLevel: profile.player.darkWhipLevel,
                 darkLegionsCallLevel: profile.player.darkLegionsCallLevel,
                 massConstructionCostReduction: profile.player.massConstructionCostReduction,

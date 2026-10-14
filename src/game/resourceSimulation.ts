@@ -1,7 +1,7 @@
 import { growingWoodTravelTime } from "./gatheringRules"
 import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
 import type { PlayerBuildingLevels } from "./playerLevels"
-import { GOLD_RUSH, LUMBER_GATHERING, type ScrollId } from "./scrolls"
+import { scrollEffect, type ScrollId } from "./scrolls"
 
 export type EconomySettings = PlayerBuildingLevels & {
     startingGold: number
@@ -186,8 +186,9 @@ export class WorkerEconomy {
     }
 
     scheduleScroll(id: ScrollId, startTime: number, finishTime: number) {
-        if (id === "gold-rush") this.scheduleGoldRush(startTime, finishTime, GOLD_RUSH.goldBonus)
-        else this.scheduleLumberGathering(startTime, finishTime, LUMBER_GATHERING.woodBonus)
+        const { incomeBonus } = scrollEffect(id, this.settings)
+        if (id === "gold-rush") this.scheduleGoldRush(startTime, finishTime, incomeBonus)
+        else this.scheduleLumberGathering(startTime, finishTime, incomeBonus)
     }
 
     private travel(assignment: "gold" | "wood") {

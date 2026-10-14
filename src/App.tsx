@@ -12,7 +12,7 @@ import BuildOrderFiles from "./BuildOrderFiles"
 import ScrollDialog from "./ScrollDialog"
 import UpgradeCards from "./UpgradeCards"
 import EventTimeDialog from "./EventTimeDialog"
-import { createScrollAction, SCROLLS, type ScrollId, isScrollAction, scrollCooldown } from "./game/scrolls"
+import { createScrollAction, SCROLLS, type ScrollId, isScrollAction, scrollCooldown, scrollEffect } from "./game/scrolls"
 import { earliestScrollTime } from "./game/scrollTiming"
 import GameProfileEditor from "./GameProfileEditor"
 import warLegendsLogo from "./icons/war-legends-logo.png"
@@ -441,7 +441,7 @@ export default function App() {
                                             {kind === "hero" && factionId === "light" && <>
                                                 <span className="scroll-card-delimiter" aria-hidden="true" />
                                                 {(Object.keys(SCROLLS) as ScrollId[]).map(scrollId => {
-                                                    const scroll = SCROLLS[scrollId]
+                                                    const scroll = scrollEffect(scrollId, gameProfile.player)
                                                     return <button key={scrollId} className="action scroll-card"
                                                         aria-label={`${scroll.name} ${scroll.manaCost} mana · ${scroll.duration}s`}
                                                         title={scroll.description} onClick={() => setScrollDialogOpen(scrollId)}>
@@ -547,11 +547,11 @@ export default function App() {
                                                             index,
                                                         }) => (
                                                             <button
-                                                                className={`event ${item.kind}${item.kind === "hero" ? " unit" : ""}`}
+                                                                className={`event ${item.kind}${item.kind === "hero" ? " unit" : ""}${isTimedEvent(item) ? " timed-event" : ""}`}
                                                                 key={`${item.id}-${index}`}
                                                                 style={{
                                                                     left: `${(commandTime! / endTime) * 100}%`,
-                                                                    width: `${Math.max(4, ((finishTime! - commandTime!) / endTime) * 100)}%`,
+                                                                    width: `${((finishTime! - commandTime!) / endTime) * 100}%`,
                                                                 }}
                                                                 title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime })}
                                                                 onClick={() =>
@@ -757,7 +757,7 @@ export default function App() {
                         setDependencyError(null)
                         setHoverTime(null)
                     }} />}
-                {scrollDialogOpen && <ScrollDialog validationError={additionError} scrollId={scrollDialogOpen} minimumTime={minimumScrollTime} automaticTime={automaticScrollTime}
+                {scrollDialogOpen && <ScrollDialog validationError={additionError} scrollId={scrollDialogOpen} levels={gameProfile.player} minimumTime={minimumScrollTime} automaticTime={automaticScrollTime}
                     onClose={() => setScrollDialogOpen(null)} onAdd={commandTime => {
                         if (!setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime }, factionId)])) return
                         setScrollDialogOpen(null)

@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react"
 
-import { SCROLLS, type ScrollId } from "./game/scrolls"
+import { scrollEffect, type ScrollId } from "./game/scrolls"
+import type { GameProfile } from "./game/gameProfile"
 
 import DurationInput from "./DurationInput"
 import { formatDuration, parseDuration, MAX_DURATION_SECONDS } from "./durationTime"
 
-export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "gold-rush", onAdd, onClose, validationError }: {
+export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "gold-rush", levels = {}, onAdd, onClose, validationError }: {
     minimumTime: number; automaticTime: number | null; scrollId?: ScrollId; validationError?: string | null
+    levels?: Partial<Pick<GameProfile["player"], "lightGoldRushLevel" | "lightLumberGatheringLevel">>
     onAdd: (time: number) => void; onClose: () => void
 }) {
-    const scroll = SCROLLS[scrollId]
+    const scroll = scrollEffect(scrollId, levels)
     const dialog = useRef<HTMLDivElement>(null)
     const [automatic, setAutomatic] = useState(true)
     const [manualTime, setManualTime] = useState(() => formatDuration(automaticTime ?? minimumTime))
@@ -33,7 +35,6 @@ export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "g
             }}>
             <h2 id="scroll-dialog-title">Use {scroll.name}</h2>
             <p>{scroll.description}</p>
-            <p>All scroll levels (1–6) currently use the same effect.</p>
             <form onSubmit={event => { event.preventDefault(); if (valid && !validationError) onAdd(commandTime!) }}>
                 <label className="scroll-automatic"><input type="checkbox" checked={automatic}
                     onChange={event => setAutomatic(event.target.checked)} /> Use after the last scroll as soon as enough mana is available</label>

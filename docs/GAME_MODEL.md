@@ -45,6 +45,8 @@ Wood workers gather independently, with no shared node capacity. Default gatheri
 
 `map.goldTravelTime` and `map.woodTravelTime` each apply to both travel directions. Equipment modifiers `player.goldMiningTimeReduction` (0–1 seconds) and `player.woodMiningTimeReduction` (0–5 seconds) subtract from gathering durations. Effective gathering time is at least 0.001 seconds. Neither modifier changes travel or base cargo yield.
 
+The `growingWoodTravelTime` function models forest logging: as nearby trees are cut down, workers must travel farther to reach the remaining trees. Increasing travel time gradually represents this effect without tracking individual trees or forest positions.
+
 Wood travel increases in steps both before and after a Sawmill. Before the first completion, the initial value is `map.woodTravelTime` (default 4 seconds each way), and growth is measured from game start. Each completed Sawmill resets the value to `map.sawmillWoodTravelTime` (default 0.5 seconds each way) and restarts its growth timer. Growth is global, not tied to individual workers or time spent gathering.
 
 `map.woodTravelTimeIncreaseBase` is the amount added at each increase (default 0.3 seconds). `map.maxWoodTravelTime` caps both initial and subsequent values (default 5 seconds). Each current travel value lasts 30 seconds times its rounded-up value before increasing: values up to 1 second last 30 seconds, values above 1 and up to 2 seconds last 60 seconds, values above 2 and up to 3 seconds last 90 seconds, and so on. Zero travel also lasts 30 seconds before its first increase. Zero increase disables growth; zero maximum makes new wood travel instantaneous.
@@ -126,11 +128,13 @@ Timed events retain explicit command timestamps independently of their position 
 
 | Command | Current behavior |
 | --- | --- |
-| Gold Rush (Light) | Spends 50 mana; starts 1 second after command; adds 10 gold to loads exiting the mine during its 30-second window. |
-| Lumber Gathering (Light) | Spends 25 mana; starts 1 second after command; adds 15 wood to loads finishing gathering during its 30-second window. |
+| Gold Rush (Light) | Spends 50 mana; starts 1 second after command; adds 10–15 gold to loads exiting the mine during its level-dependent window. |
+| Lumber Gathering (Light) | Spends 25 mana; starts 1 second after command; adds 15–20 wood to loads finishing gathering during its level-dependent window. |
 | Resources collected (both factions) | Instantly adds non-negative gold and wood without mana, worker, or delay requirements. |
 | Mana well is captured / Mana well is lost (both factions) | Instantly adds/removes one owned well. A loss requires ownership at that timestamp. |
 | Unit is killed (both factions) | Removes one completed living recruit or starting worker, releasing food. Workers assigned to construction, including travel, are ineligible; wood workers are selected before gold workers. |
+
+For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively. Levels are independent profile settings, editable for Light in Resources collection, and default to 1.
 
 Scroll windows include their start and exclude expiry. Cargo is fixed at mine exit or wood-gathering completion, so a bonus load retains its bonus when delivered after expiry. Overlapping windows of the same scroll do not stack. Interruption or worker loss discards cargo.
 

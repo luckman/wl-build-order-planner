@@ -34,6 +34,7 @@
 .timeline-help-tooltip[hidden] { display: none; }
 
 .timeline-grid { grid-template-columns: max-content minmax(0, 1fr); }
+.event.timed-event:not(.scroll) { min-width: 75px; }
 .resource-legend { height: 110px; display: grid; grid-template-rows: repeat(4, 1fr); }
 .resource-legend-row { display: grid; grid-template-columns: 73px minmax(74px, auto); align-items: stretch; border-bottom: 1px solid #29455d; }
 .resource-legend .resource-label, .resource-legend .resource-value { height: auto; border-bottom: 0; }

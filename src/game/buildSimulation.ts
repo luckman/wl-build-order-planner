@@ -5,7 +5,7 @@ import { createResourcesCollectedAction, resourcesCollectedCommand, isTimedEvent
 import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
 import { type EconomySettings, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
-import { createScrollAction, SCROLLS, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
+import { createScrollAction, scrollEffect, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
 import { actionDuration } from "./playerLevels"
 
 export type ScheduledAction = {
@@ -63,7 +63,10 @@ export function simulateBuildOrder(
     const unitInstances: Array<{ item: PlannerItem; readyAt: number; killed: boolean }> =
         simulation.workers.map(() => ({ item: workerItem, readyAt: 0, killed: false }))
     // Timed commands are processed independently of their position among catalog rows.
-    until = Math.max(until, ...pendingUnitsKilled.map(({ item }) => item.commandTime), ...pendingResourcesCollected.map(({ item }) => item.commandTime), ...pendingScrolls.map(({ item }) => item.commandTime + SCROLLS[item.scrollId].startDelay + SCROLLS[item.scrollId].duration))
+    until = Math.max(until, ...pendingUnitsKilled.map(({ item }) => item.commandTime), ...pendingResourcesCollected.map(({ item }) => item.commandTime), ...pendingScrolls.map(({ item }) => {
+        const scroll = scrollEffect(item.scrollId, economy)
+        return item.commandTime + scroll.startDelay + scroll.duration
+    }))
     const scrollPlan: ScheduledAction[] = []
     let lastScrollCommand = -Infinity
     const timedEventsByIndex = new Map<number, ScheduledAction>()
@@ -128,7 +131,7 @@ export function simulateBuildOrder(
             }
             while (pendingScrolls[0]?.item.commandTime === eventTime) {
                 const { item, index } = pendingScrolls.shift()!
-                const scroll = SCROLLS[item.scrollId]
+                const scroll = scrollEffect(item.scrollId, economy)
                 const availableMana = manaAt(economy, [...plan, ...scrollPlan, ...wellPlan], eventTime).mana
                 const readyMana = manaAt(economy, [...plan, ...scrollPlan, ...wellPlan], Math.max(0, eventTime - economy.orderDelay)).mana
                 const cooldownUntil = lastScrollCommand + scrollCooldown(economy) + economy.orderDelay
