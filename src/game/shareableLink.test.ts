@@ -15,6 +15,7 @@ test.each<FactionId>(["light", "dark"])("%s links preserve duplicate actions and
     const profile = {
         ...initialGameProfile,
         basic: { ...initialGameProfile.basic, initialGoldTravelReduction: 2.5 },
+        map: { ...initialGameProfile.map, sawmillWoodTravelTime: 1.25, woodTravelTimeIncreaseBase: 0.75, maxWoodTravelTime: 6.5 },
         player: { ...initialGameProfile.player, startingGold: 2000, startingWood: 2000 },
         delays: { ...initialGameProfile.delays, orderDelay: 2.5 },
     }

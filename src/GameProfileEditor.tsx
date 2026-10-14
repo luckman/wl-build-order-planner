@@ -3,7 +3,6 @@ import { economyFromProfile, initialGameProfile, type GameProfile } from "./game
 import { useState, type ReactNode } from "react"
 import { playerLevelFields, yieldsFromLevels } from "./game/playerLevels"
 import type { FactionId } from "./game/gameData"
-import { MAX_SAWMILL_WOOD_TRAVEL_TIME, SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE } from "./game/resourceSimulation"
 
 const buildingNames = {
     light: { townHall: "Castle", farm: "Farm", industrial: "Factory", arcane: "Sanctuary" },
@@ -25,8 +24,10 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         manaFromManaWells: "Extra mana regenerated per minute for each owned mana well, up to mana capacity. Mana well is captured adds one well; Mana well is lost removes one at the selected timestamp, with no delays.",
         scrollCooldownReduction: `Reduces the ${profile.basic.timeBetweenScrolls}-second scroll cooldown by this percentage. Order delay applies afterward.`,
         goldTravelTime: "Travel time each way to mine gold.",
-        woodTravelTime: "Travel time each way to gather wood before a Sawmill completes. Wood trips run independently. The first initial wood gatherer starts immediately; later initial wood gatherers wait for the order delay.",
-        sawmillWoodTravelTime: `Each completed Sawmill resets wood travel to ${Math.min(MAX_SAWMILL_WOOD_TRAVEL_TIME, profile.map.sawmillWoodTravelTime)} seconds each way. Travel increases by ${SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE} seconds per full minute afterward, up to ${MAX_SAWMILL_WOOD_TRAVEL_TIME} seconds.`,
+        woodTravelTime: "Initial travel time each way to gather wood before a Sawmill completes.",
+        sawmillWoodTravelTime: "Initial travel time each way to gather wood after each Sawmill completes.",
+        woodTravelTimeIncreaseBase: "Seconds added at each wood travel increase, with or without a Sawmill.",
+        maxWoodTravelTime: "Maximum wood travel time each way, with or without a Sawmill.",
         constructionStartDelay: "Builders stop gathering during travel, construction, and return. This delay applies to their travel in each direction.",
         orderDelay: "This delay applies before the first build-order command and the second and later initial wood gathering commands. It also applies after a recruitment building or prerequisites complete, before their first eligible command. Subsequent recruitment uses the normal queue. The first initial wood gatherer starts immediately.",
     }
@@ -127,6 +128,8 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
             {field("map", "goldTravelTime", "Gold travel time (seconds each way)", 0, 0.1)}
             {field("map", "woodTravelTime", "Wood travel time (seconds each way)", 0, 0.1)}
             {field("map", "sawmillWoodTravelTime", "Sawmill wood travel time (seconds)", 0, 0.1)}
+            {field("map", "woodTravelTimeIncreaseBase", "Wood travel increase (seconds)", 0, 0.01, undefined, 2)}
+            {field("map", "maxWoodTravelTime", "Maximum wood travel time (seconds each way)", 0, 0.1)}
         </div>
         <div className="economy-grid resource-profile-grid">
             {field("delays", "constructionStartDelay", "Construction start delay (seconds)", 0, 0.1)}

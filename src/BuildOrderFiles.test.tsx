@@ -218,7 +218,7 @@ function documentText() {
         format: "wl-build-order", version: 2, gameRulesVersion: GAME_RULES_VERSION, faction: "dark",
         gameProfile: {
             basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1 },
-            map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
+            map: { ...initialGameProfile.map, goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
             player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 30, startingMana: 35, baseManaLimit: 50, manaAccumulation: 10, ...initialPlayerLevels, townHallLevel: 9, farmLevel: 21 },
             delays: { constructionStartDelay: 2, orderDelay: 1 },
         },

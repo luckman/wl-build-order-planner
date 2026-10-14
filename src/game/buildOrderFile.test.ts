@@ -6,7 +6,7 @@ import { economyFromProfile, initialGameProfile } from "./gameProfile"
 
 const profile: GameProfile = {
     basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, timeBetweenScrolls: 10 },
-    map: { goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
+    map: { ...initialGameProfile.map, goldTravelTime: 4, woodTravelTime: 4, sawmillWoodTravelTime: 0.5 },
     player: { startingGold: 2000, startingWood: 2000, baseFoodLimit: 24, startingMana: 35, baseManaLimit: 50, lightGoldRushLevel: 1, lightLumberGatheringLevel: 1, darkWhipLevel: 1, darkLegionsCallLevel: 1,
         manaAccumulation: 10, manaFromManaWells: 60, scrollCooldownReduction: 0, massConstructionCostReduction: 12.5,
         goldMiningTimeReduction: 0, woodMiningTimeReduction: 0, ...initialPlayerLevels },
@@ -94,6 +94,8 @@ test("custom values in every block round trip with unchanged format and rules ve
     const doc = JSON.parse(sample())
     doc.gameProfile.basic.initialGoldTravelReduction = 2.5
     doc.gameProfile.map.sawmillWoodTravelTime = 1.25
+    doc.gameProfile.map.woodTravelTimeIncreaseBase = 0.75
+    doc.gameProfile.map.maxWoodTravelTime = 6.5
     doc.gameProfile.map.goldTravelTime = 2.5
     doc.gameProfile.map.woodTravelTime = 1.5
     doc.gameProfile.delays.orderDelay = 3.5
@@ -107,6 +109,8 @@ test("custom values in every block round trip with unchanged format and rules ve
     expect(exported.gameRulesVersion).toBe(GAME_RULES_VERSION)
     expect(economy.initialGoldTravelReduction).toBe(2.5)
     expect(economy.sawmillWoodTravelTime).toBe(1.25)
+    expect(economy.woodTravelTimeIncreaseBase).toBe(0.75)
+    expect(economy.maxWoodTravelTime).toBe(6.5)
     expect(economy.goldTravelTime).toBe(2.5)
     expect(economy.woodTravelTime).toBe(1.5)
 })
@@ -128,6 +132,8 @@ test.each([
     ["oversized allocation", (doc: any) => { doc.buildOrder[0].goldWorkers = 1001 }],
     ["negative initial delay", (doc: any) => { doc.gameProfile.delays.orderDelay = -1 }],
     ["negative sawmill travel", (doc: any) => { doc.gameProfile.map.sawmillWoodTravelTime = -1 }],
+    ...["woodTravelTimeIncreaseBase", "maxWoodTravelTime"].flatMap(key =>
+        [-1, null, "5", 1801].map(value => [`invalid ${key}: ${value}`, (doc: any) => { doc.gameProfile.map[key] = value }] as const)),
     ["negative gold travel", (doc: any) => { doc.gameProfile.map.goldTravelTime = -1 }],
     ["negative wood travel", (doc: any) => { doc.gameProfile.map.woodTravelTime = -1 }],
     ["negative initial gold reduction", (doc: any) => { doc.gameProfile.basic.initialGoldTravelReduction = -1 }],

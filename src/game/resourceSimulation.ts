@@ -1,5 +1,4 @@
-import { MAX_SAWMILL_WOOD_TRAVEL_TIME, SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE } from "./gatheringRules"
-export { MAX_SAWMILL_WOOD_TRAVEL_TIME, SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE } from "./gatheringRules"
+import { growingWoodTravelTime } from "./gatheringRules"
 import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
 import type { PlayerBuildingLevels } from "./playerLevels"
 import { GOLD_RUSH, LUMBER_GATHERING, type ScrollId } from "./scrolls"
@@ -31,6 +30,8 @@ export type EconomySettings = PlayerBuildingLevels & {
     constructionStartDelay: number
     orderDelay: number
     sawmillWoodTravelTime: number
+    woodTravelTimeIncreaseBase: number
+    maxWoodTravelTime: number
     initialGoldTravelReduction: number
 }
 
@@ -192,13 +193,13 @@ export class WorkerEconomy {
     private travel(assignment: "gold" | "wood") {
         if (assignment === "wood") {
             const latestCompletion = Math.max(-Infinity, ...this.sawmillCompletions.filter(time => time <= this.time))
-            if (Number.isFinite(latestCompletion)) {
-                const fullMinutes = Math.floor((this.time - latestCompletion) / 60)
-                return Math.min(MAX_SAWMILL_WOOD_TRAVEL_TIME,
-                    this.settings.sawmillWoodTravelTime + SAWMILL_WOOD_TRAVEL_GROWTH_PER_MINUTE * fullMinutes)
-            }
+            const hasSawmill = Number.isFinite(latestCompletion)
+            return growingWoodTravelTime(
+                hasSawmill ? this.settings.sawmillWoodTravelTime : this.settings.woodTravelTime,
+                this.time - (hasSawmill ? latestCompletion : 0),
+                this.settings.woodTravelTimeIncreaseBase, this.settings.maxWoodTravelTime)
         }
-        return assignment === "gold" ? this.settings.goldTravelTime : this.settings.woodTravelTime
+        return this.settings.goldTravelTime
     }
 
     private transition(worker: GatheringWorker, state: GatheringWorker["state"], duration: number) {

@@ -45,13 +45,43 @@ Wood workers gather independently, with no shared node capacity. Default gatheri
 
 `map.goldTravelTime` and `map.woodTravelTime` each apply to both travel directions. Equipment modifiers `player.goldMiningTimeReduction` (0–1 seconds) and `player.woodMiningTimeReduction` (0–5 seconds) subtract from gathering durations. Effective gathering time is at least 0.001 seconds. Neither modifier changes travel or base cargo yield.
 
-Each completed Sawmill resets wood travel to `map.sawmillWoodTravelTime` (default 0.5 seconds) each way. Travel increases by 0.5 seconds per full minute since the latest completion, capped at 4 seconds:
+Wood travel increases in steps both before and after a Sawmill. Before the first completion, the initial value is `map.woodTravelTime` (default 4 seconds each way), and growth is measured from game start. Each completed Sawmill resets the value to `map.sawmillWoodTravelTime` (default 0.5 seconds each way) and restarts its growth timer. Growth is global, not tied to individual workers or time spent gathering.
+
+`map.woodTravelTimeIncreaseBase` is the amount added at each increase (default 0.3 seconds). `map.maxWoodTravelTime` caps both initial and subsequent values (default 5 seconds). Each current travel value lasts 30 seconds times its rounded-up value before increasing: values up to 1 second last 30 seconds, values above 1 and up to 2 seconds last 60 seconds, values above 2 and up to 3 seconds last 90 seconds, and so on. Zero travel also lasts 30 seconds before its first increase. Zero increase disables growth; zero maximum makes new wood travel instantaneous.
+
+For initial travel `v0`, increment `b`, maximum `M`, and elapsed seconds since game start or the latest Sawmill completion:
 
 ```text
-travel = min(4, sawmillWoodTravelTime + 0.5 * floor(secondsSinceCompletion / 60))
+v[n] = min(M, v0 + n * b)
+T[0] = 0
+T[n + 1] = T[n] + 30 * max(1, ceil(v[n]))
+travel = v[n] for T[n] <= elapsed < T[n + 1]
 ```
 
-Each travel leg keeps the duration chosen when it began. Sawmill completion and minute boundaries do not change travel already underway. The rule applies to both factions.
+Once travel reaches the maximum, it stays there until another Sawmill completes. An increase takes effect exactly at its boundary.
+
+| Seconds since Sawmill completion (defaults) | Travel each way |
+|---------------------------------------------|----------------:|
+| 0–<30                                       |     0.5 seconds |
+| 30–<60                                      |     0.8 seconds |
+| 60–<120                                     |     1.1 seconds |
+| 120–<180                                    |     1.4 seconds |
+| 180–<240                                    |     1.7 seconds |
+| 240–<300                                    |     2.0 seconds |
+| 300–<390                                    |     2.3 seconds |
+| 390–<480                                    |     2.6 seconds |
+| 480–<570                                    |     2.9 seconds |
+| 570–<690                                    |     3.2 seconds |
+| 690–<810                                    |     3.5 seconds |
+| 810–<930                                    |     3.8 seconds |
+| 930–<1080                                   |     4.1 seconds |
+| 1080–<1230                                  |     4.4 seconds |
+| 1230–<1380                                  |     4.7 seconds |
+| 1380 onward                                 |     5.0 seconds |
+
+Without a Sawmill, defaults give 4 seconds until game second 120, 4.3 seconds until second 270, 4.6 seconds until second 420, 4.9 seconds until second 570, and 5 seconds thereafter.
+
+Each outbound or return travel leg keeps the duration chosen when it began. Sawmill completion and growth boundaries do not change travel already underway. Chopping durations and gold travel are unchanged. The rule applies to both factions.
 
 Newly recruited workers join gold until assigned gold workers reach `ceil((2 * goldTravelTime + effectiveGoldGatherTime) / effectiveGoldGatherTime)`, then join wood. Workers temporarily constructing count toward their previous assignment. Worker losses remove their future deliveries and assignment; recruitment uses the resulting current allocation.
 

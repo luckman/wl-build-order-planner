@@ -19,6 +19,8 @@ const settings = {
     constructionStartDelay: 4,
     orderDelay: 1,
     sawmillWoodTravelTime: 0.5,
+    woodTravelTimeIncreaseBase: 0.5,
+    maxWoodTravelTime: 5,
     initialGoldTravelReduction: 1,
 }
 
@@ -54,17 +56,30 @@ test.each([[0, 11], [2.5, 8.5], [10, 7]])("initial gold travel reduction %ss cla
     expect(deliveries[1].time - deliveries[0].time).toBe(11)
 })
 
-test("custom sawmill travel affects both legs, grows by fixed increments, caps and resets", () => {
+test("custom sawmill travel affects both legs, grows at variable intervals and resets", () => {
     const simulation = new WorkerEconomy({ ...settings, workerCount: 0, goldWorkers: 0, sawmillWoodTravelTime: 1.25 })
     simulation.scheduleSawmill(10)
     simulation.scheduleSawmill(500)
-    for (const [time, duration] of [[10, 1.25], [70, 1.75], [130, 2.25], [430, 4], [500, 1.25]]) {
+    for (const [time, duration] of [[10, 1.25], [70, 1.75], [130, 2.25], [220, 2.75], [430, 3.75], [500, 1.25]]) {
         simulation.advanceTo(time)
         const worker = simulation.addWorker("wood")
         expect(worker.nextAt).toBe(time + duration)
         simulation.advanceTo(worker.nextAt + settings.woodGatherTime)
         expect(worker.nextAt - simulation.time).toBe(duration)
     }
+})
+
+test("wood return travel uses growth at departure while outbound travel stays unchanged", () => {
+    const simulation = new WorkerEconomy({ ...settings, workerCount: 0, goldWorkers: 0, woodGatherTime: 1 })
+    simulation.advanceTo(119)
+    const worker = simulation.addWorker("wood")
+    expect(worker.nextAt).toBe(123)
+    simulation.advanceTo(120)
+    expect(worker.nextAt).toBe(123)
+    simulation.advanceTo(124)
+    expect(worker.nextAt).toBe(128.5)
+    simulation.advanceTo(128.5)
+    expect(simulation.deliveries[0].time).toBe(128.5)
 })
 
 test("zero sawmill travel still advances through gathering and delivers wood", () => {
@@ -116,8 +131,9 @@ test("a Sawmill does not shorten an outbound wood leg already in progress", () =
 })
 
 test.each([
-    [69.9, 0.5, 1], [70, 1, 1], [130, 1.5, 1.5], [190, 2, 2],
-    [250, 2.5, 2.5], [310, 3, 3], [370, 3.5, 3.5], [430, 4, 4], [1000, 4, 4],
+    [39.9, 0.5, 1], [40, 1, 1], [70, 1.5, 1.5], [100, 1.5, 1.5],
+    [129.9, 1.5, 2], [130, 2, 2], [190, 2.5, 2.5], [280, 3, 3],
+    [370, 3.5, 3.5], [490, 4, 4], [610, 4.5, 4.5], [760, 5, 5], [1700, 5, 5],
 ])("wood travel starting at %ss takes %ss since Sawmill completion at 10s", (time, duration, returnDuration) => {
     const simulation = new WorkerEconomy({ ...settings, workerCount: 0, goldWorkers: 0 })
     simulation.scheduleSawmill(10)
@@ -134,26 +150,26 @@ test("only the latest completed Sawmill resets travel, regardless of scheduling 
     simulation.scheduleSawmill(200)
     simulation.scheduleSawmill(10)
     simulation.scheduleSawmill(100)
-    for (const [time, duration] of [[9, 4], [99, 1], [100, 0.5], [160, 1], [200, 0.5], [260, 1], [620, 4]]) {
+    for (const [time, duration] of [[9, 4], [99, 1.5], [100, 0.5], [160, 1.5], [200, 0.5], [260, 1.5], [620, 3.5], [1700, 5]]) {
         simulation.advanceTo(time)
         expect(simulation.addWorker("wood").nextAt).toBe(time + duration)
     }
 })
 
-test("minute boundaries and new Sawmills preserve travel already underway", () => {
+test("growth boundaries and new Sawmills preserve travel already underway", () => {
     const simulation = new WorkerEconomy({ ...settings, workerCount: 0, goldWorkers: 0 })
     simulation.scheduleSawmill(10)
-    simulation.scheduleSawmill(71)
-    simulation.advanceTo(69.9)
-    const beforeMinute = simulation.addWorker("wood")
-    simulation.advanceTo(70)
-    expect(beforeMinute.nextAt).toBe(70.4)
-    simulation.advanceTo(70.5)
+    simulation.scheduleSawmill(41)
+    simulation.advanceTo(39.9)
+    const beforeGrowth = simulation.addWorker("wood")
+    simulation.advanceTo(40)
+    expect(beforeGrowth.nextAt).toBe(40.4)
+    simulation.advanceTo(40.5)
     const beforeReset = simulation.addWorker("wood")
-    simulation.advanceTo(71)
-    expect(beforeReset.nextAt).toBe(71.5)
+    simulation.advanceTo(41)
+    expect(beforeReset.nextAt).toBe(41.5)
     const afterReset = simulation.addWorker("wood")
-    expect(afterReset.nextAt).toBe(71.5)
+    expect(afterReset.nextAt).toBe(41.5)
 })
 
 test("only the first initial wood gatherer receives its command immediately", () => {

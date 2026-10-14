@@ -72,7 +72,7 @@ test("gathering reductions use one decimal, enforce bounds, and sit in the first
 test("reset basic restores main fields while preserving advanced settings, hidden settings, and the build", () => {
     const editedProfile = {
         basic: { ...initialGameProfile.basic, goldGatherTime: 5 },
-        map: { goldTravelTime: 8, woodTravelTime: 9, sawmillWoodTravelTime: 2 },
+        map: { ...initialGameProfile.map, goldTravelTime: 8, woodTravelTime: 9, sawmillWoodTravelTime: 2, woodTravelTimeIncreaseBase: 0.75, maxWoodTravelTime: 8 },
         delays: { constructionStartDelay: 6, orderDelay: 3 },
         player: { ...initialGameProfile.player, startingGold: 2000, startingMana: 45, townHallLevel: 9, workerLevel: 9, lightGoldRushLevel: 2, lightLumberGatheringLevel: 3, darkWhipLevel: 5, darkLegionsCallLevel: 6, massConstructionCostReduction: 12.5 },
     }
@@ -110,7 +110,7 @@ test("reset basic restores main fields while preserving advanced settings, hidde
     expect(resetProfile.player.massConstructionCostReduction).toBe(0)
 })
 
-test("advanced help is specific to each field, appears on hover or focus, and follows edited values", () => {
+test("advanced help is brief and specific to each field and appears on hover or focus", () => {
     const { container } = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     expect(container.querySelector(".mechanics-note")).toBeNull()
@@ -119,12 +119,22 @@ test("advanced help is specific to each field, appears on hover or focus, and fo
     const sawmillHelp = screen.getByRole("button", { name: "Sawmill wood travel time (seconds) help" })
     fireEvent.mouseEnter(sawmillHelp.parentElement!)
     let tooltip = screen.getByRole("tooltip")
-    expect(tooltip.textContent).toContain("resets wood travel to 0.5 seconds each way")
+    expect(tooltip.textContent).toBe("Initial travel time each way to gather wood after each Sawmill completes.")
     expect(screen.getByLabelText("Sawmill wood travel time (seconds)").getAttribute("aria-describedby")).toBe(tooltip.id)
     change("Sawmill wood travel time (seconds)", "2")
-    expect(screen.getByRole("tooltip").textContent).toContain("resets wood travel to 2 seconds each way")
+    expect(screen.getByRole("tooltip").textContent).toBe("Initial travel time each way to gather wood after each Sawmill completes.")
     fireEvent.mouseLeave(sawmillHelp.parentElement!)
     expect(screen.queryByRole("tooltip")).toBeNull()
+
+    for (const [label, text] of [
+        ["Wood travel increase (seconds)", "Seconds added at each wood travel increase, with or without a Sawmill."],
+        ["Maximum wood travel time (seconds each way)", "Maximum wood travel time each way, with or without a Sawmill."],
+    ]) {
+        const help = screen.getByRole("button", { name: `${label} help` })
+        fireEvent.focus(help)
+        expect(screen.getByRole("tooltip").textContent).toBe(text)
+        fireEvent.blur(help)
+    }
 
     const orderHelp = screen.getByRole("button", { name: "Order delay (seconds) help" })
     fireEvent.focus(orderHelp)
@@ -158,6 +168,8 @@ test("resource settings persist independently for each faction across remounts, 
     change("Gold travel time (seconds each way)", "6.5")
     change("Wood travel time (seconds each way)", "7.5")
     change("Sawmill wood travel time (seconds)", "1.5")
+    change("Wood travel increase (seconds)", "0.75")
+    change("Maximum wood travel time (seconds each way)", "8")
     change("Construction start delay (seconds)", "3.5")
     change("Order delay (seconds)", "2.5")
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
@@ -188,6 +200,8 @@ test("resource settings persist independently for each faction across remounts, 
     expect(value("Gold travel time (seconds each way)")).toBe("6.5")
     expect(value("Wood travel time (seconds each way)")).toBe("7.5")
     expect(value("Sawmill wood travel time (seconds)")).toBe("1.5")
+    expect(value("Wood travel increase (seconds)")).toBe("0.75")
+    expect(value("Maximum wood travel time (seconds each way)")).toBe("8")
     expect(value("Construction start delay (seconds)")).toBe("3.5")
     expect(value("Order delay (seconds)")).toBe("2.5")
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))

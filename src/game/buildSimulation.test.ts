@@ -21,6 +21,8 @@ const economy: EconomySettings = {
     constructionStartDelay: 4,
     orderDelay: 1,
     sawmillWoodTravelTime: 0.5,
+    woodTravelTimeIncreaseBase: 0.5,
+    maxWoodTravelTime: 5,
     initialGoldTravelReduction: 1,
 }
 
@@ -443,7 +445,7 @@ test.each(["light", "dark"] as const)("%s completed Sawmill accelerates income a
     )
     expect(plan[0]).toMatchObject({ commandTime: 1, finishTime: 25, workerReturnTime: 29 })
     expect(plan[1]).toMatchObject({ blocked: false, commandTime: 49.5 })
-    expect(deliveries.map(({ time }) => time)).toEqual([20, 36.5, 49.5, 62.5, 75.5, 89, 103])
+    expect(deliveries.map(({ time }) => time)).toEqual([20, 36.5, 49.5, 63, 77, 91.5, 106.5])
 })
 
 test("a blocked Sawmill does not change wood travel", () => {

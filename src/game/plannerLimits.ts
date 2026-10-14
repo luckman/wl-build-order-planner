@@ -1,5 +1,3 @@
-import { MAX_SAWMILL_WOOD_TRAVEL_TIME } from "./gatheringRules"
-
 /** Shared supported-plan policy. The opening allocation is not a subsequent action. */
 export const MAX_PLAN_SECONDS = 30 * 60
 export const MAX_COMMAND_SECONDS = MAX_PLAN_SECONDS - 1
@@ -23,12 +21,13 @@ export function validateCommandTime(time: number) {
 
 export function validateEconomyDurations(settings: {
     goldGatherTime: number; woodGatherTime: number; goldTravelTime: number; woodTravelTime: number;
-    sawmillWoodTravelTime: number; initialGoldTravelReduction: number; constructionStartDelay: number; orderDelay: number;
+    sawmillWoodTravelTime: number; woodTravelTimeIncreaseBase: number; maxWoodTravelTime: number;
+    initialGoldTravelReduction: number; constructionStartDelay: number; orderDelay: number;
     timeBetweenScrolls?: number;
 }, maximumWorkers = MAX_PLAN_ACTIONS + 5) {
     for (const [key, value] of Object.entries(settings)) {
         if (["goldGatherTime", "woodGatherTime", "goldTravelTime", "woodTravelTime", "sawmillWoodTravelTime",
-            "initialGoldTravelReduction", "constructionStartDelay", "orderDelay", "timeBetweenScrolls"].includes(key))
+            "woodTravelTimeIncreaseBase", "maxWoodTravelTime", "initialGoldTravelReduction", "constructionStartDelay", "orderDelay", "timeBetweenScrolls"].includes(key))
             validatePlanTime(value, key)
     }
     // Overestimate both resources using the full worker count for each. Each trip
@@ -38,7 +37,7 @@ export function validateEconomyDurations(settings: {
     const goldGatherTime = Math.max(0.001, settings.goldGatherTime)
     const goldCycle = goldGatherTime + 2 * settings.goldTravelTime
     const goldTripsPerSecond = Math.min(1 / goldGatherTime, workers / goldCycle)
-    const woodCycle = Math.max(0.001, settings.woodGatherTime) + 2 * Math.min(settings.woodTravelTime, settings.sawmillWoodTravelTime, MAX_SAWMILL_WOOD_TRAVEL_TIME)
+    const woodCycle = Math.max(0.001, settings.woodGatherTime) + 2 * Math.min(settings.woodTravelTime, settings.sawmillWoodTravelTime, settings.maxWoodTravelTime)
     const steps = 6 * MAX_PLAN_SECONDS * (goldTripsPerSecond + workers / woodCycle)
     if (steps > MAX_SIMULATION_STEPS * 0.9)
         throw new Error("Gathering cycles are too short for the supported simulation budget. Increase gathering or travel times, or reduce mining time reductions.")
