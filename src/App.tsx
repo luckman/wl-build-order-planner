@@ -1,10 +1,10 @@
 import Notification, { type NotificationMessage } from "./Notification"
 import { ACTION_LIMIT_MESSAGE, MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, MAX_COMMAND_SECONDS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
-import UnitLossDialog from "./UnitLossDialog"
-import { createUnitLossAction, foodUsedAt } from "./game/unitLosses"
+import UnitKilledDialog from "./UnitKilledDialog"
+import { createUnitKilledAction, foodUsedAt } from "./game/unitsKilled"
 import { createManaWellAction, evaluateManaWells, MANA_WELL_EVENTS, manaWellCountAt, type ManaWellEventType } from "./game/manaWells"
-import ResourceDialog from "./ResourceDialog"
-import { createResourceAction, isTimedEvent } from "./game/resourceEvents"
+import ResourcesCollectedDialog from "./ResourcesCollectedDialog"
+import { createResourcesCollectedAction, isTimedEvent } from "./game/resourcesCollected"
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd"
 import { type parseBuildOrder } from "./game/buildOrderFile"
@@ -41,11 +41,11 @@ import "./build-order-files.css"
 import "./scrolls.css"
 
 const iconSources: Record<string, string> = {
-    lightLoseUnit: require("./icons/events/light-lose-unit.png"),
-    darkLoseUnit: require("./icons/events/dark-lose-unit.png"),
-    captureManaWell: require("./icons/events/capture-mana-well.png"),
-    loseManaWell: require("./icons/events/lose-mana-well.png"),
-    addResources: require("./icons/events/add-resources.png"),
+    lightUnitIsKilled: require("./icons/events/light-unit-is-killed.png"),
+    darkUnitIsKilled: require("./icons/events/dark-unit-is-killed.png"),
+    manaWellIsCaptured: require("./icons/events/mana-well-is-captured.png"),
+    manaWellIsLost: require("./icons/events/mana-well-is-lost.png"),
+    resourcesCollected: require("./icons/events/resources-collected.png"),
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     lightCastle: require("./icons/buildings/light-castle.png"),
@@ -165,9 +165,9 @@ export default function App() {
     const [factionId, setFactionId] = useState<FactionId>(loadActiveFaction)
     useEffect(() => saveActiveFaction(factionId), [factionId])
     const [scrollDialogOpen, setScrollDialogOpen] = useState<ScrollId | null>(null)
-    const [unitLossDialogOpen, setUnitLossDialogOpen] = useState(false)
+    const [unitKilledDialogOpen, setUnitKilledDialogOpen] = useState(false)
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
-    const [resourceDialogOpen, setResourceDialogOpen] = useState(false)
+    const [resourcesCollectedDialogOpen, setResourcesCollectedDialogOpen] = useState(false)
     const [editingEventId, setEditingEventId] = useState<string | null>(null)
     const nextOrderId = useRef(0)
     const withOrderIds = useCallback((items: PlannerItem[]) => items.map(item => "orderId" in item
@@ -452,10 +452,10 @@ export default function App() {
                                             </>}
                                             {kind === "hero" && <>
                                                 <span className="scroll-card-delimiter" aria-hidden="true" />
-                                                <button className="action resource-card" aria-label="Add resources" title="Add gold and wood instantly at a chosen timestamp"
-                                                    onClick={() => setResourceDialogOpen(true)}>
-                                                    <span className="action-name">Add resources</span>
-                                                    <img src={iconSources.addResources} alt="" />
+                                                <button className="action resource-card" aria-label="Resources collected" title="Add gold and wood instantly at a chosen timestamp"
+                                                    onClick={() => setResourcesCollectedDialogOpen(true)}>
+                                                    <span className="action-name">Resources collected</span>
+                                                    <img src={iconSources.resourcesCollected} alt="" />
                                                 </button>
                                                 {(Object.keys(MANA_WELL_EVENTS) as ManaWellEventType[]).map(type => <button key={type}
                                                     className="action resource-card" aria-label={MANA_WELL_EVENTS[type].name}
@@ -463,10 +463,10 @@ export default function App() {
                                                     <span className="action-name">{MANA_WELL_EVENTS[type].name}</span>
                                                     <img src={iconSources[MANA_WELL_EVENTS[type].icon]} alt="" />
                                                 </button>)}
-                                                <button className="action resource-card" aria-label="Lose unit" title="Lose a worker, unit or hero at a chosen timestamp"
-                                                    onClick={() => setUnitLossDialogOpen(true)}>
-                                                    <span className="action-name">Lose unit</span>
-                                                    <img src={iconSources[factionId === "light" ? "lightLoseUnit" : "darkLoseUnit"]} alt="" />
+                                                <button className="action resource-card" aria-label="Unit is killed" title="Record a worker, unit or hero being killed at a chosen timestamp"
+                                                    onClick={() => setUnitKilledDialogOpen(true)}>
+                                                    <span className="action-name">Unit is killed</span>
+                                                    <img src={iconSources[factionId === "light" ? "lightUnitIsKilled" : "darkUnitIsKilled"]} alt="" />
                                                 </button>
                                             </>}
                                         </div>}
@@ -638,8 +638,8 @@ export default function App() {
                                         <img src={iconSources[item.icon]} alt="" />
                                         <div>
                                             <b>{item.name}</b>
-                                            {item.kind === "unit-loss" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}</small>}
-                                            {item.kind === "resource" && <small>+{item.resourceGold} gold · +{item.resourceWood} wood</small>}
+                                            {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}</small>}
+                                            {item.kind === "resources-collected" && <small>+{item.collectedGold} gold · +{item.collectedWood} wood</small>}
                                             <small>
                                                 {blocked || commandTime === null
                                                     ? blockedReason
@@ -687,40 +687,40 @@ export default function App() {
                         </div>
                     </aside>
                 </div>
-                {(resourceDialogOpen || editingEvent?.kind === "resource") && <ResourceDialog
-                    key={editingEvent?.orderId ?? "new-resource-event"}
+                {(resourcesCollectedDialogOpen || editingEvent?.kind === "resources-collected") && <ResourcesCollectedDialog
+                    key={editingEvent?.orderId ?? "new-resources-collected-event"}
                     defaultTime={defaultEventTime}
-                    validationError={editingEvent?.kind === "resource" ? null : additionError}
-                    action={editingEvent?.kind === "resource" ? editingEvent : undefined}
-                    onClose={() => { setResourceDialogOpen(false); setEditingEventId(null) }}
+                    validationError={editingEvent?.kind === "resources-collected" ? null : additionError}
+                    action={editingEvent?.kind === "resources-collected" ? editingEvent : undefined}
+                    onClose={() => { setResourcesCollectedDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {
-                        const action = createResourceAction(command)
-                        if (!setBuildOrder(current => editingEvent?.kind === "resource"
+                        const action = createResourcesCollectedAction(command)
+                        if (!setBuildOrder(current => editingEvent?.kind === "resources-collected"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
                             : [...current, action])) return
-                        setResourceDialogOpen(false)
+                        setResourcesCollectedDialogOpen(false)
                         setEditingEventId(null)
                         setDependencyError(null)
                         setHoverTime(null)
                     }} />}
-                {(unitLossDialogOpen || editingEvent?.kind === "unit-loss") && <UnitLossDialog
-                    key={editingEvent?.orderId ?? "new-unit-loss"} faction={factionId} defaultTime={defaultEventTime}
-                    action={editingEvent?.kind === "unit-loss" ? editingEvent : undefined}
+                {(unitKilledDialogOpen || editingEvent?.kind === "unit-is-killed") && <UnitKilledDialog
+                    key={editingEvent?.orderId ?? "new-unit-is-killed"} faction={factionId} defaultTime={defaultEventTime}
+                    action={editingEvent?.kind === "unit-is-killed" ? editingEvent : undefined}
                     validate={command => {
-                        const item = createUnitLossAction(command, factionId)
-                        const proposed = editingEvent?.kind === "unit-loss"
+                        const item = createUnitKilledAction(command, factionId)
+                        const proposed = editingEvent?.kind === "unit-is-killed"
                             ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
                         if (proposed.length > MAX_PLAN_ACTIONS) return ACTION_LIMIT_MESSAGE
                         return simulateBuildOrder(proposed, economy, initialFoodUsed, baseFoodLimit, foodPerFarm, faction.startingTownHall)
                             .plan.find(action => action.item === item)?.blockedReason ?? null
                     }}
-                    onClose={() => { setUnitLossDialogOpen(false); setEditingEventId(null) }}
+                    onClose={() => { setUnitKilledDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {
-                        const action = createUnitLossAction(command, factionId)
-                        if (!setBuildOrder(current => editingEvent?.kind === "unit-loss"
+                        const action = createUnitKilledAction(command, factionId)
+                        if (!setBuildOrder(current => editingEvent?.kind === "unit-is-killed"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
                             : [...current, action])) return
-                        setUnitLossDialogOpen(false)
+                        setUnitKilledDialogOpen(false)
                         setEditingEventId(null)
                         setDependencyError(null)
                         setHoverTime(null)

@@ -54,7 +54,7 @@ A React starter for planning War Legends mobile RTS build orders. It was bootstr
 - Choosing an action inserts missing prerequisite quantities and limit-unlocking upgrades in dependency order. Duplicate upgrades require another building at the preceding level; the planner explains rejected actions and blocked orders.
 - Save profile and Load saved profile sit above the reset controls and affect only the current faction, as their hover tips explain. Only Save profile replaces the personal saved settings; Load restores them without changing the build order. Load is disabled until a valid profile is saved. Edits, resets, JSON imports, and shared links leave personal saved settings untouched.
 - Light and Dark keep separate working drafts in browser local storage, including the active profile, opening allocation, and exact action sequence. Direct visits resume a draft when available, otherwise use the saved personal profile or defaults. JSON imports and shared links always use their supplied profile and build. Drafts and the selected faction survive page reloads. Clear resets only the selected faction's actions and opening allocation, preserving its profile. Only complete build-order documents are loaded as drafts; unsupported drafts fall back to an empty build with the saved personal profile or defaults.
-- Resource collection profiles are saved independently per faction, including resources, food limit, levels, and all advanced/hidden settings. Invalid saved profiles or drafts fall back independently to defaults; storage failures leave editing usable in memory. Existing version 1 resource profiles migrate their assignments into the opening action and retain other settings.
+- Resource collection profiles are saved independently per faction, including resources, food limit, levels, and all advanced/hidden settings. Invalid saved profiles or drafts fall back independently to defaults; storage failures leave editing usable in memory. Version 1 resource profiles are not read or migrated.
 - Build-order rows can be reordered with their drag handles using mouse or touch. Keyboard users can focus a handle, press Space, move with the arrow keys, and press Space to drop (Escape cancels). Each drop fully recalculates timings, dependencies, resource/food charts, queues, and blocked-action warnings. Invalid orders remain editable; moving a prerequisite after its dependent action shows a warning without silently changing the chosen order.
 - Heroes use production queues and food like units. Miriel requires Altar of Heroes lvl 1 and Elven Tree lvl 1. Each hero type is limited to one across all Altars, including queued recruitment, allowing at most three Light heroes total (Miriel, Gilbert, and Berin). Removing a hero's order releases that type's reservation.
 - The first hero requires at least one Altar level 1 or higher, the second level 2 or higher, and the third level 3. Queued heroes count across all Altars; once the required Altar level is unlocked, any available Altar can recruit that hero. Selecting a hero inserts missing Altar upgrades and their prerequisites automatically.
@@ -76,17 +76,17 @@ Build the production app with `npm run build`.
 
 The site includes GoatCounter visitor analytics for `luckman.goatcounter.com`, loaded asynchronously from the HTML template in `public/index.html`.
 
-See `docs/README.md` for migration context.
+See [docs/README.md](docs/README.md) for the documentation index and current implementation guides.
 
 
-## Add resources events
+## Resources collected events
 
 Both factions can add gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 29:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
 
 ## Mana well events
 
-Capture mana well and Lose mana well are available to both factions beside Add resources. Select a whole-second timestamp only. Ownership changes instantly without costs or delays, starting from zero wells. Each owned well adds the Mana from mana wells setting to mana regeneration per minute, subject to mana capacity. Loss requires an owned well at that timestamp; invalid losses are flagged and have no effect. Automatic scroll timing, drafts, JSON files and share links include these events.
+Mana well is captured and Mana well is lost are available to both factions beside Resources collected. Select a whole-second timestamp only. Ownership changes instantly without costs or delays, starting from zero wells. Each owned well adds the Mana from mana wells setting to mana regeneration per minute, subject to mana capacity. Loss requires an owned well at that timestamp; invalid losses are flagged and have no effect. Automatic scroll timing, drafts, JSON files and share links include these events.
 
-## Lose unit
+## Unit is killed
 
-Both factions can lose one worker, unit or hero at a selected timestamp. Only completed, living units are eligible; starting workers exist at 00:00. Loss releases food immediately, and lost workers stop gathering. Construction workers are excluded; wood gatherers are lost before gold miners. The dialog accepts whole seconds and defaults to one second after the latest active command. Invalid events have no effect and show a warning. Events are editable and included in drafts, JSON and share links.
+Both factions can record one worker, unit or hero being killed at a selected timestamp. Only completed, living units are eligible; starting workers exist at 00:00. Loss releases food immediately, and killed workers stop gathering. Construction workers are excluded; wood gatherers are killed before gold miners. The dialog accepts whole seconds and defaults to one second after the latest active command. Invalid events have no effect and show a warning. Events are editable and included in drafts, JSON and share links.

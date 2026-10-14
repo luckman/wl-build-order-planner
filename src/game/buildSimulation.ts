@@ -1,7 +1,7 @@
 import { MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
-import { createUnitLossAction, unitLossCommand, foodUsedAt } from "./unitLosses"
+import { createUnitKilledAction, unitKilledCommand, foodUsedAt } from "./unitsKilled"
 import { evaluateManaWells } from "./manaWells"
-import { createResourceAction, resourceCommand, isTimedEvent } from "./resourceEvents"
+import { createResourcesCollectedAction, resourcesCollectedCommand, isTimedEvent } from "./resourcesCollected"
 import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
 import { type EconomySettings, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
@@ -48,22 +48,22 @@ export function simulateBuildOrder(
         createScrollAction(scrollCommand(item), faction)
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
-    const pendingResources = buildOrder.flatMap((item, index) => {
-        if (item.kind !== "resource") return []
-        createResourceAction(resourceCommand(item))
+    const pendingResourcesCollected = buildOrder.flatMap((item, index) => {
+        if (item.kind !== "resources-collected") return []
+        createResourcesCollectedAction(resourcesCollectedCommand(item))
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
-    const pendingLosses = buildOrder.flatMap((item, index) => {
-        if (item.kind !== "unit-loss") return []
-        createUnitLossAction(unitLossCommand(item), faction)
+    const pendingUnitsKilled = buildOrder.flatMap((item, index) => {
+        if (item.kind !== "unit-is-killed") return []
+        createUnitKilledAction(unitKilledCommand(item), faction)
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
-    const lossPlan: ScheduledAction[] = []
+    const unitKilledPlan: ScheduledAction[] = []
     const workerItem = catalog.find(item => item.id === (faction === "light" ? "worker" : "slave"))!
-    const unitInstances: Array<{ item: PlannerItem; readyAt: number; lost: boolean }> =
-        simulation.workers.map(() => ({ item: workerItem, readyAt: 0, lost: false }))
+    const unitInstances: Array<{ item: PlannerItem; readyAt: number; killed: boolean }> =
+        simulation.workers.map(() => ({ item: workerItem, readyAt: 0, killed: false }))
     // Timed commands are processed independently of their position among catalog rows.
-    until = Math.max(until, ...pendingLosses.map(({ item }) => item.commandTime), ...pendingResources.map(({ item }) => item.commandTime), ...pendingScrolls.map(({ item }) => item.commandTime + SCROLLS[item.scrollId].startDelay + SCROLLS[item.scrollId].duration))
+    until = Math.max(until, ...pendingUnitsKilled.map(({ item }) => item.commandTime), ...pendingResourcesCollected.map(({ item }) => item.commandTime), ...pendingScrolls.map(({ item }) => item.commandTime + SCROLLS[item.scrollId].startDelay + SCROLLS[item.scrollId].duration))
     const scrollPlan: ScheduledAction[] = []
     let lastScrollCommand = -Infinity
     const timedEventsByIndex = new Map<number, ScheduledAction>()
@@ -90,38 +90,38 @@ export function simulateBuildOrder(
 
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
-        while (Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResources[0]?.item.commandTime ?? Infinity, pendingLosses[0]?.item.commandTime ?? Infinity) <= time) {
-            const eventTime = Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResources[0]?.item.commandTime ?? Infinity, pendingLosses[0]?.item.commandTime ?? Infinity)
+        while (Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingUnitsKilled[0]?.item.commandTime ?? Infinity) <= time) {
+            const eventTime = Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingUnitsKilled[0]?.item.commandTime ?? Infinity)
             simulation.advanceTo(eventTime)
             while (workerCompletions[0] === eventTime) {
                 workerCompletions.shift()
                 const goldCount = simulation.workers.filter(({ assignment }) => assignment === "gold").length
                 simulation.addWorker(goldCount < saturation ? "gold" : "wood")
             }
-            while (pendingLosses[0]?.item.commandTime === eventTime) {
-                const { item, index } = pendingLosses.shift()!
+            while (pendingUnitsKilled[0]?.item.commandTime === eventTime) {
+                const { item, index } = pendingUnitsKilled.shift()!
                 const target = catalog.find(unit => unit.id === item.unitId)!
                 const isWorker = target.id === workerItem.id
-                const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.lost && unit.readyAt <= eventTime)
-                const worker = isWorker ? simulation.selectLossWorker() : undefined
+                const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.killed && unit.readyAt <= eventTime)
+                const worker = isWorker ? simulation.selectWorkerToKill() : undefined
                 const blocked = !instance || (isWorker && !worker)
                 if (!blocked) {
-                    instance!.lost = true
-                    if (worker) simulation.loseWorker(worker.id)
+                    instance!.killed = true
+                    if (worker) simulation.killWorker(worker.id)
                 }
                 const action: ScheduledAction = { item, cost: { gold: 0, wood: 0 }, blocked,
                     commandTime: eventTime, startTime: blocked ? null : eventTime, finishTime: blocked ? null : eventTime,
                     workerReturnTime: null, workerId: blocked ? null : worker?.id ?? null,
                     foodReleased: blocked ? 0 : target.food,
                     ...(blocked ? { blockedReason: isWorker && instance
-                        ? `Lose unit: no available ${target.name}; workers assigned to construction cannot be lost.`
-                        : `Lose unit requires a living ${target.name} at this timestamp (recruitment must be complete).` } : {}) }
-                lossPlan.push(action)
+                        ? `Unit is killed: no available ${target.name}; workers assigned to construction cannot be killed.`
+                        : `Unit is killed requires a living ${target.name} at this timestamp (recruitment must be complete).` } : {}) }
+                unitKilledPlan.push(action)
                 timedEventsByIndex.set(index, action)
             }
-            while (pendingResources[0]?.item.commandTime === eventTime) {
-                const { item, index } = pendingResources.shift()!
-                simulation.deliveries.push({ time: eventTime, gold: item.resourceGold, wood: item.resourceWood, worker: -1 })
+            while (pendingResourcesCollected[0]?.item.commandTime === eventTime) {
+                const { item, index } = pendingResourcesCollected.shift()!
+                simulation.deliveries.push({ time: eventTime, gold: item.collectedGold, wood: item.collectedWood, worker: -1 })
                 timedEventsByIndex.set(index, { item, cost: { gold: 0, wood: 0 }, blocked: false,
                     commandTime: eventTime, startTime: eventTime, finishTime: eventTime,
                     workerReturnTime: null, workerId: null })
@@ -206,13 +206,13 @@ export function simulateBuildOrder(
             advanceTo(simulation.time)
             const time = simulation.time
             const unlockedBuildings = unlockedBuildingsAt(time)
-            const maxCountReached = item.maxCount !== undefined && unitInstances.filter(unit => unit.item.id === item.id && !unit.lost).length >= item.maxCount
-            if (maxCountReached && !pendingLosses.some(loss => loss.item.unitId === item.id)) {
+            const maxCountReached = item.maxCount !== undefined && unitInstances.filter(unit => unit.item.id === item.id && !unit.killed).length >= item.maxCount
+            if (maxCountReached && !pendingUnitsKilled.some(kill => kill.item.unitId === item.id)) {
                 blockedReason = `${item.name} limit reached (maximum ${item.maxCount}, including queued recruitment)`
                 break
             }
             const requiredAltarLevel = item.kind === "hero"
-                ? heroAltarLevel(unitInstances.filter(unit => !unit.lost).map(unit => unit.item)) : 1
+                ? heroAltarLevel(unitInstances.filter(unit => !unit.killed).map(unit => unit.item)) : 1
             const completed = plan.filter(({ finishTime }) => finishTime !== null && finishTime <= time)
             const completedNames = new Set([initialTownHall, ...completed.filter(action => action.finishTime! + economy.orderDelay <= time).map(({ item }) => item.name)])
             const matching = buildings.filter(building => item.kind === "upgrade"
@@ -223,7 +223,7 @@ export function simulateBuildOrder(
                 { item: item.producerBuildingId!, count: 1, minLevel: requiredAltarLevel }, time) >= 1
             const builder = requiresConstructionWorker(item) ? simulation.selectBuilder() : undefined
             const state = resourceAt(economy, simulation.deliveries, spending, time)
-            const foodUsed = foodUsedAt([...plan, ...lossPlan], initialFoodUsed, time)
+            const foodUsed = foodUsedAt([...plan, ...unitKilledPlan], initialFoodUsed, time)
             const foodLimit =
                 baseFoodLimit +
                 completed.filter(({ item }) => item.id === "farm" || item.id === "pigsty").length * foodPerFarm
@@ -271,7 +271,7 @@ export function simulateBuildOrder(
                     workerId: builder?.id ?? null,
                     buildingInstanceId: producer ? buildings.indexOf(producer) : item.kind === "building" ? buildings.length : undefined,
                 })
-                if (isRecruitable(item)) unitInstances.push({ item, readyAt: finishTime, lost: false })
+                if (isRecruitable(item)) unitInstances.push({ item, readyAt: finishTime, killed: false })
                 spending.push({ time, gold: -cost.gold, wood: -cost.wood })
                 if (builder) {
                     simulation.construct(builder, duration)
@@ -294,8 +294,8 @@ export function simulateBuildOrder(
                 ...[
                     simulation.nextEventTime,
                     pendingScrolls[0]?.item.commandTime ?? Infinity,
-                    pendingResources[0]?.item.commandTime ?? Infinity,
-                    pendingLosses[0]?.item.commandTime ?? Infinity,
+                    pendingResourcesCollected[0]?.item.commandTime ?? Infinity,
+                    pendingUnitsKilled[0]?.item.commandTime ?? Infinity,
                     ...workerCompletions,
                     ...buildings.map(({ availableAt }) => availableAt),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime])),

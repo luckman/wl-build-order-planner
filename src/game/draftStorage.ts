@@ -1,7 +1,7 @@
 import { validateActionCount, validateCommandTime } from "./plannerLimits"
-import { unitLossCommand } from "./unitLosses"
+import { unitKilledCommand } from "./unitsKilled"
 import { manaWellCommand } from "./manaWells"
-import { resourceCommand } from "./resourceEvents"
+import { resourcesCollectedCommand } from "./resourcesCollected"
 import { FILE_VERSION, GAME_RULES_VERSION, parseBuildOrder } from "./buildOrderFile"
 import { initialOpeningAction, type GameProfile, type OpeningAction } from "./gameProfile"
 import type { FactionId, PlannerItem } from "./gameData"
@@ -41,7 +41,7 @@ export function saveFactionDrafts(drafts: FactionDrafts, profiles: FactionProfil
                 if ("commandTime" in item) validateCommandTime(item.commandTime)
             }
             const buildOrder = [
-                draft.opening, ...draft.items.map(item => isScrollAction(item) ? scrollCommand(item) : item.kind === "resource" ? resourceCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-loss" ? unitLossCommand(item) : ({ itemId: item.id })),
+                draft.opening, ...draft.items.map(item => isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : ({ itemId: item.id })),
             ]
             const document = {
                 format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,

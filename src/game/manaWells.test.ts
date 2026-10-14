@@ -7,8 +7,8 @@ import { createScrollAction } from "./scrolls"
 import { parseBuildOrder, serializeBuildOrder } from "./buildOrderFile"
 
 const event = (type: ManaWellEventType, commandTime: number) => createManaWellAction({ type, commandTime })
-const capture = (time: number) => event("capture-mana-well", time)
-const lose = (time: number) => event("lose-mana-well", time)
+const capture = (time: number) => event("mana-well-is-captured", time)
+const lose = (time: number) => event("mana-well-is-lost", time)
 const economy = { ...economyFromProfile(initialGameProfile), startingMana: 0, baseManaLimit: 1000,
     manaPerMinute: 10, manaFromManaWells: 60, orderDelay: 10 }
 const simulate = (items: Parameters<typeof simulateBuildOrder>[0], settings = economy, townHall = "Castle") =>
@@ -78,7 +78,7 @@ test.each(["light", "dark"] as const)("%s well events round trip with fixed time
     const parsed = parseBuildOrder(json)
     expect(parsed.buildOrder).toEqual(items)
     expect(JSON.parse(json).buildOrder.slice(1).map((item: { type: string }) => item.type)).toEqual([
-        "capture-mana-well", "lose-mana-well", "lose-mana-well" ])
+        "mana-well-is-captured", "mana-well-is-lost", "mana-well-is-lost" ])
     expect(simulate(parsed.buildOrder).map(action => action.blocked)).toEqual([false, true, false])
 })
 

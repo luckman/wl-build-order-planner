@@ -24,7 +24,7 @@
 
 
 .dark-events-grid { grid-template-columns: 10px repeat(4, var(--action-card-width)); }
-.event.resource { background: linear-gradient(#8b723a, #52421f); border-color: #e1b55f; }
+.event.resources-collected { background: linear-gradient(#8b723a, #52421f); border-color: #e1b55f; }
 
 .action.resource-card { min-height: 64px; align-self: stretch; padding: 3px 2px; }
 .action.resource-card .action-name { text-align: center; overflow-wrap: normal; }
@@ -32,5 +32,5 @@
 
 .event.mana-well { background: linear-gradient(#3c688f, #25425f); border-color: #91bcdf; }
 
-.event.unit-loss { background: linear-gradient(#84474b, #4c272c); border-color: #d78d95; }
-.event.unit-loss img, .order li.order-timed-event img { width: 28px; height: 28px; }
+.event.unit-is-killed { background: linear-gradient(#84474b, #4c272c); border-color: #d78d95; }
+.event.unit-is-killed img, .order li.order-timed-event img { width: 28px; height: 28px; }

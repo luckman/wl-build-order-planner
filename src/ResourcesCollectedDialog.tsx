@@ -4,15 +4,15 @@ import DurationInput from "./DurationInput"
 
 import { formatDuration, parseDuration } from "./durationTime"
 
-import type { AddResourcesCommand, ResourceAction } from "./game/resourceEvents"
+import type { ResourcesCollectedCommand, ResourcesCollectedAction } from "./game/resourcesCollected"
 
 
 
-export default function ResourceDialog({ defaultTime, action, onSave, onClose, validationError }: {
+export default function ResourcesCollectedDialog({ defaultTime, action, onSave, onClose, validationError }: {
 
-    defaultTime: number; action?: ResourceAction; validationError?: string | null
+    defaultTime: number; action?: ResourcesCollectedAction; validationError?: string | null
 
-    onSave: (command: AddResourcesCommand) => void; onClose: () => void
+    onSave: (command: ResourcesCollectedCommand) => void; onClose: () => void
 
 }) {
 
@@ -20,9 +20,9 @@ export default function ResourceDialog({ defaultTime, action, onSave, onClose, v
 
     const [time, setTime] = useState(() => formatDuration(Math.ceil(action?.commandTime ?? defaultTime)))
 
-    const [gold, setGold] = useState(String(action?.resourceGold ?? 300))
+    const [gold, setGold] = useState(String(action?.collectedGold ?? 300))
 
-    const [wood, setWood] = useState(String(action?.resourceWood ?? 300))
+    const [wood, setWood] = useState(String(action?.collectedWood ?? 300))
 
     const commandTime = parseDuration(time)
 
@@ -40,7 +40,7 @@ export default function ResourceDialog({ defaultTime, action, onSave, onClose, v
 
     return <div className="scroll-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
 
-        <div ref={dialog} className="scroll-dialog panel" role="dialog" aria-modal="true" aria-labelledby="resource-dialog-title"
+        <div ref={dialog} className="scroll-dialog panel" role="dialog" aria-modal="true" aria-labelledby="resources-collected-dialog-title"
 
             onKeyDown={event => {
 
@@ -60,11 +60,11 @@ export default function ResourceDialog({ defaultTime, action, onSave, onClose, v
 
             }}>
 
-            <h2 id="resource-dialog-title">{action ? "Edit Add resources" : "Add resources"}</h2>
+            <h2 id="resources-collected-dialog-title">{action ? "Edit Resources collected" : "Resources collected"}</h2>
 
             <p>Gold and wood are added instantly at the command time, with no delays.</p>
 
-            <form onSubmit={event => { event.preventDefault(); if (valid && !validationError) onSave({ type: "add-resources", commandTime: commandTime!, gold: Number(gold), wood: Number(wood) }) }}>
+            <form onSubmit={event => { event.preventDefault(); if (valid && !validationError) onSave({ type: "resources-collected", commandTime: commandTime!, gold: Number(gold), wood: Number(wood) }) }}>
 
                 <DurationInput wholeSeconds label="Command time (mm:ss)" value={time} onChange={setTime} />
 
@@ -76,7 +76,7 @@ export default function ResourceDialog({ defaultTime, action, onSave, onClose, v
 
                 {validationError && <p role="alert">{validationError}</p>}
 
-                <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid || !!validationError}>{action ? "Save event" : "Add resources"}</button></div>
+                <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid || !!validationError}>{action ? "Save event" : "Resources collected"}</button></div>
 
             </form>
 

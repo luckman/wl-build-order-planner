@@ -14,7 +14,7 @@ test("resource dialog defaults reset, allows any valid timestamp, edits amounts 
 
     const view = render(<App />)
 
-    const open = () => fireEvent.click(screen.getByRole("button", { name: "Add resources", exact: true }))
+    const open = () => fireEvent.click(screen.getByRole("button", { name: "Resources collected", exact: true }))
 
     open()
 
@@ -28,13 +28,13 @@ test("resource dialog defaults reset, allows any valid timestamp, edits amounts 
 
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "00:00" } })
 
-    fireEvent.click(dialog.getByRole("button", { name: "Add resources" }))
+    fireEvent.click(dialog.getByRole("button", { name: "Resources collected" }))
 
     expect(view.container.querySelector(".resource-summary")?.textContent).toContain("Gold 450")
 
     expect(view.container.querySelector(".resource-summary")?.textContent).toContain("Wood 350")
 
-    fireEvent.click(screen.getByRole("button", { name: "Change Add resources timestamp, action 1" }))
+    fireEvent.click(screen.getByRole("button", { name: "Change Resources collected timestamp, action 1" }))
 
     dialog = within(screen.getByRole("dialog"))
 
@@ -56,17 +56,17 @@ test("resource dialog defaults reset, allows any valid timestamp, edits amounts 
 
     expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder[1]).toMatchObject({
 
-        type: "add-resources", commandTime: 20, gold: 700, wood: 300 })
+        type: "resources-collected", commandTime: 20, gold: 700, wood: 300 })
 
     view.unmount()
 
     render(<App />)
 
-    expect(screen.getByRole("button", { name: "Remove Add resources" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Remove Resources collected" })).toBeTruthy()
 
     fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
 
-    expect(screen.getByRole("button", { name: "Add resources", exact: true })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Resources collected", exact: true })).toBeTruthy()
 
 })
 
@@ -88,7 +88,7 @@ test("default timestamp excludes blocked scrolls and follows the latest active c
 
     fireEvent.click(dialog.getByRole("button", { name: "Add scroll" }))
 
-    fireEvent.click(screen.getByRole("button", { name: "Add resources", exact: true }))
+    fireEvent.click(screen.getByRole("button", { name: "Resources collected", exact: true }))
 
     dialog = within(screen.getByRole("dialog"))
 

@@ -11,7 +11,7 @@ afterEach(() => window.localStorage.clear())
 function fullDraft() {
     storeDraft([
         initialOpeningAction,
-        ...Array.from({ length: MAX_PLAN_ACTIONS }, () => ({ type: "add-resources", commandTime: 0, gold: 0, wood: 0 })),
+        ...Array.from({ length: MAX_PLAN_ACTIONS }, () => ({ type: "resources-collected", commandTime: 0, gold: 0, wood: 0 })),
     ])
 }
 
@@ -39,7 +39,7 @@ test("action-limit notifications are red, restart their timeout, and support dis
     }
 })
 
-test.each(["Add resources", "Capture mana well", "Lose mana well", "Gold Rush", "Lumber Gathering"])(
+test.each(["Resources collected", "Mana well is captured", "Mana well is lost", "Gold Rush", "Lumber Gathering"])(
     "%s keeps its dialog values and explains the action limit", name => {
         fullDraft()
         render(<App />)
@@ -52,15 +52,15 @@ test.each(["Add resources", "Capture mana well", "Lose mana well", "Gold Rush", 
         if (automatic) fireEvent.click(automatic)
         const time = dialog.getByLabelText("Command time (mm:ss)") as HTMLInputElement
         fireEvent.change(time, { target: { value: "00:25" } })
-        if (name === "Add resources") {
+        if (name === "Resources collected") {
             fireEvent.change(dialog.getByLabelText("Gold"), { target: { value: "123" } })
             fireEvent.change(dialog.getByLabelText("Wood"), { target: { value: "456" } })
         }
-        expect((dialog.getByRole("button", { name: name === "Add resources" ? name : automatic ? "Add scroll" : "Add event" }) as HTMLButtonElement).disabled).toBe(true)
+        expect((dialog.getByRole("button", { name: name === "Resources collected" ? name : automatic ? "Add scroll" : "Add event" }) as HTMLButtonElement).disabled).toBe(true)
         fireEvent.submit(element.querySelector("form")!)
         expect(screen.getByRole("dialog")).toBe(element)
         expect(time.value).toBe("00:25")
-        if (name === "Add resources") {
+        if (name === "Resources collected") {
             expect((dialog.getByLabelText("Gold") as HTMLInputElement).value).toBe("123")
             expect((dialog.getByLabelText("Wood") as HTMLInputElement).value).toBe("456")
         }
@@ -79,7 +79,7 @@ test("panel additions repeatedly explain the limit and existing event edits rema
     fireEvent.click(panel.getByRole("button", { name: "Castle upgrade" }))
     fireEvent.click(screen.getByRole("menuitem", { name: /^Castle lvl 2/ }))
     expect(screen.getByRole("alert").textContent).toContain("100 actions")
-    fireEvent.click(screen.getByRole("button", { name: "Change Add resources timestamp, action 1" }))
+    fireEvent.click(screen.getByRole("button", { name: "Change Resources collected timestamp, action 1" }))
     const dialog = within(screen.getByRole("dialog"))
     expect(dialog.queryByRole("alert")).toBeNull()
     fireEvent.change(dialog.getByLabelText("Gold"), { target: { value: "123" } })
@@ -94,7 +94,7 @@ test("panel additions repeatedly explain the limit and existing event edits rema
 test("editor rejects additions with dependencies atomically at the action limit and still allows removal", () => {
     storeDraft([
         initialOpeningAction,
-        ...Array.from({ length: MAX_PLAN_ACTIONS - 1 }, () => ({ type: "add-resources", commandTime: 0, gold: 0, wood: 0 })),
+        ...Array.from({ length: MAX_PLAN_ACTIONS - 1 }, () => ({ type: "resources-collected", commandTime: 0, gold: 0, wood: 0 })),
     ])
     render(<App />)
     const count = () => storedOrder().length - 1
@@ -106,7 +106,7 @@ test("editor rejects additions with dependencies atomically at the action limit 
     fireEvent.click(screen.getByRole("button", { name: /^Worker 150 gold/ }))
     expect(count()).toBe(100)
     expect(screen.getByRole("alert").textContent).toContain("100 actions")
-    fireEvent.click(screen.getByRole("button", { name: "Lose unit", exact: true }))
+    fireEvent.click(screen.getByRole("button", { name: "Unit is killed", exact: true }))
     expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toContain("100 actions")
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }))
     fireEvent.click(screen.getAllByRole("button", { name: /^Remove / })[0])
@@ -115,12 +115,12 @@ test("editor rejects additions with dependencies atomically at the action limit 
 
 test("event time entry caps at 29:59 and its timeline samples remain bounded", () => {
     const { container } = render(<App />)
-    fireEvent.click(screen.getByRole("button", { name: "Add resources", exact: true }))
+    fireEvent.click(screen.getByRole("button", { name: "Resources collected", exact: true }))
     const dialog = within(screen.getByRole("dialog"))
     const time = dialog.getByLabelText("Command time (mm:ss)") as HTMLInputElement
     fireEvent.change(time, { target: { value: "99:59" } })
     expect(time.value).toBe("29:59")
-    fireEvent.click(dialog.getByRole("button", { name: "Add resources" }))
+    fireEvent.click(dialog.getByRole("button", { name: "Resources collected" }))
     const saved = JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).buildOrder
     expect(saved[1].commandTime).toBe(1799)
     const lines = container.querySelectorAll("polyline")

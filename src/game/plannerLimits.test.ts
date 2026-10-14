@@ -5,15 +5,15 @@ import { factions } from "./gameData"
 import { economyFromProfile, initialGameProfile, initialOpeningAction } from "./gameProfile"
 import { createManaWellAction } from "./manaWells"
 import { MAX_COMMAND_SECONDS, MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS } from "./plannerLimits"
-import { createResourceAction } from "./resourceEvents"
+import { createResourcesCollectedAction } from "./resourcesCollected"
 import { WorkerEconomy } from "./resourceSimulation"
 import { createScrollAction } from "./scrolls"
 import { createShareableLink, parseShareableLink } from "./shareableLink"
-import { createUnitLossAction } from "./unitLosses"
+import { createUnitKilledAction } from "./unitsKilled"
 import { deflate } from "pako"
 
 const economy = economyFromProfile(initialGameProfile)
-const resource = (commandTime: number) => createResourceAction({ type: "add-resources", commandTime, gold: 1, wood: 1 })
+const resource = (commandTime: number) => createResourcesCollectedAction({ type: "resources-collected", commandTime, gold: 1, wood: 1 })
 const simulate = (items: Parameters<typeof simulateBuildOrder>[0], settings = economy) =>
     simulateBuildOrder(items, settings, 10, 20, 20, "Castle")
 const profiles = { light: initialGameProfile, dark: initialGameProfile }
@@ -22,9 +22,9 @@ afterEach(() => window.localStorage.clear())
 
 test.each([
     resource,
-    (commandTime: number) => createManaWellAction({ type: "capture-mana-well", commandTime }),
+    (commandTime: number) => createManaWellAction({ type: "mana-well-is-captured", commandTime }),
     (commandTime: number) => createScrollAction({ type: "use-scroll", scrollId: "gold-rush", commandTime }, "light"),
-    (commandTime: number) => createUnitLossAction({ type: "lose-unit", unitId: "worker", commandTime }, "light"),
+    (commandTime: number) => createUnitKilledAction({ type: "unit-is-killed", unitId: "worker", commandTime }, "light"),
 ])("event factories accept 29:59 and reject unsupported timestamps", create => {
     expect(create(MAX_COMMAND_SECONDS).commandTime).toBe(MAX_COMMAND_SECONDS)
     for (const time of [MAX_COMMAND_SECONDS + 0.001, MAX_PLAN_SECONDS, 1e100]) expect(() => create(time)).toThrow()
@@ -94,7 +94,7 @@ test("simulation remains within 30 minutes and blocks late construction and buil
 
 test("untrusted timestamps cannot bypass limits through links or saved drafts", () => {
     const doc = JSON.parse(serializeBuildOrder("light", initialGameProfile, []))
-    doc.buildOrder.push({ type: "add-resources", commandTime: 1e100, gold: 0, wood: 0 })
+    doc.buildOrder.push({ type: "resources-collected", commandTime: 1e100, gold: 0, wood: 0 })
     const payload = btoa(Array.from(deflate(JSON.stringify(doc)), byte => String.fromCharCode(byte)).join(""))
         .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
     expect(() => parseShareableLink(`#build=2.${payload}`)).toThrow("29:59")

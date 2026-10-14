@@ -1,8 +1,10 @@
-# Build-order JSON files
+# Build-order files, links, and browser storage
 
 Export JSON uses the browser's native Save As picker for directory and filename selection, with the faction's default filename suggested and JSON as the file type. The browser can remember the last export directory. Cancelling does not save or download a file. This API requires a supporting browser and a secure context (HTTPS or localhost). Unsupported browsers use their normal download behavior and browser save-location preferences. No custom filename dialog is shown. Save failures produce a visible error.
 
-The top Import / Export menu offers Export JSON, Import JSON, and the Include calculated timings option. The menu is also available on narrow screens and can be closed with Escape. Files include the selected faction, ordered action IDs (including duplicates and blocked actions), and the complete economy and food profile. Empty orders can be used to share a profile alone. Import selects the imported faction and replaces its order and profile after validating the entire document, preserving the other faction's draft and settings.
+The top Import / Export menu offers Export JSON, Copy link, Import JSON, the Include calculated timings option, and faction-specific starting templates when available. The menu is also available on narrow screens and closes with Escape or a click outside it. Files include the selected faction, the opening allocation and exact subsequent commands (including duplicates and blocked actions), and the complete game profile. Orders containing only the required opening allocation can share a profile alone. Import selects the imported faction and replaces its order and profile after validating the entire document, preserving the other faction's draft and settings.
+
+Start from template replaces the selected faction's build and opening allocation while retaining its active Resource collection settings. It asks before replacing a build with subsequent actions, recalculates timings, and saves the resulting working draft without replacing the personal saved profile. Templates are declared in `src/game/buildOrderTemplates.ts`.
 
 Personal profiles and working drafts are stored separately per faction in browser local storage (`wl-resource-profile-v2-*` and `wl-build-draft-v2-*`). Save profile and Load saved profile appear above the reset buttons, with hover tips explaining that they affect only the current faction. Only Save profile writes the personal profile, including advanced and hidden settings. Load saved profile is disabled when no valid personal profile exists; loading preserves the build order and opening allocation and recalculates timings. Save failures show an error instead of a success notice.
 
@@ -20,16 +22,16 @@ Base mana capacity (`player.baseManaLimit`) must be at least starting mana (`pla
 
 - `basic`: `goldGatherTime`, `woodGatherTime`, `initialGoldTravelReduction`, `timeBetweenScrolls` (default 10 seconds, hidden from the profile UI).
 - `map`: `goldTravelTime`, `woodTravelTime`, `sawmillWoodTravelTime`.
-- `player`: `startingGold`, `startingWood`, `baseFoodLimit`, `startingMana` (default 35), `baseManaLimit` (default 50), `townHallLevel`, `sawmillLevel`, `farmLevel`, `manaTowerLevel`, `lightGoldRushLevel`, `lightLumberGatheringLevel`, `darkWhipLevel`, `darkLegionsCallLevel` (each an integer from 1 to 6, default 1, hidden), `barracksLevel`, `industrialBuildingLevel`, `arcaneBuildingLevel`, `workerLevel`.
+- `player`: `startingGold`, `startingWood`, `baseFoodLimit`, `startingMana` (default 35), `baseManaLimit` (default 50), `townHallLevel`, `sawmillLevel`, `farmLevel`, `manaTowerLevel`, `barracksLevel`, `industrialBuildingLevel`, `arcaneBuildingLevel`, `workerLevel`; `manaAccumulation`, `manaFromManaWells`, `scrollCooldownReduction`, `goldMiningTimeReduction`, `woodMiningTimeReduction`; and the hidden settings `massConstructionCostReduction`, `lightGoldRushLevel`, `lightLumberGatheringLevel`, `darkWhipLevel`, `darkLegionsCallLevel` (scroll levels are integers 1–6, default 1).
 - `delays`: `constructionStartDelay`, `orderDelay`.
 
 Missing mana fields in older profiles default to the values above, with `manaTowerLevel` defaulting to 1. Supplied values are validated normally. Tower levels are integers 1–24 and add 50–55 capacity per completed tower in four-level tiers. Mana regenerates continuously into available capacity; time spent capped does not bank income. Tower completion increases capacity without adding mana. These settings persist and round-trip through JSON and shareable links.
 
-The `player` block also includes `manaAccumulation` (default 10 mana per minute), `manaFromManaWells` (default 60), and `scrollCooldownReduction` (default 0 percent). All three appear in the mana column and reset with the main fields. Accumulation and well mana accept finite non-negative values; cooldown reduction accepts 0–100 percent through import/API validation, while UI edits are capped at 20 percent. Imported values above 20 percent are preserved until this field is edited. `player.manaAccumulation` defaults to 10 when omitted and controls simulation; no legacy mana-rate migration is performed. Each owned well adds player.manaFromManaWells mana per minute between Capture mana well and Lose mana well events, subject to mana capacity. Effective scroll cooldown is `basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, used for automatic suggestions, manual insertion minimums, and simulation validation. A 5% reduction yields 9.5 seconds with the default base; order delay still applies afterward.
+The `player` block also includes `manaAccumulation` (default 10 mana per minute), `manaFromManaWells` (default 60), and `scrollCooldownReduction` (default 0 percent). All three appear in the mana column and reset with the main fields. Accumulation and well mana accept finite non-negative values; cooldown reduction accepts 0–100 percent through import/API validation, while UI edits are capped at 20 percent. Imported values above 20 percent are preserved until this field is edited. `player.manaAccumulation` defaults to 10 when omitted and controls simulation; no legacy mana-rate migration is performed. Each owned well adds player.manaFromManaWells mana per minute between Mana well is captured and Mana well is lost events, subject to mana capacity. Effective scroll cooldown is `basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, used for automatic suggestions, manual insertion minimums, and simulation validation. A 5% reduction yields 9.5 seconds with the default base; order delay still applies afterward.
 
 `player.massConstructionCostReduction` is a hidden percentage setting accepting finite values from 0 to 100, defaulting to 0 for new and older profiles. It round-trips through files, shareable links, drafts, and saved profiles. Reset basic preserves it; Reset all restores 0. It is stored for future support and does not yet change construction costs.
 
-`goldTravelTime` and `woodTravelTime` each apply to both outbound and return trips (default 4 seconds each way). They replace the separate outbound/return fields. Initial gold travel reduction and Sawmill overrides still apply. These travel fields retain their existing behavior.
+`goldTravelTime` and `woodTravelTime` each apply to both outbound and return trips (default 4 seconds each way). There are no separate outbound/return profile fields. Initial gold travel reduction and Sawmill overrides still apply; obsolete fields are ignored like other unrecognized fields.
 
 `player.goldMiningTimeReduction` and `player.woodMiningTimeReduction` subtract seconds from `basic.goldGatherTime` and `basic.woodGatherTime`, respectively. Both default to 0 for older profiles. Gold accepts 0–1.0 seconds; wood accepts 0–5.0 seconds. Import rejects non-numeric, non-finite, negative, or over-limit values. The editor shows one decimal digit and uses 0.1-second steps in the first resource column; food fields appear in the second column. Effective durations apply to every gathering phase, mine queues, worker saturation, builder selection, and resource readiness; travel and yield are unchanged. A 0.001-second minimum protects custom base durations smaller than a reduction. Both values round-trip through files, shareable links, and saved profiles and reset with player settings.
 
@@ -44,7 +46,8 @@ Example profile using the current defaults:
   "basic": {
     "goldGatherTime": 3.1,
     "woodGatherTime": 12.1,
-    "initialGoldTravelReduction": 1
+    "initialGoldTravelReduction": 1,
+    "timeBetweenScrolls": 10
   },
   "map": {
     "goldTravelTime": 4,
@@ -55,13 +58,26 @@ Example profile using the current defaults:
     "startingGold": 150,
     "startingWood": 50,
     "baseFoodLimit": 20,
+    "startingMana": 35,
+    "baseManaLimit": 50,
     "townHallLevel": 1,
     "sawmillLevel": 1,
     "farmLevel": 1,
+    "manaTowerLevel": 1,
     "barracksLevel": 1,
     "industrialBuildingLevel": 1,
     "arcaneBuildingLevel": 1,
-    "workerLevel": 1
+    "workerLevel": 1,
+    "lightGoldRushLevel": 1,
+    "lightLumberGatheringLevel": 1,
+    "darkWhipLevel": 1,
+    "darkLegionsCallLevel": 1,
+    "manaAccumulation": 10,
+    "manaFromManaWells": 60,
+    "scrollCooldownReduction": 0,
+    "massConstructionCostReduction": 0,
+    "goldMiningTimeReduction": 0,
+    "woodMiningTimeReduction": 0
   },
   "delays": {
     "constructionStartDelay": 4,
@@ -70,11 +86,11 @@ Example profile using the current defaults:
 }
 ```
 
-All seven player levels default to 1 and must be integers from 1 to 24. Every four-level tier (1–4, 5–8, 9–12, 13–16, 17–20, 21–24) increases town-hall gold and Sawmill wood yields through 50/51/52/53/54/55, and Farm/Pigsty food through 20/21/22/23/24/25. Town halls, Barracks, industrial buildings, and arcane buildings reduce recruitment duration by 1%/2%/3%/4%/5%/6%. Worker level reduces construction and building-upgrade duration by 0%/1%/2%/3%/4%/5% across the same tiers, without changing builder travel; unrelated producers receive no bonus. Player progression is independent of in-match building upgrades.
+All eight player building levels default to 1 and must be integers from 1 to 24. Every four-level tier (1–4, 5–8, 9–12, 13–16, 17–20, 21–24) increases town-hall gold and Sawmill wood yields through 50/51/52/53/54/55, Farm/Pigsty food through 20/21/22/23/24/25, and Tower of Mana capacity additions through 50/51/52/53/54/55. Town halls, Barracks, industrial buildings, and arcane buildings reduce recruitment duration by 1%/2%/3%/4%/5%/6%. Worker level reduces construction and building-upgrade duration by 0%/1%/2%/3%/4%/5% across the same tiers, without changing builder travel; unrelated producers receive no bonus. Player progression is independent of in-match building upgrades.
 
-Gold/wood yields and food per Farm/Pigsty are derived runtime values, omitted from exported profiles. Missing player levels default to 1. Factory/Workshop and Sanctuary/Dark Gate production mappings are ready for future catalog entries; their game stats remain unimplemented.
+Gold/wood yields, food per Farm/Pigsty, and capacity per Tower of Mana are derived runtime values, omitted from exported profiles. Missing player levels default to 1. Factory and Sanctuary are implemented Light producers with player-level recruitment bonuses. The corresponding Workshop and Dark Gate bonus mappings exist, but those Dark catalog entries are not implemented. Shipyard and Altar recruitment use base durations.
 
-Resource collection appears below the timeline, with starting resources, food limit, and player levels in the main grid. Advanced reveals travel and delay inputs; hidden Basic fields are preserved by imports and exports. The allocation slider lives in a fixed opening action at the top of Build order, ranges from 0 to 5 in whole workers, and cannot be removed or dragged. Moving it changes the build without changing the resource profile.
+Resource collection appears below the timeline, with starting resources, gathering reductions, food/mana settings, and player levels in the main grid. Advanced reveals travel and delay inputs; hidden Basic fields are preserved by imports and exports. The allocation slider lives in a fixed opening action at the top of Build order, ranges from 1 to 4 gold miners in whole workers, and cannot be removed or dragged. JSON/API allocations accept 0–5 gold miners. Moving the slider changes the build without changing the resource profile.
 
 `buildOrder` begins with exactly one `{ "type": "allocate-workers", "goldWorkers": 4 }` entry, followed by `{ "itemId": "worker" }` catalog entries. The opening is required even when there are no subsequent actions. Missing, repeated, misplaced, fractional, negative, or oversized allocations reject the whole import. Item IDs are resolved within the selected faction's current catalog. Unknown IDs reject the entire import; valid but unexecutable actions import unchanged and appear blocked. Import does not insert missing prerequisites or deduplicate actions.
 
@@ -90,7 +106,7 @@ Version 2 also accepts timed scroll commands after the opening allocation:
 { "type": "use-scroll", "scrollId": "gold-rush", "commandTime": 90 }
 ```
 
-`commandTime` is a required finite non-negative number of seconds after game start, rather than cached simulation output. Scroll levels are independent `gameProfile.player` settings: `lightGoldRushLevel`, `lightLumberGatheringLevel`, `darkWhipLevel`, and `darkLegionsCallLevel`. Each is an integer from 1 to 6 and defaults to 1 when older files or profiles omit it. The four settings are saved, exported, shared, and reset with the profile, but have no UI controls; simulation continues to use level 1 effects regardless of their values. Reset basic preserves these hidden settings; Reset all restores them to 1. Gold Rush and Lumber Gathering are Light-only. Invalid fields, unknown scroll IDs, and scrolls in a Dark build reject the whole import. Existing version 2 catalog-only files remain supported; earlier app releases cannot read the new scroll entries. The rules revision is `2026-10-14.3`.
+`commandTime` is a required finite number of seconds from 0 to 1799 (29:59) after game start, rather than cached simulation output. Scroll levels are independent `gameProfile.player` settings: `lightGoldRushLevel`, `lightLumberGatheringLevel`, `darkWhipLevel`, and `darkLegionsCallLevel`. Each is an integer from 1 to 6 and defaults to 1 when older files or profiles omit it. The four settings are saved, exported, shared, and reset with the profile, but have no UI controls; simulation continues to use level 1 effects regardless of their values. Reset basic preserves these hidden settings; Reset all restores them to 1. Gold Rush and Lumber Gathering are Light-only. Invalid fields, unknown scroll IDs, and scrolls in a Dark build reject the whole import. Existing version 2 catalog-only files remain supported; earlier app releases cannot read the new scroll entries. The rules revision is `2026-10-14.7`.
 
 Scroll commands run at their timestamps independently of their positions among catalog rows. Equal-time scrolls run in source order; resource deliveries, worker recruitment completions, and mana-tower capacity completions at that timestamp are available before validation. Catalog actions retain their existing sequence and scheduling rules. Validation is recalculated on every simulation, including imports. Insufficient mana retains a blocked command and its requested timestamp, with a warning, no mana expenditure, and no effect; it does not wait for regeneration.
 
@@ -102,11 +118,11 @@ The Gold Rush and Lumber Gathering cards share the Light heroes row after a smal
 
 `basic.timeBetweenScrolls` is a finite non-negative duration and defaults to 10 for older files and saved profiles that omit it. It is exported, shared, saved, and reset with the profile, but has no profile-editor control. The player percentage reduction applies to this base duration. Simulation validates cooldown chronologically between successful command times, with an additional `delays.orderDelay` after cooldown expires. With defaults, a cast at 190 has cooldown expiry at 200 and the next command can be sent at 201. A cast inside cooldown remains blocked with no mana spending or bonus. Blocked commands do not start a cooldown. The insertion dialog uses the latest requested scroll timestamp, including blocked commands, as its lower bound.
 
-Mana availability also requires `delays.orderDelay` before sending a scroll command. If mana reaches 50 at 80 and orderDelay is 1, the earliest command is 81 and its effect starts at 82. Both readiness waits overlap: use the later of mana readiness plus orderDelay and cooldown expiry plus orderDelay. If mana was already sufficient long before the command, this does not add another wait. Starting mana is available from time zero. Manual/imported fixed timestamps are validated against both rules and retain their timestamp with no spending/effect if blocked.
+Mana availability also requires `delays.orderDelay` before sending a scroll command. Even with sufficient starting mana, the first scroll command cannot precede `orderDelay`. If mana reaches 50 at 80 and orderDelay is 1, the earliest command is 81 and its effect starts at 82. Both readiness waits overlap: use the later of mana readiness plus orderDelay and cooldown expiry plus orderDelay. If mana was already sufficient long before the command, this does not add another wait. Starting mana is available from time zero. Manual/imported fixed timestamps are validated against both rules and retain their timestamp with no spending/effect if blocked.
 
 ## Shareable links
 
-Save shareable link in the Import / Export menu copies a URL containing the current faction, exact action sequence, and complete profile. Calculated timings are always omitted, regardless of the JSON export checkbox; required scroll command timestamps remain. Successful copying closes the menu and shows a notice. If clipboard access fails, the menu stays open with the link selected for manual copying.
+Copy link in the Import / Export menu copies a URL containing the current faction, exact action sequence, and complete profile. Calculated timings are always omitted, regardless of the JSON export checkbox; required scroll command timestamps remain. Successful copying closes the menu and shows a notice. If clipboard access fails, the menu stays open with the link selected for manual copying.
 
 Open the copied URL in a browser to restore the build order and profile automatically. Changes to the URL fragment in an already-open planner also load the new shared order. Imports reuse JSON validation and current catalog/simulation rules; saved timings are ignored. Different game-rules revisions warn without blocking. Invalid or unsupported links display an error and leave the current plan intact. Unrelated URL fragments are ignored.
 
@@ -125,19 +141,19 @@ Generated URLs are limited to 16,000 characters; larger orders should use JSON f
 Lumber Gathering costs 25 mana at command time, starts exactly one second later, and lasts 30 seconds. All profile scroll levels (1–6) currently add 15 wood to the configured trip yield. It applies to the forest and all wood workers independently: cargo receives the bonus when gathering finishes at or after start and strictly before expiry. The current stage or elapsed gathering time at activation does not matter. Returning workers retain their current cargo and can receive the bonus on their next gathering cycle; new workers and returning builders follow the same completion rule. Cargo keeps the bonus when deposited after expiry. Overlapping Lumber Gathering windows do not stack. Construction interruption discards cargo. Gold Rush and Lumber Gathering share mana and scroll cooldowns; automatic timing uses the selected scroll's mana cost.
 
 
-## Add resources events
+## Resources collected events
 
 Both factions can add gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 29:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
 
-The command schema is `{ "type": "add-resources", "commandTime": 1, "gold": 300, "wood": 300 }`. Values must be finite and non-negative.
+The command schema is `{ "type": "resources-collected", "commandTime": 1, "gold": 300, "wood": 300 }`. Resource values must be finite and non-negative; command time must be within 0–1799 seconds. The UI uses whole-second timestamps, while imports/API commands may retain fractional seconds.
 
 ## Mana well commands
 
-`{ "type": "capture-mana-well", "commandTime": 30 }` and `{ "type": "lose-mana-well", "commandTime": 90 }` specify exact timestamps with no delays or resource costs. Ownership starts at zero. Commands are evaluated by timestamp, with source order breaking ties. A loss without an owned well is preserved as a blocked, editable event and has no effect. Imports recalculate ownership validation.
+`{ "type": "mana-well-is-captured", "commandTime": 30 }` and `{ "type": "mana-well-is-lost", "commandTime": 90 }` specify exact timestamps with no delays or resource costs. Ownership starts at zero. Commands are evaluated by timestamp, with source order breaking ties. The UI uses whole-second timestamps; imports/API commands may retain fractional seconds. A loss without an owned well is preserved as a blocked, editable event and has no effect. Imports recalculate ownership validation.
 
-## Unit losses
+## Unit is killed events
 
-`{ "type": "lose-unit", "unitId": "worker", "commandTime": 30 }` specifies one loss at an exact timestamp with no delay or costs. unitId must identify a recruitable item in the chosen faction. Imports recalculate eligibility from completed recruitment, starting workers, earlier losses, and worker construction assignments. Successful losses release food; invalid losses remain editable and inactive.
+`{ "type": "unit-is-killed", "unitId": "worker", "commandTime": 30 }` records one unit being killed at an exact timestamp with no delay or costs. unitId must identify a recruitable item in the chosen faction. Imports recalculate eligibility from completed recruitment, starting workers, earlier losses, and worker construction assignments. Successful losses release food and, for heroes, their recruitment cap and Altar tier reservation. Killed workers stop gathering and discard cargo. Workers assigned to construction (including travel) cannot be killed; wood workers are selected before gold workers. Invalid losses remain editable and inactive. The UI uses whole-second timestamps; imports/API commands may retain fractional seconds.
 
 ## Supported plan limits
 

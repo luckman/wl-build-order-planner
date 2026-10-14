@@ -1,6 +1,6 @@
 # Construction and gathering
 
-Implemented on 2026-10-08 for Light Workers and Dark Slaves.
+This guide describes current construction and building-upgrade behavior for Light Workers and Dark Slaves. See [GAME_MODEL.md](GAME_MODEL.md) for the complete economy overview and [CATALOG_DEPENDENCIES.md](CATALOG_DEPENDENCIES.md) for building and upgrade requirements.
 
 The first build-order command is available at `gameProfile.delays.orderDelay` (default 1.0 seconds). Initial gold miners
 and the first initial wood gatherer receive their gathering orders at game
@@ -33,18 +33,18 @@ For a command accepted at time `t`:
   `src/game/data.json`.
 - The worker returns to its resource after another `constructionStartDelay`.
 
-At worker level 1–4, a 30-second Barracks ordered at 0s therefore starts at 4s, completes at 34s,
-and releases its worker back to gathering at 38s. The Barracks can train units
-at 35s with the default one-second order delay. The builder cannot gather or accept another construction command
-before 38s. Multiple buildings can be constructed concurrently when enough
+At worker level 1–4, a 30-second Barracks ordered at 1s therefore starts at 5s, completes at 35s,
+and releases its worker back to gathering at 39s. The Barracks can train units
+at 36s with the default one-second order delay, if resources and food permit. The builder cannot gather or accept another construction command
+before 39s. Multiple buildings can be constructed concurrently when enough
 eligible workers and resources are available.
 
 Player `workerLevel` defaults to 1 and is an integer from 1 to 24. The six tiers
 (1–4, 5–8, 9–12, 13–16, 17–20, 21–24) reduce construction and upgrade
 duration by 0%, 1%, 2%, 3%, 4%, and 5%. Builder travel in both directions,
 order delay, and unit recruitment are unaffected by worker level. For example,
-at level 21 a 30-second Barracks ordered at 0s starts at 4s, completes at
-32.5s, and releases its builder at 36.5s.
+at level 21 a 30-second Barracks ordered at 1s starts at 5s, completes at
+33.5s, and releases its builder at 37.5s.
 
 ## Automatic worker selection
 
@@ -62,8 +62,10 @@ eligible when they exit the mine; other queued miners can enter the freed slot.
 Workers travelling to a building, constructing, or returning are unavailable.
 If no eligible worker exists, the command waits for a worker to become eligible.
 
-The UI currently assigns all starting workers to gold or wood. The simulation
-also supports idle workers when total worker count exceeds those assignments.
+The planner assigns all five starting workers to gold or wood; the UI permits
+1–4 gold miners, while JSON/API opening allocations permit 0–5. The lower-level
+worker economy also supports idle workers when its worker count exceeds its
+assignments, but the persisted game profile has no idle-worker allocation field.
 Newly trained workers retain the existing allocation rule: gold up to mine
 saturation, then wood. Workers temporarily constructing still count toward
 their previous resource assignment for this allocation rule.
@@ -79,13 +81,16 @@ outbound, gathering, and deposit travel times.
 
 Wood example: a worker interrupted at 5s for a 30-second building returns at
 43s, chops for 12.1s, then travels 4s to deposit 50 wood at 59.1s. Its originally
-scheduled delivery at 20s does not occur.
+scheduled delivery at 20.1s does not occur. This example uses normal four-second
+wood travel with no completed Sawmill, gathering reduction, or scroll effect.
 
 Gathering and commands use the same chronological simulation, so lost deliveries
 also delay later purchases. Building completion, food capacity, producer queues,
 and newly trained workers use the delayed completion times. Command scheduling
-retains the existing 600-second planning horizon; resource simulation extends
-through the final scheduled completion/worker return when necessary.
+uses a maximum 30:00 planning horizon. Commands whose completion or builder
+return would exceed 30:00 remain blocked without spending resources or reserving
+a builder. The graphs follow the plan within this maximum; they do not extend
+beyond it. See [BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md#supported-plan-limits).
 
 Building upgrades retain their producer-queue behavior while also reserving a
 worker for outbound travel, construction, and the return trip. They appear in

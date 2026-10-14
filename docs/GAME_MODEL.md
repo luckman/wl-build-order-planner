@@ -1,1029 +1,117 @@
-# War Legends Game Model
+# War Legends game model
 
-## 1. Overview
+This guide describes the implemented simulator. Detailed catalog rules are in [CATALOG_DEPENDENCIES.md](CATALOG_DEPENDENCIES.md), builder behavior in [CONSTRUCTION.md](CONSTRUCTION.md), and persisted commands and profiles in [BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md).
 
-The planner should model War Legends as an event-driven RTS economy and production system.
+## Implementation and data ownership
 
-The important distinction is between:
-
-- an **order** issued by the player;
-- the **actual start** of the action;
-- the **completion** of the action.
-
-For example:
+The planner combines a faction catalog, a game profile, and an ordered build:
 
 ```text
-01:20  Player orders Barracks
-01:23  Worker reaches construction location
-01:23  Construction starts
-01:53  Construction completes
+Catalog + Game profile + Opening allocation + Action commands
+    -> Build scheduler and worker economy
+    -> Scheduled actions, resource deliveries, and validation
+    -> Build-order rows, timeline, and resource graphs
 ```
 
-The planner must represent these as separate events.
-
-### Initial state (confirmed)
-
-At time 0 the Light faction has one completed Castle; the Dark faction has
-one completed Citadel. This initial building is available to produce workers
-immediately, without construction cost or delay.
-
-The default starting workforce is five Workers/Slaves: four assigned to gold
-and one to wood. Initial assignments remain editable; starting food usage is
-2 per worker (10 food for the default five).
-
----
-
-## 2. Resources
-
-The current target resource model includes:
-
-- Gold
-- Wood
-- Food capacity
-
-The planner should track both the current amount of spendable resources and the parameters that determine future income/capacity.
-
-Costs do not depend on account level. Production and Racial buildings multiply their base gold and wood costs by the copy number of that same building: the first costs 1×, the second 2×, the third 3×, and so on. Earlier planned copies count immediately, including orders whose workers are still travelling. Different building IDs have independent counts. Building upgrades neither receive the multiplier nor increase the initial building's count. Economic and Defensive buildings, units, and upgrades retain fixed costs.
-
-A resource state at time `t` should be derivable from:
-
-```text
-initial resources
-+ completed gathering deliveries
-- completed expenditures
-```
-
-Food is different from Gold/Wood: it represents a population/capacity limit and is increased by building Farms.
-
----
-
-## 3. Gold Gathering
-
-Gold gathering should be modeled as an explicit worker-to-mine cycle rather than a constant income rate.
-
-### Gold Mine Constraints
-
-A gold mine can contain:
-
-```text
-maximum 1 worker at a time
-```
-
-The mine therefore behaves like a single-server queue.
-
-Multiple workers can be assigned to the same mine, but only one can be actively mining at any given time. Other workers wait for the mining spot to become available or remain in transit.
-
-### Gold Yield
-
-Each completed mine trip provides:
-
-```text
-50–55 gold
-```
-
-The exact amount depends on **Castle level**.
-
-Example conceptual model:
-
-```text
-goldPerTrip = castleLevelTable[castleLevel]
-```
-
-The confirmed player-level tiers are implemented in `src/game/playerLevels.ts`; player progression is distinct from in-match Castle/Citadel upgrades.
-
-### Gold Mining Time
-
-Default time spent inside the mine:
-
-```text
-3.10 seconds
-```
-
-Worker items can reduce this time.
-
-Example:
-
-```text
-effectiveMiningTime = baseGoldMiningTime - goldMiningTimeReduction
-```
-
-`gameProfile.player.goldMiningTimeReduction` is entered in seconds, defaults to 0.0, and accepts values from 0.0 to 1.0. The editor displays one decimal digit and steps by 0.1 seconds. It reduces every mine visit, including the opening trip, and affects mine queues and worker saturation. Gold travel time and yield are unchanged. The simulator keeps gathering duration at least 0.001 seconds if a custom base time is smaller than the reduction.
-
-### Travel Time
-
-The time from the Town Hall to the gold mine is a configurable parameter.
-
-Default:
-
-```text
-4 seconds
-```
-
-Initial gold miners take one second less on this opening outbound trip only.
-Their later outbound trips, return trips, and every trip by newly trained workers
-use the configured 4-second defaults.
-
-The return trip should also be configurable.
-
-Default:
-
-```text
-4 seconds
-```
-
-The simulator should therefore not hard-code a universal worker movement time.
-
-Suggested profile/configuration:
-
-```json
-{
-  "gold": {
-    "outboundTravelTime": 4.0,
-    "returnTravelTime": 4.0,
-    "baseMiningTime": 3.10
-  }
-}
-```
-
-### Gold Worker Cycle
-
-For a worker with no queue delay:
-
-```text
-4s travel to mine
-3.10s mine
-4s return
-----------------
-11.10s total
-```
-
-However, when multiple workers share one mine, queueing changes the effective cycle.
-
-### Three Workers
-
-With 3 workers assigned to the same mine:
-
-```text
-4s travel
-3.10s mining
-4s return
-= 11.10s per worker cycle
-```
-
-Three workers are not enough to keep the mine continuously occupied.
-
-In steady-state terms:
-
-```text
-3 workers × 3.10s mining = 9.30 worker-seconds of mining
-11.10-second cycle
-```
-
-so the mine has idle periods.
-
-A typical staggered schedule can look conceptually like:
-
-```text
-Worker 1:   [MINE 4–7]          [MINE 15–18] ...
-Worker 2:            [MINE 7–10]          [MINE 18–21] ...
-Worker 3:                    [MINE 10–13]          [MINE 21–24] ...
-Mine idle:                          [13–15]
-```
-
-Exact timing depends on initial worker positions and dispatch order.
-
-### Four Workers
-
-With 4 workers, the mine can remain continuously occupied.
-
-Each worker spends approximately:
-
-```text
-4s travel to mine
-1s average/steady-state queue wait
-3.10s mining
-4s return
-----------------
-approximately 12.40s effective cycle
-```
-
-The 1-second wait follows from the fact that the mine has one mining slot and the four workers collectively need to occupy that slot continuously:
-
-```text
-4 workers × 3.10s mining = 12.40s of mining demand
-```
-
-while the non-queue portion of an individual cycle is:
-
-```text
-4s + 3.10s + 4s = 11.10s
-```
-
-so roughly 1 additional second per worker is spent waiting in the mine queue in steady state.
-
-This should be treated as an emergent property of the event simulation rather than hard-coded as:
-
-```text
-4 workers => exactly 1 second wait
-```
-
-The simulator should calculate the actual queue time from worker arrival times and mine availability.
-
-### Gold Gathering State
-
-A gold worker can be in states such as:
-
-```text
-MOVING_TO_GOLD_MINE
-WAITING_FOR_MINE
-MINING_GOLD
-RETURNING_GOLD
-```
-
-When gold is delivered, the worker starts another trip unless reassigned.
-
----
-
-## 4. Wood Gathering
-
-Wood gathering is similar to gold gathering but does **not** have the same single-worker mine constraint.
-
-There is effectively abundant access to trees for the workers:
-
-- multiple workers can harvest at the same time;
-- multiple workers can work on the same tree;
-- there is no `maximum 1 worker gathering simultaneously` constraint.
-
-Therefore, wood gathering can be modeled independently per worker without a shared single-server queue.
-
-### Wood Yield
-
-Each completed wood trip provides:
-
-```text
-50–55 wood
-```
-
-The exact amount depends on **Sawmill level**.
-
-Conceptual model:
-
-```text
-woodPerTrip = sawmillLevelTable[sawmillLevel]
-```
-
-The exact level table should be stored as game data.
-
-### Wood Mining/Chopping Time
-
-Default time spent gathering wood:
-
-```text
-12.1 seconds
-```
-
-Worker items can reduce this time.
-
-Example:
-
-```text
-effectiveWoodGatherTime = baseWoodGatherTime - woodMiningTimeReduction
-```
-
-`gameProfile.player.woodMiningTimeReduction` is entered in seconds, defaults to 0.0, and accepts values from 0.0 to 5.0. The editor displays one decimal digit and steps by 0.1 seconds. It reduces every wood gathering phase, including after a Sawmill completes. Wood travel time and yield are unchanged. The simulator keeps gathering duration at least 0.001 seconds if a custom base time is smaller than the reduction.
-
-### Travel Time
-
-The normal time between the Town Hall and the tree is configurable.
-
-Default:
-
-```text
-4 seconds
-```
-
-The return trip is also configurable.
-
-Default:
-
-```text
-4 seconds
-```
-
-Conceptual cycle:
-
-```text
-4s travel to tree
-12.1s gather wood
-4s return
-----------------
-20.1s total
-```
-
-The exact cycle should be calculated from the configured travel and item modifiers.
-
-### Nearby Sawmill
-
-A completed Sawmill is treated as a nearby wood deposit point. Each newly completed Sawmill resets travel time for all wood gatherers to 0.5 seconds in each direction (outbound and return). Travel time then increases by 0.5 seconds per full minute since the most recent Sawmill completion, capped at 4 seconds:
-
-```text
-fullMinutes = floor((currentTime - latestSawmillCompletionTime) / 60)
-woodTravelTime = min(4, 0.5 + 0.5 * fullMinutes)
-```
-
-| Time since latest Sawmill completion | Travel time each way |
+| Source | Responsibility |
 | --- | --- |
-| 0–59.999… seconds | 0.5 seconds |
-| 60–119.999… seconds | 1 second |
-| 120–179.999… seconds | 1.5 seconds |
-| 180–239.999… seconds | 2 seconds |
-| 240–299.999… seconds | 2.5 seconds |
-| 300–359.999… seconds | 3 seconds |
-| 360–419.999… seconds | 3.5 seconds |
-| 420 seconds onward | 4 seconds |
+| `src/game/data.json` | Faction items, base costs and durations, prerequisites, production/upgrade links, and limits. |
+| `src/game/gameData.ts` and `buildingRules.ts` | Derived producers and building families, dependency insertion, copy prices, and physical building/upgrade rules. |
+| `src/game/gameProfile.ts` | Starting resources, progression, gathering modifiers, travel, delays, and profile defaults. |
+| `src/game/playerLevels.ts` | Resource yields, food/mana capacity additions, and duration bonuses from player progression. |
+| `src/game/buildSimulation.ts` | Catalog scheduling, producer queues, construction reservations, fixed-time commands, and blocked-action reasons. |
+| `src/game/resourceSimulation.ts` | Individual worker cycles, resource deliveries, builder selection, resource balances, and mana integration. |
+| `src/game/plannerLimits.ts` | Action/time limits and simulation-work safeguards. |
 
-Before any Sawmill completes, workers use the configured normal wood travel times (default 4 seconds each way). Only completed Sawmills reset the timer; queued or unfinished Sawmills have no effect. Each travel leg uses the duration calculated when that leg starts. A travel leg already in progress keeps its original duration across minute boundaries and Sawmill completions. Chopping time, wood per trip, gold travel, and construction travel are unchanged.
+Game values are entered manually. Player settings affect simulation without modifying catalog definitions. There is no external game-data API or data-entry editor.
 
-For example:
+## Factions and initial state
 
-```json
-{
-  "wood": {
-    "outboundTravelTime": 4.0,
-    "returnTravelTime": 4.0,
-    "nearbySawmillOutboundTime": 0.5,
-    "nearbySawmillReturnTime": 0.5,
-    "sawmillTravelIncreasePerMinute": 0.5,
-    "sawmillMaxTravelTime": 4.0,
-    "baseGatherTime": 12.1
-  }
-}
-```
+Exactly two factions are supported: Light and Dark. Light has the expanded building, unit, upgrade, and hero catalog. Dark currently has Citadel levels 1–4, Sawmill, Pigsty, Barracks, Tower of Mana, Slave, and Goon. Its action picker exposes only Citadel level 2; levels 3–4 remain available to catalog validation and simulation, including imports. Dark scrolls and its other illustrated buildings, units, and heroes have no implemented catalog entries.
 
-The Sawmill timer rule applies to both Light and Dark factions.
+Each game starts with one completed Castle/Citadel and five Workers/Slaves. The initial town hall costs nothing and can produce workers after the configured order delay. Worker count is a game-rule constant, not a profile field.
 
-### Wood Worker State
+The required opening allocation defaults to four gold miners and one wood gatherer. The UI slider permits 1–4 gold miners; JSON/API allocation accepts integers 0–5. All remaining starting workers gather wood. Initial food usage is 10, regardless of the split. There is no manual reassignment action after the opening.
 
-A wood worker can be in:
+Default resources are 150 gold, 50 wood, 20 base food capacity, and 35 mana with 50 base mana capacity. Initial mana-well ownership is zero. Profile fields are editable or, for hidden settings, configurable through JSON. Personal profiles and working drafts are independent per faction.
 
-```text
-MOVING_TO_TREE
-GATHERING_WOOD
-RETURNING_WOOD
-```
+## Resource cycles
 
-Multiple wood workers may gather in parallel with no resource-node capacity limit.
+Gold and wood arrive as discrete worker deliveries, rather than a fixed income rate. Spendable resources equal starting resources plus deliveries and Resources collected events, minus accepted catalog commands' costs.
 
----
+Gold uses one shared mine slot. A worker travels outbound, waits for the slot, gathers, and returns to deposit. Default gathering time is 3.1 seconds, with 4 seconds of travel each way. Initial gold miners' first outbound trip is shortened by `basic.initialGoldTravelReduction` (default 1 second), clamped at zero. Queue waits emerge from arrivals and mine availability.
 
-## 5. Worker Allocation and Economy
+Wood workers gather independently, with no shared node capacity. Default gathering time is 12.1 seconds and normal travel is 4 seconds each way. Initial gold miners and the first wood gatherer start at time zero; additional initial wood gatherers start at `delays.orderDelay` (default 1 second).
 
-Additional worker states (any other states can be added as needed):
+`map.goldTravelTime` and `map.woodTravelTime` each apply to both travel directions. Equipment modifiers `player.goldMiningTimeReduction` (0–1 seconds) and `player.woodMiningTimeReduction` (0–5 seconds) subtract from gathering durations. Effective gathering time is at least 0.001 seconds. Neither modifier changes travel or base cargo yield.
+
+Each completed Sawmill resets wood travel to `map.sawmillWoodTravelTime` (default 0.5 seconds) each way. Travel increases by 0.5 seconds per full minute since the latest completion, capped at 4 seconds:
 
 ```text
-MOVING
-IDLE
-BUILDING
-UPGRADING
+travel = min(4, sawmillWoodTravelTime + 0.5 * floor(secondsSinceCompletion / 60))
 ```
 
-Because workers are individual simulation entities, changing worker allocation must change the future resource curve.
+Each travel leg keeps the duration chosen when it began. Sawmill completion and minute boundaries do not change travel already underway. The rule applies to both factions.
 
-Example:
+Newly recruited workers join gold until assigned gold workers reach `ceil((2 * goldTravelTime + effectiveGoldGatherTime) / effectiveGoldGatherTime)`, then join wood. Workers temporarily constructing count toward their previous assignment. Worker losses remove their future deliveries and assignment; recruitment uses the resulting current allocation.
 
-```text
-Worker 1 → Gold
-Worker 2 → Gold
-Worker 3 → Gold
-Worker 4 → Gold
-Worker 5 → Wood
-Worker 6 → Wood
-Worker 7 → Building
-```
+## Player progression and in-match upgrades
 
-Worker #7 does not contribute to Gold or Wood income while constructing.
+Eight player building levels are integers 1–24, defaulting to 1. These profile levels are distinct from individual buildings' levels upgraded during a match. Player levels apply globally to the corresponding family; there are no separate account levels per building instance.
 
-This is a key difference from a simple fixed-income build-order calculator.
+| Player levels | 1–4 | 5–8 | 9–12 | 13–16 | 17–20 | 21–24 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Gold per trip (`townHallLevel`) | 50 | 51 | 52 | 53 | 54 | 55 |
+| Wood per trip (`sawmillLevel`) | 50 | 51 | 52 | 53 | 54 | 55 |
+| Food per completed Farm/Pigsty (`farmLevel`) | 20 | 21 | 22 | 23 | 24 | 25 |
+| Capacity per completed Tower of Mana (`manaTowerLevel`) | 50 | 51 | 52 | 53 | 54 | 55 |
+| Recruitment duration reduction | 1% | 2% | 3% | 4% | 5% | 6% |
+| Construction/upgrade duration reduction (`workerLevel`) | 0% | 1% | 2% | 3% | 4% | 5% |
 
-The planner should allow the user to inspect:
+Recruitment bonuses use `townHallLevel` for Workers/Slaves, `barracksLevel` for Barracks, `industrialBuildingLevel` for Factory/Workshop, and `arcaneBuildingLevel` for Sanctuary/Dark Gate. Workshop and Dark Gate mappings exist but their catalog entries are not implemented. Shipyards and Altars retain base recruitment durations. Duration is `baseSeconds * (1 - reduction)`.
 
-```text
-Gold workers
-Wood workers
-Building workers
-Idle workers
-```
+In-match upgrades unlock catalog prerequisites, producer capabilities, and building limits. They do not change the profile's resource yields or account bonuses.
 
-at any point in time.
+## Catalog scheduling and construction
 
----
+Catalog actions keep their relative order. The scheduler accepts each command when resources, completed prerequisites, building capacity, food, producer availability, and an eligible builder allow it. Later commands can overlap earlier construction or training after earlier commands have been accepted. Reordering or removing actions recalculates the entire plan.
 
-## 6. Castle Level
+Production and Racial buildings double their base gold/wood cost for each successive copy of the same ID: 1×, 2×, 4×, 8×, or `2^(n - 1)` for copy `n`. Earlier catalog orders count for pricing, including orders whose builders are travelling. Economic/Defensive buildings, units, heroes, and upgrades retain fixed costs. The hidden `massConstructionCostReduction` setting is persisted but currently has no cost effect.
 
-Castle/Citadel player level is stored as `gameProfile.player.townHallLevel` (integer 1–24, default 1).
+Construction and upgrades expose separate command, start, finish, and builder-return times. At command acceptance, costs are paid and a selected worker stops gathering. The worker travels for `constructionStartDelay` (default 4 seconds), builds for the worker-level-adjusted duration, then travels back for the same delay. The completed building becomes available before the builder returns.
 
-It affects the amount of gold obtained per completed mining trip.
+Builders are selected from idle workers, then wood gatherers with the least gathered/carried cargo, then gold workers carrying the least cargo outside the mine. Worker ID breaks ties. Builders are unavailable through both travel legs and construction. Interrupted cargo is discarded, and the worker resumes gathering at its previous resource after return without another outbound trip. These rules also apply to building upgrades.
 
-Conceptually:
+Upgrades reserve an exact preceding-level building instance and its queue. Its completed lower level still satisfies prerequisites and limits during the upgrade; the higher level unlocks at completion. Each producer has one recruitment slot, and additional physical producers have independent queues. Upgrading and training cannot use the same building simultaneously.
 
-```text
-Castle Level
-    ↓
-Gold per trip
-    ↓
-Gold income
-    ↓
-Build-order timing
-```
+`orderDelay` applies to the first catalog command and commands unlocked by completed prerequisites, recruitment buildings, and building capacity. The wait runs from completion and overlaps waits for other resources or workers. It does not repeat between recruits on an already available producer. There are no per-action construction-delay overrides or theoretical/practical mode controls.
 
-Example data structure:
+Food is reserved at an accepted recruitment command, including for queued heroes. Completed Farms/Pigsties increase capacity. Successful Unit is killed events release the lost unit's food. Hero limits and Altar tiers count living and queued heroes across producers; a successful hero loss allows replacement and reduces the next recruitment tier. See the catalog guide for the Light hero requirements.
 
-```json
-{
-  "castle": {
-    "goldPerTripByLevel": {
-      "1": 50,
-      "5": 51,
-      "9": 52
-    }
-  }
-}
-```
+## Mana, scrolls, and fixed-time events
 
-Confirmed yields increase every four levels: gold/wood 50/51/52/53/54/55 and Farm/Pigsty food 20/21/22/23/24/25.
+Mana regenerates continuously at `player.manaAccumulation + ownedWells * player.manaFromManaWells` per minute (defaults 10 and 60). Capacity caps income; capped income is discarded. Completed Towers of Mana add capacity without adding mana. Base capacity must be at least starting mana.
 
----
+Timed events retain explicit command timestamps independently of their position among catalog rows. Moving other actions or changing the profile recalculates validation without moving event timestamps. Events are edited through their build-order rows and have no drag handles. Equal-time commands of the same event type use source order; different types follow the simulator's processing order.
 
-## 7. Sawmill Level
+| Command | Current behavior |
+| --- | --- |
+| Gold Rush (Light) | Spends 50 mana; starts 1 second after command; adds 10 gold to loads exiting the mine during its 30-second window. |
+| Lumber Gathering (Light) | Spends 25 mana; starts 1 second after command; adds 15 wood to loads finishing gathering during its 30-second window. |
+| Resources collected (both factions) | Instantly adds non-negative gold and wood without mana, worker, or delay requirements. |
+| Mana well is captured / Mana well is lost (both factions) | Instantly adds/removes one owned well. A loss requires ownership at that timestamp. |
+| Unit is killed (both factions) | Removes one completed living recruit or starting worker, releasing food. Workers assigned to construction, including travel, are ineligible; wood workers are selected before gold workers. |
 
-Sawmill player level is stored as `gameProfile.player.sawmillLevel` (integer 1–24, default 1).
+Scroll windows include their start and exclude expiry. Cargo is fixed at mine exit or wood-gathering completion, so a bonus load retains its bonus when delivered after expiry. Overlapping windows of the same scroll do not stack. Interruption or worker loss discards cargo.
 
-It affects the amount of wood obtained per completed gathering trip.
+All six stored scroll levels currently use level-1 effects. Dark scroll levels and mass-construction cost reduction are stored for future support. Scroll cooldown is shared between both Light scrolls: `basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, followed by `orderDelay`. Mana must also have been sufficient for `orderDelay` before the command. Blocked scrolls spend no mana and start no cooldown.
 
-Example:
+Automatic scroll insertion chooses an affordable timestamp once, respecting cooldown, mana, and order delay. Manual scroll insertion may retain a mana-blocked event. Invalid fixed-time events remain editable with warnings and have no effect; the mana-well and unit-is-killed dialogs also validate eligibility before saving.
 
-```json
-{
-  "sawmill": {
-    "woodPerTripByLevel": {
-      "1": 50,
-      "2": 51,
-      "3": 52
-    }
-  }
-}
-```
+## Limits, persistence, and UI boundaries
 
-The exact values should be populated manually.
+Builds permit 100 subsequent actions plus the required opening allocation. Timed command inputs range from 00:00 to 29:59; simulation has a 30:00 maximum. Actions whose completion, scroll expiry, or builder return exceeds that horizon are blocked. Profile durations are bounded to 1,800 seconds and gathering-work estimates reject configurations that could exceed the simulation budget. Graph duration follows the plan within the same maximum; regular sampling is bounded to 361 points.
 
----
+Version-2 JSON files and compressed shareable links store the faction, profile, opening allocation, and exact commands. Optional exported timings are ignored on import and recalculated. Rules-revision mismatches warn without loading historical rules. Browser drafts and explicitly saved personal profiles persist per faction. Version-1 files, links, and browser profiles are unsupported and are not migrated.
 
-## 8. Worker Level
-
-Worker level affects construction and building-upgrade time.
-
-Known behavior:
-
-```text
-Worker level 1/5/9/13/17/21 → 0%/1%/2%/3%/4%/5% construction-time reduction
-```
-
-The confirmed `gameProfile.player.workerLevel` mapping is implemented in `src/game/playerLevels.ts`. The default is 1, maximum 24. It affects construction and building upgrades but leaves worker travel and unit production bonuses unchanged.
-
-For a base construction time:
-
-```text
-effectiveConstructionTime =
-    baseConstructionTime * (1 - workerConstructionBonus)
-```
-
-The planner uses this duration-reduction formula, matching the existing production-bonus convention.
-
----
-
-## 9. Production Building Level
-
-Player production levels reduce unit training time by 1%/2%/3%/4%/5%/6% at levels 1/5/9/13/17/21 (maximum 24). The fields are `townHallLevel` for Workers/Slaves, `barracksLevel` for Barracks, `industrialBuildingLevel` for Factory/Workshop, and `arcaneBuildingLevel` for Sanctuary/Dark Gate. All default to 1; there is no zero-bonus tier. Production levels do not affect construction or building upgrades; those durations use workerLevel. Other producers, including Altar of Heroes, retain base recruitment times.
-
-For example:
-
-```text
-baseTrainingTime = 20s
-productionBonus = 4%
-
-effectiveTrainingTime = 20 * (1 - 0.04)
-                      = 19.2s
-```
-
-The bonus belongs to the production building instance/profile, not to the unit itself.
-
-This allows:
-
-```text
-Barracks Lv.2 → Soldier = X seconds
-Barracks Lv.5 → Soldier = Y seconds
-```
-
-without duplicating the Soldier definition.
-
----
-
-## 10. Food Capacity
-
-Food is modeled as a capacity rather than as a continuously gathered resource.
-
-There is a base food capacity.
-
-Default:
-
-```text
-20
-```
-
-Farms increase the available food capacity.
-
-Default contribution per completed Farm:
-
-```text
-+20 food capacity
-```
-
-Conceptually:
-
-```text
-foodCapacity =
-    baseFoodCapacity
-    + sum(completedFarm.foodCapacityBonus)
-```
-
-Example:
-
-```text
-Base capacity: 20
-Farm #1:       +20
-Farm #2:       +20
--------------------
-Total:          60
-```
-
-The exact terminology and population-consumption rules should be adapted to the actual War Legends mechanics.
-
-The important simulator requirement is that unit production must be checked against the current available food capacity.
-
-If unit production consumes population immediately, the simulator should model:
-
-```text
-currentFoodUsed
-currentFoodCapacity
-```
-
-and reject/delay production when:
-
-```text
-currentFoodUsed + unitFoodCost > currentFoodCapacity
-```
-
-If the game uses a different timing for population reservation, that rule should be encoded in `GameRules`.
-
-Farm construction itself is a normal building action and therefore can require a worker and a construction period.
-
----
-
-## 11. Buildings
-
-Each building should contain at least:
-
-```text
-id
-name
-cost
-baseConstructionTime
-prerequisites
-productionCapabilities
-upgradeCapabilities
-```
-
-Example:
-
-```json
-{
-  "id": "barracks",
-  "name": "Barracks",
-  "cost": {
-    "gold": 150,
-    "wood": 100
-  },
-  "baseConstructionTime": 30,
-  "produces": ["soldier"]
-}
-```
-
-The actual War Legends values should be entered manually.
-
-The current starter catalog is stored in `src/game/data.json`. Buildings are
-always constructed by the faction's worker as a planner rule; unit and upgrade
-producers use `produces` and `upgrades` on the producing item, and targets use
-`requires`. `src/game/gameData.ts` derives the planner-facing producer and
-prerequisite information from those relationships.
-
----
-
-## 12. Units
-
-Each unit should contain at least:
-
-```text
-id
-name
-cost
-baseTrainingTime
-foodCost
-prerequisites
-producer
-```
-
-Example:
-
-```json
-{
-  "id": "soldier",
-  "name": "Soldier",
-  "cost": {
-    "gold": 80,
-    "wood": 20
-  },
-  "baseTrainingTime": 12,
-  "foodCost": 1,
-  "producer": "barracks"
-}
-```
-
-Costs are assumed to be constant across account progression unless the game proves otherwise.
-
----
-
-## 13. Construction Delay
-
-The implemented profile has one configurable `constructionStartDelay`, default
-4 seconds, used for travel both to the building and back to the resource.
-Construction itself uses the building's `seconds` value from `data.json`.
-There are no custom per-action delays or positioning modes in the current UI.
-
-The worker stops gathering at command acceptance and remains unavailable through
-travel, construction, and return. Building availability starts at completion,
-before the worker returns. See `CONSTRUCTION.md` for selection priorities and the
-documented decision to discard interrupted cargo and restart gathering from zero.
-
----
-
-## 14. Command Time vs. Start Time
-
-Every construction action should expose at least:
-
-```text
-commandTime
-startTime
-completionTime
-```
-
-Example:
-
-```text
-Barracks
-
-commandTime:    01:20
-startTime:      01:24
-completionTime: 01:54
-workerReturnTime: 01:58
-```
-
-This distinction is important for execution-oriented build orders.
-
-The planner should tell the player when to issue the command, not only when the building finishes.
-
----
-
-## 15. Theoretical vs. Practical Build (future modes)
-
-The following named modes are future design ideas. The current implementation
-uses only the shared profile delay; setting it to zero removes both travel legs.
-
-### Theoretical
-
-Assume perfect positioning:
-
-```text
-constructionStartDelay = 0
-```
-
-This shows the mathematical optimum.
-
-### Practical
-
-Apply the configured construction delay.
-
-Example:
-
-```text
-                 Theoretical    Practical
-
-Barracks start     01:34.0       01:37.0
-Barracks finish    01:59.0       02:02.0
-```
-
-This makes the planner more useful for real gameplay.
-
----
-
-## 16. Production Queues
-
-Production buildings should have explicit queues.
-
-Castle/Citadel produces Workers/Slaves, and Barracks produces Swordsmen/Goons.
-Each building instance can train only one unit at a time. Training requires a
-completed producer and waits for its slot, resources, and food capacity.
-For example, a Worker started at 17s finishes at 35s, so the next Worker from
-that Castle cannot start before 35s. A newly built producer becomes available
-only when its construction finishes. Additional producer instances have
-independent slots.
-
-Example:
-
-```text
-Barracks #1
-    Soldier
-    Soldier
-    Soldier
-
-Barracks #2
-    Soldier
-    Soldier
-
-Stable #1
-    Knight
-```
-
-Production on one building must not block production on another unless the game rules require it.
-
-The simulator should therefore track production per building instance.
-
----
-
-## 17. Worker Construction and Gathering Interaction
-
-When a worker starts building (worker involvement in upgrades remains future work):
-
-```text
-worker leaves gathering
-worker becomes unavailable
-construction proceeds
-worker travels back to its resource
-worker becomes available again
-worker resumes or receives a new assignment
-```
-
-This should immediately affect the future resource curve.
-
-Example:
-
-```text
-02:00  Worker #4 is gathering gold
-02:10  Worker #4 receives construction order
-02:14  Worker #4 starts building Barracks
-02:44  Barracks completes
-02:48  Worker #4 is available again at its resource
-```
-
-There is no gold/wood income from Worker #4 while it is:
-
-```text
-moving to construction
-building
-returning to its resource
-```
-
----
-
-## 18. Event Model
-
-A useful internal event model is:
-
-```text
-ResourceGatheringStarted
-ResourceArrived
-WorkerArrived
-GoldMineSpotFreed
-GoldMineSpotOccupied
-BuildingConstructionOrdered
-BuildingConstructionStarted
-BuildingConstructionFinished
-BuildingUpgradeStarted
-BuildingUpgradeFinished
-UnitTrainingStarted
-UnitTrainingFinished
-WorkerAssigned
-WorkerFreed
-FarmCompleted
-FoodCapacityChanged
-```
-
-The exact implementation can differ, but the simulator should preserve the distinction between scheduled actions and their actual state transitions.
-
----
-
-## 19. Player Profile
-
-A build should be evaluated against a player profile.
-
-Example player block (see `BUILD_ORDER_FILES.md` for the complete persisted profile):
-
-```json
-{
-  "player": {
-    "startingGold": 150,
-    "startingWood": 50,
-    "baseFoodLimit": 20,
-    "townHallLevel": 8,
-    "sawmillLevel": 6,
-    "farmLevel": 1,
-    "barracksLevel": 5,
-    "industrialBuildingLevel": 1,
-    "arcaneBuildingLevel": 1,
-    "workerLevel": 1
-  }
-}
-```
-
-This allows the same build order to be tested for different account progression levels.
-
----
-
-## 20. Game Data vs. Player Data
-
-Do not mix these two categories.
-
-### Game data
-
-Static definitions:
-
-```text
-unit costs
-unit base training times
-unit food costs
-building costs
-building base construction times
-prerequisites
-Castle-level gold yield table
-Sawmill-level wood yield table
-Worker-level construction modifiers
-Production-building-level training modifiers
-Worker-item gathering modifiers
-default travel times
-default nearby-Sawmill travel time
-base food capacity
-Farm food-capacity bonus
-```
-
-### Player data
-
-Current configuration:
-
-```text
-Castle level
-Sawmill level
-Worker level
-Production building levels
-Worker equipment
-Initial resources
-Initial workers
-Travel-time overrides
-Construction-delay settings
-```
-
-This separation is essential because account progression changes simulation results without changing the underlying unit/building definitions.
-
----
-
-## 21. Manual Data Entry
-
-The game exposes the relevant unit/building parameters in its UI, but does not necessarily provide them as a convenient public table.
-
-Therefore, the initial dataset should be manually transcribed into structured files.
-
-No measurement system is required for the first version.
-
-Recommended structure:
-
-```text
-src/game/
-  data/
-    units.json
-    buildings.json
-    upgrades.json
-    progression.json
-    modifiers.json
-    economy.json
-```
-
-The data should be easy to update when the game changes.
-
----
-
-## 22. Validation
-
-The simulator should detect at least:
-
-- insufficient resources;
-- missing prerequisites;
-- unavailable production building;
-- unavailable worker;
-- food/population capacity exceeded;
-- invalid upgrade level;
-- duplicate or impossible actions;
-- production queue conflicts;
-- invalid or unreachable worker assignments.
-
-The UI should clearly distinguish:
-
-```text
-Valid
-Warning
-Impossible
-```
-
----
-
-## 23. Example Economy Timeline
-
-A useful visualization should expose the separate components of a worker's economy cycle.
-
-### Gold
-
-```text
-Worker #1
-
-0:00         0:04      0:07          0:11      0:15
-|------------|---------|-------------|---------|
-Town Hall    Arrive    Mine          Return    Arrive again
-             at mine   3.10s         4s        at mine
-
-                [waiting is inserted here when the mine is occupied]
-```
-
-With four workers, the mine can be continuously active:
-
-```text
-Mine:
-W1 [====] W2 [====] W3 [====] W4 [====] W1 [====] ...
-     3.10s    3.10s    3.10s    3.10s    3.10s
-
-Worker cycle is approximately 12.40s in steady state:
-4s outbound + ~1.30s queue + 3.10s mining + 4s return.
-```
-
-With three workers, the mine is not continuously active:
-
-```text
-Mine:
-W1 [====] W2 [====] W3 [====] ..idle.. W1 [====] ...
-     3.10s    3.10s    3.10s    1.70s
-```
-
-The exact schedule should always be generated by the simulator, including worker starting positions and event order.
-
----
-
-## 24. Future Extensions
-
-Potential future features:
-
-- import/export player profiles;
-- saved build orders;
-- build-order comparison;
-- theoretical vs. practical comparison;
-- configurable construction delays per building;
-- optimized worker allocation;
-- automatic search for earlier completion;
-- automatic worker reassignment;
-- gold-mine queue visualization;
-- shareable build-order URLs;
-- patch/versioned game data.
-
-## Lumber Gathering Scroll
-
-The Light Lumber Gathering scroll costs 25 mana, activates at command time + 1 second, and lasts 30 seconds. Levels 1–6 currently share a +15 wood cargo bonus (65 rather than 50 at default yield). The forest effect checks each worker's gathering-completion time: start is inclusive and expiry exclusive. This applies to workers already gathering, travelling to the forest, recruited later, or returning from construction. A returning worker's existing cargo is unchanged; its next gathering completion can receive the bonus. Cargo is fixed at gathering completion and retains any bonus when delivered after expiry. Overlapping casts do not stack; interrupted loads are discarded. Timing uses the configured travel and effective gathering durations, including Sawmill travel and equipment reductions.
-
-
-## Add resources events
-
-Both factions can add gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 29:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
-
-## Mana well ownership
-
-Ownership starts at zero. Capture mana well increases ownership by one at its exact command timestamp; Lose mana well decreases it by one only when at least one well is owned. There are no costs or delays. Evaluate in timestamp order and use source order for ties, including simultaneous captures and losses. Invalid losses remain blocked and do not change ownership or mana.
-
-Mana regenerates at `manaAccumulation + ownedWells * manaFromManaWells` per minute. Integrate separately across each capture/loss, capacity completion and scroll spend. Capacity still limits regeneration and capped income is discarded. Automatic scroll suggestions use the changing rate and retain scroll order-delay rules.
-
-## Lose unit
-
-Both factions can lose one worker, unit or hero at a selected timestamp. Only completed, living units are eligible; starting workers exist at 00:00. Loss releases food immediately, and lost workers stop gathering. Construction workers are excluded; wood gatherers are lost before gold miners. The dialog accepts whole seconds and defaults to one second after the latest active command. Invalid events have no effect and show a warning. Events are editable and included in drafts, JSON and share links.
+The timeline shows construction, recruitment, scrolls/events, and resource graphs, with hover inspection of resources and worker allocation. Individual mine queues and full per-worker activity lanes are not displayed. There is no combat simulation, build comparison, automatic build optimization, or manual worker reassignment beyond the opening allocation.

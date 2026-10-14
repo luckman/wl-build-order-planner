@@ -54,7 +54,7 @@ export function manaAt(
             action.finishTime !== null && action.finishTime <= time)
             return [{ time: action.finishTime, capacity: settings.manaPerTower, spend: 0, wells: 0 }]
         if (action.item.kind === "mana-well" && action.commandTime != null && action.commandTime <= time)
-            return [{ time: action.commandTime, capacity: 0, spend: 0, wells: action.item.id === "capture-mana-well" ? 1 : -1 }]
+            return [{ time: action.commandTime, capacity: 0, spend: 0, wells: action.item.id === "mana-well-is-captured" ? 1 : -1 }]
         if (action.manaCost && action.commandTime != null && action.commandTime <= time)
             return [{ time: action.commandTime, capacity: 0, spend: action.manaCost, wells: 0 }]
         return []
@@ -74,7 +74,7 @@ export type WorkerStart = { time: number; assignment: "gold" | "wood" }
 export type GatheringWorker = {
     id: number
     assignment: "gold" | "wood" | "idle"
-    state: "idle" | "outbound" | "waiting" | "gathering" | "deposit" | "construction" | "lost"
+    state: "idle" | "outbound" | "waiting" | "gathering" | "deposit" | "construction" | "killed"
     stateSince: number
     nextAt: number
     cargoGold: number
@@ -151,23 +151,23 @@ export class WorkerEconomy {
         return worker
     }
 
-    /** Construction workers cannot be selected; wood gatherers are lost before gold miners. */
-    selectLossWorker() {
+    /** Construction workers cannot be selected; wood gatherers are killed before gold miners. */
+    selectWorkerToKill() {
         const priority = (worker: GatheringWorker) => worker.assignment === "wood" || this.delayedInitialWoodWorkerIds.includes(worker.id)
             ? 0 : worker.assignment === "gold" ? 1 : 2
-        return this.workers.filter(worker => worker.state !== "construction" && worker.state !== "lost")
+        return this.workers.filter(worker => worker.state !== "construction" && worker.state !== "killed")
             .sort((a, b) => priority(a) - priority(b) || a.id - b.id)[0]
     }
 
-    loseWorker(workerId: number) {
+    killWorker(workerId: number) {
         const worker = this.workers[workerId]
-        if (!worker || worker.state === "lost" || worker.state === "construction") return false
+        if (!worker || worker.state === "killed" || worker.state === "construction") return false
         if (this.mineWorker === workerId) this.mineWorker = null
         this.delayedInitialWoodWorkerIds = this.delayedInitialWoodWorkerIds.filter(id => id !== workerId)
         worker.assignment = "idle"
         worker.cargoGold = 0
         worker.cargoWood = 0
-        this.transition(worker, "lost", Infinity)
+        this.transition(worker, "killed", Infinity)
         this.startMine()
         return true
     }
@@ -307,7 +307,7 @@ export class WorkerEconomy {
         return this.workers
             .filter(
                 (worker) =>
-                    worker.state !== "construction" && worker.state !== "lost" && !(worker.assignment === "gold" && worker.state === "gathering"),
+                    worker.state !== "construction" && worker.state !== "killed" && !(worker.assignment === "gold" && worker.state === "gathering"),
             )
             .sort((a, b) => priority(a) - priority(b) || amount(a) - amount(b) || a.id - b.id)[0]
     }
@@ -383,12 +383,12 @@ export function workerAllocationAt(
         .flatMap((action) => {
             const events: Array<{
                 time: number
-                type: "worker" | "construction" | "loss"
+                type: "worker" | "construction" | "kill"
                 workerId?: number
                 duration?: number
             }> = []
-            if (action.item.kind === "unit-loss" && !action.blocked && action.commandTime !== null && action.workerId !== null) {
-                events.push({ time: action.commandTime, type: "loss", workerId: action.workerId })
+            if (action.item.kind === "unit-is-killed" && !action.blocked && action.commandTime !== null && action.workerId !== null) {
+                events.push({ time: action.commandTime, type: "kill", workerId: action.workerId })
             }
             if ((action.item.id === "worker" || action.item.id === "slave") && action.finishTime !== null) {
                 events.push({ time: action.finishTime, type: "worker" })
@@ -409,15 +409,15 @@ export function workerAllocationAt(
             return events
         })
         .filter((event) => event.time <= time)
-        .sort((left, right) => left.time - right.time || ({ worker: 0, loss: 1, construction: 2 }[left.type] - { worker: 0, loss: 1, construction: 2 }[right.type]))
+        .sort((left, right) => left.time - right.time || ({ worker: 0, kill: 1, construction: 2 }[left.type] - { worker: 0, kill: 1, construction: 2 }[right.type]))
 
     for (const event of events) {
         simulation.advanceTo(event.time)
         if (event.type === "worker") {
             const goldWorkers = simulation.workers.filter(({ assignment }) => assignment === "gold").length
             simulation.addWorker(goldWorkers < saturation ? "gold" : "wood")
-        } else if (event.type === "loss") {
-            simulation.loseWorker(event.workerId!)
+        } else if (event.type === "kill") {
+            simulation.killWorker(event.workerId!)
         } else {
             const worker = simulation.workers[event.workerId!]
             if (worker) {
@@ -427,10 +427,10 @@ export function workerAllocationAt(
     }
     simulation.advanceTo(time)
     const busyOrIdle = simulation.workers.filter(
-        ({ assignment, state }) => state !== "lost" && (assignment === "idle" || state === "construction" || state === "idle"),
+        ({ assignment, state }) => state !== "killed" && (assignment === "idle" || state === "construction" || state === "idle"),
     ).length
     return {
-        total: simulation.workers.filter(worker => worker.state !== "lost").length,
+        total: simulation.workers.filter(worker => worker.state !== "killed").length,
         gold: simulation.workers.filter(({ assignment, state }) => assignment === "gold" && state !== "construction").length,
         wood: simulation.workers.filter(({ assignment, state }) => assignment === "wood" && state !== "construction").length,
         busyOrIdle,

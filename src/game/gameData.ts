@@ -3,15 +3,15 @@ import { buildingLimit, newBuilding, plannedBuildings, requirementCount } from "
 
 export type FactionId = "light" | "dark"
 export type ItemKind = "building" | "unit" | "hero" | "upgrade"
-export function isRecruitable(item: { kind: ItemKind | "scroll" | "resource" | "mana-well" | "unit-loss" }) {
+export function isRecruitable(item: { kind: ItemKind | "scroll" | "resources-collected" | "mana-well" | "unit-is-killed" }) {
     return item.kind === "unit" || item.kind === "hero"
 }
 export type BuildingType = "Economic" | "Production" | "Racial" | "Defensive"
 /** Queued heroes reserve the next recruitment tier across all Altars. */
 export function heroAltarLevel(previousItems: PlannerItem[]) {
     const heroes = previousItems.filter(item => item.kind === "hero")
-    const losses = previousItems.filter(item => item.kind === "unit-loss" && heroes.some(hero => hero.id === item.unitId))
-    return 1 + Math.max(0, heroes.length - losses.length)
+    const kills = previousItems.filter(item => item.kind === "unit-is-killed" && heroes.some(hero => hero.id === item.unitId))
+    return 1 + Math.max(0, heroes.length - kills.length)
 }
 export type ItemRequirement = { item: string; count: number; minLevel?: number }
 export type BuildingLimit = {
@@ -19,9 +19,9 @@ export type BuildingLimit = {
     byHighestLevel: Array<{ minLevel: number; max: number }>
 }
 export type IconId =
-    | "lightLoseUnit" | "darkLoseUnit"
-    | "captureManaWell" | "loseManaWell"
-    | "addResources"
+    | "lightUnitIsKilled" | "darkUnitIsKilled"
+    | "manaWellIsCaptured" | "manaWellIsLost"
+    | "resourcesCollected"
     | "lightGoldRush" | "lightLumberGathering"
     | "lightCastle"
     | "lightSawmill"
@@ -131,7 +131,7 @@ export type PlannerItem = {
     level?: number
     upgradeFrom?: string
     producerBuildingId?: string
-} & ({ kind: ItemKind } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering"; commandTime: number } | { kind: "resource"; commandTime: number; resourceGold: number; resourceWood: number } | { kind: "mana-well"; wellEvent: "capture-mana-well" | "lose-mana-well"; commandTime: number } | { kind: "unit-loss"; commandTime: number; unitId: string })
+} & ({ kind: ItemKind } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering"; commandTime: number } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string })
 
 export type Faction = {
     id: FactionId
@@ -271,7 +271,7 @@ export function buildOrderWithDependencies(
     }
 
     const add = (item: PlannerItem) => {
-        if (item.maxCount !== undefined && result.filter(previous => previous.id === item.id).length - result.filter(previous => previous.kind === "unit-loss" && previous.unitId === item.id).length >= item.maxCount) {
+        if (item.maxCount !== undefined && result.filter(previous => previous.id === item.id).length - result.filter(previous => previous.kind === "unit-is-killed" && previous.unitId === item.id).length >= item.maxCount) {
             throw new Error(`${item.name} limit reached (maximum ${item.maxCount}, including queued recruitment)`)
         }
         if (visiting.has(item.id)) throw new Error(`Circular prerequisite or building limit for ${item.name}`)
