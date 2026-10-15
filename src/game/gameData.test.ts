@@ -158,5 +158,8 @@ test("Miriel inserts Altar prerequisites and cannot be queued twice across multi
     expect(itemCost(altar, twoAltars, "Castle")).toEqual({ gold: 600, wood: 400 })
     const removed = twoAltars.filter(item => item.id !== "miriel")
     expect(buildOrderWithDependencies(faction, removed, miriel).filter(item => item.id === "miriel")).toHaveLength(1)
-    expect(factions.dark.items.some(item => item.id === "miriel" || item.id === "altar-of-heroes")).toBe(false)
+    expect(factions.dark.items.some(item => item.id === "miriel")).toBe(false)
+    expect(factions.dark.items.find(item => item.id === "altar-of-heroes")).toMatchObject({
+        kind: "building", producer: "Slave",
+    })
 })

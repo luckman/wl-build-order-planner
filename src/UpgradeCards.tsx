@@ -1,4 +1,5 @@
 import { type Faction, itemCost, type PlannerItem } from "./game/gameData"
+import { orderedBuildings } from "./buildingDisplayOrder"
 
 type Props = {
     faction: Faction
@@ -11,7 +12,7 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd }
     const [open, setOpen] = useState<{ building: PlannerItem; anchor: HTMLButtonElement; last: boolean } | null>(null)
     const menu = useRef<HTMLDivElement>(null)
     const upgrades = open ? faction.items.filter(item => item.kind === "upgrade" && item.buildingId === open.building.id &&
-        !(faction.id === "dark" && item.buildingId === "citadel" && (item.level ?? 0) > 2))
+        !(faction.id === "dark" && item.buildingId === "citadel" && (item.level ?? 0) > 3))
         .sort((a, b) => (a.level ?? 0) - (b.level ?? 0)) : []
     const close = () => {
         open?.anchor.focus()
@@ -44,7 +45,7 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd }
             window.removeEventListener("resize", dismissOnResize)
         }
     }, [open])
-    const buildings = faction.items.filter(building => building.kind === "building" &&
+    const buildings = orderedBuildings(faction).filter(building =>
         faction.items.some(item => item.kind === "upgrade" && item.buildingId === building.id))
 
     return <><div className="action-grid upgrade-grid">

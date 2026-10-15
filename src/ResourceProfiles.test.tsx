@@ -52,11 +52,11 @@ test("gathering reductions use one decimal, enforce bounds, and sit in the first
     }
     const firstLabels = Array.from(columns[0].querySelectorAll("label")).map(label => label.textContent)
     expect(firstLabels[firstLabels.indexOf("Sawmill level") + 1]).toBe("Worker level")
-    expect(Array.from(columns[1].querySelectorAll("label")).slice(-2).map(label => label.textContent)).toEqual(["Gold Rush level", "Wood Gathering level"])
-    change("Gold Rush level", "7")
-    change("Wood Gathering level", "3.5")
-    expect(value("Gold Rush level")).toBe("6")
-    expect(value("Wood Gathering level")).toBe("3")
+    expect(Array.from(columns[1].querySelectorAll("label")).slice(-2).map(label => label.textContent)).toEqual(["Gold Rush scroll level", "Wood Gathering scroll level"])
+    change("Gold Rush scroll level", "7")
+    change("Wood Gathering scroll level", "3.5")
+    expect(value("Gold Rush scroll level")).toBe("6")
+    expect(value("Wood Gathering scroll level")).toBe("3")
     change(gold, "1")
     change(wood, "3")
     expect(value(gold)).toBe("1.0")
@@ -76,8 +76,8 @@ test("gathering reductions use one decimal, enforce bounds, and sit in the first
     expect(screen.getByLabelText("Pigsty level").closest(".resource-profile-column")).toBe(columns[1])
     const darkLabels = Array.from(columns[0].querySelectorAll("label")).map(label => label.textContent)
     expect(darkLabels[darkLabels.indexOf("Sawmill level") + 1]).toBe("Slave level")
-    expect(screen.queryByLabelText("Gold Rush level")).toBeNull()
-    expect(screen.queryByLabelText("Wood Gathering level")).toBeNull()
+    expect(screen.queryByLabelText("Gold Rush scroll level")).toBeNull()
+    expect(screen.queryByLabelText("Wood Gathering scroll level")).toBeNull()
 })
 
 test("reset basic restores main fields while preserving advanced settings, hidden settings, and the build", () => {

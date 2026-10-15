@@ -11,6 +11,7 @@ import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
 import ScrollDialog from "./ScrollDialog"
 import UpgradeCards from "./UpgradeCards"
+import { orderedBuildings } from "./buildingDisplayOrder"
 import EventTimeDialog from "./EventTimeDialog"
 import { createScrollAction, SCROLLS, type ScrollId, isScrollAction, scrollCooldown, scrollEffect } from "./game/scrolls"
 import { earliestScrollTime } from "./game/scrollTiming"
@@ -427,8 +428,7 @@ export default function App() {
                                     <section key={kind} aria-label={kind === "hero" ? "heroes" : `${kind}s`}>
                                         {kind === "upgrade" ? <UpgradeCards key={faction.id} faction={faction} buildOrder={buildOrder} iconSources={iconSources}
                                             onAdd={addCatalogItem} /> : <div className={`action-grid${kind === "hero" ? ` hero-scroll-grid${factionId === "dark" ? " dark-events-grid" : ""}` : ""}`}>
-                                            {faction.items
-                                                .filter((item) => item.kind === kind)
+                                            {(kind === "building" ? orderedBuildings(faction) : faction.items.filter(item => item.kind === kind))
                                                 .map((item) => {
                                                     const cost = itemCost(item, buildOrder, faction.startingTownHall)
                                                     const food = isRecruitable(item) ? item.food : 0

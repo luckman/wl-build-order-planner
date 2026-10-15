@@ -1423,7 +1423,14 @@
                 "max": 4
               }
             ]
-          }
+          },
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 1
+            }
+          ]
         },
         {
           "id": "pigsty",
@@ -1457,7 +1464,14 @@
                 "max": 4
               }
             ]
-          }
+          },
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 1
+            }
+          ]
         },
         {
           "id": "barracks",
@@ -1471,7 +1485,11 @@
           },
           "seconds": 30,
           "produces": [
-            "goon"
+            "goon",
+            "skeleton-archer",
+            "bomber",
+            "warg-rider",
+            "axe-master"
           ],
           "icon": "darkBarracks",
           "requires": [
@@ -1480,7 +1498,258 @@
               "count": 1,
               "minLevel": 1
             }
+          ],
+          "upgrades": [
+            "barracks-lvl-2"
           ]
+        },
+        {
+          "id": "barracks-lvl-2",
+          "name": "Barracks lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 50,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 35,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "darkBarracks"
+        },
+        {
+          "id": "workshop",
+          "name": "Workshop",
+          "kind": "building",
+          "type": "Production",
+          "cost": {
+            "gold": 250,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 40,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkWorkshop",
+          "produces": [
+            "aeronaut"
+          ]
+        },
+        {
+          "id": "dark-gate",
+          "name": "Dark Gate",
+          "kind": "building",
+          "type": "Production",
+          "cost": {
+            "gold": 300,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 35,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkDarkGate",
+          "produces": [
+            "necromancer"
+          ]
+        },
+        {
+          "id": "goblin-lab",
+          "name": "Goblin Lab",
+          "kind": "building",
+          "type": "Racial",
+          "cost": {
+            "gold": 250,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkGoblinLab"
+        },
+        {
+          "id": "totem-of-orcs",
+          "name": "Totem of Orcs",
+          "kind": "building",
+          "type": "Racial",
+          "cost": {
+            "gold": 300,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkTotemOfOrcs"
+        },
+        {
+          "id": "undead-obelisk",
+          "name": "Undead Obelisk",
+          "kind": "building",
+          "type": "Racial",
+          "cost": {
+            "gold": 200,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkUndeadObelisk"
+        },
+        {
+          "id": "altar-of-heroes",
+          "name": "Altar of Heroes",
+          "kind": "building",
+          "type": "Production",
+          "cost": {
+            "gold": 150,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 50,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkAltarOfHeroes",
+          "produces": [
+            "grokk",
+            "jax",
+            "eater"
+          ]
+        },
+        {
+          "id": "tower-of-dark-magic",
+          "name": "Tower of Dark Magic",
+          "kind": "building",
+          "type": "Defensive",
+          "cost": {
+            "gold": 250,
+            "wood": 350,
+            "food": 0
+          },
+          "seconds": 30,
+          "requires": [
+            {
+              "item": "undead-obelisk",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkTowerOfDarkMagic",
+          "limit": {
+            "basedOn": "undead-obelisk",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "slingshot-tower",
+          "name": "Slingshot Tower",
+          "kind": "building",
+          "type": "Defensive",
+          "cost": {
+            "gold": 150,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 25,
+          "requires": [
+            {
+              "item": "totem-of-orcs",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkSlingshotTower",
+          "limit": {
+            "basedOn": "totem-of-orcs",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "napalm-tower",
+          "name": "Napalm Tower",
+          "kind": "building",
+          "type": "Defensive",
+          "cost": {
+            "gold": 200,
+            "wood": 400,
+            "food": 0
+          },
+          "seconds": 35,
+          "requires": [
+            {
+              "item": "goblin-lab",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkNapalmTower",
+          "limit": {
+            "basedOn": "goblin-lab",
+            "byHighestLevel": [
+              {
+                "minLevel": 1,
+                "max": 1
+              }
+            ]
+          }
         },
         {
           "id": "tower-of-mana",
@@ -1548,6 +1817,215 @@
             }
           ],
           "icon": "darkGoon"
+        },
+        {
+          "id": "skeleton-archer",
+          "name": "Skeleton Archer",
+          "kind": "unit",
+          "cost": {
+            "gold": 125,
+            "wood": 125,
+            "food": 2
+          },
+          "seconds": 21,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "undead-obelisk",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkSkeletonArcher"
+        },
+        {
+          "id": "bomber",
+          "name": "Bomber",
+          "kind": "unit",
+          "cost": {
+            "gold": 200,
+            "wood": 100,
+            "food": 4
+          },
+          "seconds": 15,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "goblin-lab",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkBomber"
+        },
+        {
+          "id": "warg-rider",
+          "name": "Warg Rider",
+          "kind": "unit",
+          "cost": {
+            "gold": 250,
+            "wood": 150,
+            "food": 6
+          },
+          "seconds": 42,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "totem-of-orcs",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkWargRider"
+        },
+        {
+          "id": "aeronaut",
+          "name": "Aeronaut",
+          "kind": "unit",
+          "cost": {
+            "gold": 175,
+            "wood": 250,
+            "food": 5
+          },
+          "seconds": 27,
+          "requires": [
+            {
+              "item": "workshop",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkAeronaut"
+        },
+        {
+          "id": "necromancer",
+          "name": "Necromancer",
+          "kind": "unit",
+          "cost": {
+            "gold": 225,
+            "wood": 50,
+            "food": 3
+          },
+          "seconds": 24,
+          "requires": [
+            {
+              "item": "dark-gate",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkNecromancer"
+        },
+        {
+          "id": "axe-master",
+          "name": "Axe Master",
+          "kind": "unit",
+          "cost": {
+            "gold": 275,
+            "wood": 250,
+            "food": 6
+          },
+          "seconds": 36,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "totem-of-orcs",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkAxeMaster"
+        },
+        {
+          "id": "grokk",
+          "name": "Grokk",
+          "kind": "hero",
+          "cost": {
+            "gold": 600,
+            "wood": 400,
+            "food": 8
+          },
+          "seconds": 45,
+          "maxCount": 1,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "totem-of-orcs",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkGrokk"
+        },
+        {
+          "id": "jax",
+          "name": "Jax",
+          "kind": "hero",
+          "cost": {
+            "gold": 550,
+            "wood": 650,
+            "food": 9
+          },
+          "seconds": 45,
+          "maxCount": 1,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "goblin-lab",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkJax"
+        },
+        {
+          "id": "eater",
+          "name": "Eater",
+          "kind": "hero",
+          "cost": {
+            "gold": 600,
+            "wood": 300,
+            "food": 10
+          },
+          "seconds": 45,
+          "maxCount": 1,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "undead-obelisk",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkEater"
         }
       ]
     }

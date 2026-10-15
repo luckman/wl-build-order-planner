@@ -2,7 +2,7 @@
 
 The planner enforces quantity prerequisites, minimum levels, highest-level building limits, and upgrades of individual buildings, including Castle/Citadel progression through level 4.
 
-The current catalog is `src/game/data.json`; `src/game/gameData.ts` derives its producer and upgrade relationships, and `src/game/buildSimulation.ts` validates scheduling. Light has the expanded catalog documented below. Dark currently contains Citadel levels 1–4, Sawmill, Pigsty, Barracks, Tower of Mana, Slave, and Goon. The Dark action picker offers only Citadel level 2; levels 3–4 remain supported by the catalog, imports, and simulator. Other Dark artwork does not imply implemented game entries.
+The current catalog is `src/game/data.json`; `src/game/gameData.ts` derives its producer and upgrade relationships, and `src/game/buildSimulation.ts` validates scheduling. Light has the expanded catalog documented below. Dark contains Citadel levels 1–4, Sawmill, Pigsty, Barracks, Tower of Mana, Slave, Goon, and the additional level 1 buildings defined in the catalog. Workshop recruits Aeronaut and Dark Gate recruits Necromancer. Altar of Heroes recruits Grokk, Jax, and Eater; its higher-level upgrades await confirmed data. Dark defensive towers each have a limit of one, based on their corresponding level 1 racial building; no higher thresholds are inferred. The Dark action picker offers Citadel levels 2–3; level 4 remains supported by the catalog, imports, and simulator but is hidden from the picker. Pigsty and Tower of Mana follow the same town-hall prerequisites and quantity limits as Light Farm and Tower of Mana. Other Dark artwork does not imply implemented game entries.
 
 ## Copy prices
 
@@ -116,3 +116,36 @@ Miriel has `kind: "hero"`, costs 650 gold / 250 wood / 10 food, takes 45 seconds
 An optional positive integer `maxCount` on an item declares a global cap for that item within its faction. All three Light heroes have `maxCount: 1`, allowing at most one living or queued Miriel, one Gilbert, and one Berin (three total) across all Altars. The dependency helper accounts for planned unit-is-killed entries when adding another copy; the scheduler independently validates actual living and queued recruitment across all producers. A blocked recruitment does not reserve the cap or food. Removing a recruitment order recalculates reservations. A successful Unit is killed event releases the lost hero's cap and food, permitting later recruitment of that type; invalid losses release neither.
 
 Gilbert costs 500 gold / 500 wood / 8 food, takes 45 seconds to recruit, and requires Altar of Heroes level 1 and Human Monument level 1. Berin costs 500 gold / 700 wood / 9 food, takes 45 seconds, and requires Altar of Heroes level 1 and Dwarven Forge level 1. Both are registered in the Altar's `produces` list and use existing Light artwork, hero food rules, and Altar production queues. Selecting either hero inserts missing buildings and Castle upgrades automatically. Gilbert and Berin each have a maximum count of one, as does Miriel.
+
+## Dark Barracks level 2
+
+Confirmed by screenshots supplied on 2026-10-15: upgrading a level 1 Dark Barracks costs 50 gold / 100 wood, takes 35 seconds, and requires Citadel level 3. It uses the existing Barracks upgrade chain and artwork, preserves Goon production, and is offered in the Barracks upgrade menu. No additional recruits are inferred from this upgrade.
+
+## Dark unit observations — 2026-10-15
+
+Collected in BlueStacks App Player 1 from Skeleton Archer through Axe Master. Stopped on the locked Catapult without collecting or adding it. Slave and Goon retain their existing data. Only catalog fields were collected.
+
+Displayed training times already include a 1% reduction. Base seconds are recovered as `round(displayedSeconds / 0.99)`; the existing production-duration function applies the player bonus once during simulation. Every recovered value reproduces the displayed time within 0.05 seconds of display rounding.
+
+| Unit | Gold / wood / food | Displayed seconds | Base seconds | Producer | Additional requirement |
+| --- | --- | --- | --- | --- | --- |
+| Skeleton Archer | 125 / 125 / 2 | 20.8 | 21 | Barracks lvl 1 | Undead Obelisk lvl 1 |
+| Bomber | 200 / 100 / 4 | 14.9 | 15 | Barracks lvl 1 | Goblin Lab lvl 1 |
+| Warg Rider | 250 / 150 / 6 | 41.6 | 42 | Barracks lvl 1 | Totem of Orcs lvl 1 |
+| Aeronaut | 175 / 250 / 5 | 26.7 | 27 | Workshop lvl 1 | None displayed |
+| Necromancer | 225 / 50 / 3 | 23.8 | 24 | Dark Gate lvl 1 | None displayed |
+| Axe Master | 275 / 250 / 6 | 35.6 | 36 | Barracks lvl 2 | Totem of Orcs lvl 1 |
+
+Each unit uses its existing icon, food reservation, and production queue. Selecting Axe Master inserts Barracks level 2 and Citadel level 3 when missing. No gold was spent during collection; BlueStacks was left at Catapult.
+
+## Dark hero observations — 2026-10-15
+
+Collected from a different account in BlueStacks App Player 1. All three heroes display 44.6 seconds with the user-confirmed 1% recruitment reduction; `round(44.6 / 0.99)` recovers a 45-second base time for the catalog. Combat and equipment stats are outside catalog scope.
+
+| Hero | Gold / wood / food | Base seconds | Producer | Additional requirement |
+| --- | --- | --- | --- | --- |
+| Grokk | 600 / 400 / 8 | 45 | Altar of Heroes lvl 1 | Totem of Orcs lvl 1 |
+| Jax | 550 / 650 / 9 | 45 | Altar of Heroes lvl 1 | Goblin Lab lvl 1 |
+| Eater | 600 / 300 / 10 | 45 | Altar of Heroes lvl 1 | Undead Obelisk lvl 1 |
+
+The entries use existing hero icons, one-per-type limits, hero food handling, and Altar queues. Any of the three can be selected as the first hero. Higher Altar tiers for recruiting subsequent heroes remain pending confirmed Dark upgrade data. The catalog stores base durations; this collection does not add Altar player-level settings or change the existing hero timing model. No gold was spent, and the carousel was left at Grokk after confirming all three entries.
