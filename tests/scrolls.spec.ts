@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { parseBuildOrder } from "../src/game/buildOrderFile"
 
 test("Gold Rush dialog supports automatic and fixed timing on desktop and mobile", async ({ page }) => {
     for (const width of [1280, 390]) {
@@ -46,8 +47,17 @@ test("Gold Rush dialog supports automatic and fixed timing on desktop and mobile
         await editor.getByRole("button", { name: "Save timestamp" }).click()
         await expect(editor).toHaveCount(0)
         await expect(page.locator(".order li")).toHaveCount(2)
-        expect(await page.evaluate(() => JSON.parse(localStorage.getItem("wl-build-draft-v2-light")!)[2].commandTime)).toBe(60.5)
+        const saved = await page.evaluate(() => localStorage.getItem("wl-build-draft-v2-light")!)
+        const draft = parseBuildOrder(saved)
+        expect(draft.faction).toBe("light")
+        expect(draft.opening).toEqual({ type: "allocate-workers", goldWorkers: 4 })
+        expect(JSON.parse(saved).buildOrder).toEqual([
+            { type: "allocate-workers", goldWorkers: 4 },
+            { type: "use-scroll", scrollId: "gold-rush", commandTime: 91 },
+            { type: "use-scroll", scrollId: "gold-rush", commandTime: 60.5 },
+        ])
         await page.reload()
+        // Timed events display chronologically, so the edited event is now first.
         const edit = page.getByRole("button", { name: "Change Gold Rush timestamp, action 1" })
         await edit.focus()
         await edit.press("Enter")

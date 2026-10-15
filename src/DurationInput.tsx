@@ -19,12 +19,14 @@ export default function DurationInput({ label, value, onChange, onFocus, onBlur,
                 const rightCharacters = input.value.slice(input.selectionStart ?? input.value.length).replace(/:/g, "").length
                 const masked = maskDuration(wholeSeconds ? input.value.split(".")[0] : input.value)
                 onChange(masked)
-                requestAnimationFrame(() => {
-                    if (!input.isConnected || document.activeElement !== input || input.value !== masked) return
+                // Apply the mask and caret together before another input event.
+                // A deferred caret update can race with rapid typing or selection.
+                input.value = masked
+                if (document.activeElement === input) {
                     let position = masked.length, remaining = rightCharacters
                     while (position > 0 && remaining > 0) { position--; if (masked[position] !== ":") remaining-- }
                     input.setSelectionRange(position, position)
-                })
+                }
             }}
             onFocus={event => { event.target.select(); onFocus?.(event) }}
             onBlur={event => {

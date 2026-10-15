@@ -30,18 +30,25 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd }
     }, [open])
     useEffect(() => {
         if (!open) return
+        const anchorBounds = open.anchor.getBoundingClientRect()
         const dismissOutside = (event: Event) => {
             if (event.target instanceof Node && !menu.current?.contains(event.target) && !open.anchor.contains(event.target)) {
                 setOpen(null)
             }
         }
+        const dismissOnScroll = (event: Event) => {
+            // Opening via a scrolled-into-view trigger can leave a queued scroll
+            // event. Only dismiss when scrolling actually moves the anchor.
+            const current = open.anchor.getBoundingClientRect()
+            if (current.x !== anchorBounds.x || current.y !== anchorBounds.y) dismissOutside(event)
+        }
         const dismissOnResize = () => setOpen(null)
         document.addEventListener("pointerdown", dismissOutside)
-        document.addEventListener("scroll", dismissOutside, true)
+        document.addEventListener("scroll", dismissOnScroll, true)
         window.addEventListener("resize", dismissOnResize)
         return () => {
             document.removeEventListener("pointerdown", dismissOutside)
-            document.removeEventListener("scroll", dismissOutside, true)
+            document.removeEventListener("scroll", dismissOnScroll, true)
             window.removeEventListener("resize", dismissOnResize)
         }
     }, [open])
