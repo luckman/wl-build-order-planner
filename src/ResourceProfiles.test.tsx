@@ -14,6 +14,25 @@ afterEach(() => {
 const value = (label: string) => (screen.getByLabelText(label) as HTMLInputElement).value
 const change = (label: string, next: string) => fireEvent.change(screen.getByLabelText(label), { target: { value: next } })
 
+test.each(["Light", "Dark"])("%s Shipyard and Altar levels persist and reset with the profile", faction => {
+    const first = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction }))
+    change("Shipyard level", "9")
+    change("Altar of Heroes level", "21")
+    fireEvent.click(screen.getByRole("button", { name: "Save profile" }))
+    first.unmount()
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction }))
+    expect(value("Shipyard level")).toBe("9")
+    expect(value("Altar of Heroes level")).toBe("21")
+    fireEvent.click(screen.getByRole("button", { name: "Reset basic to defaults" }))
+    expect(value("Shipyard level")).toBe("1")
+    expect(value("Altar of Heroes level")).toBe("1")
+    fireEvent.click(screen.getByRole("button", { name: "Load saved profile" }))
+    expect(value("Shipyard level")).toBe("9")
+    expect(value("Altar of Heroes level")).toBe("21")
+})
+
 test("mana capacity never falls below starting mana during edits or after reload", () => {
     const first = render(<App />)
     change("Starting mana", "75")

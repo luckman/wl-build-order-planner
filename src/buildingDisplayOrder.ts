@@ -14,8 +14,6 @@ const buildingDisplayOrder = {
         "barracks", "workshop", "dark-gate", "altar-of-heroes",
         "undead-obelisk", "goblin-lab", "totem-of-orcs",
         "tower-of-mana",
-        // TODO: Dark Shipyard placeholder: add its catalog data using this ID (or update
-        // this ID to match). Keep it after Tower of Mana and before defensive buildings.
         "shipyard",
         "tower-of-dark-magic", "slingshot-tower", "napalm-tower",
     ],

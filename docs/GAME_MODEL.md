@@ -100,7 +100,7 @@ Eight player building levels are integers 1–24, defaulting to 1. These profile
 | Recruitment duration reduction | 1% | 2% | 3% | 4% | 5% | 6% |
 | Construction/upgrade duration reduction (`workerLevel`) | 0% | 1% | 2% | 3% | 4% | 5% |
 
-Recruitment bonuses use `townHallLevel` for Workers/Slaves, `barracksLevel` for Barracks, `industrialBuildingLevel` for Factory/Workshop, and `arcaneBuildingLevel` for Sanctuary/Dark Gate. Workshop and Dark Gate mappings exist but their catalog entries are not implemented. Shipyards and Altars retain base recruitment durations. Duration is `baseSeconds * (1 - reduction)`.
+Recruitment bonuses use `townHallLevel` for Workers/Slaves, `barracksLevel` for Barracks, `industrialBuildingLevel` for Factory/Workshop, `arcaneBuildingLevel` for Sanctuary/Dark Gate, `shipyardLevel` for Shipyard, and `altarOfHeroesLevel` for Altar of Heroes. All mappings apply to both factions. Duration is `baseSeconds * (1 - reduction)`.
 
 In-match upgrades unlock catalog prerequisites, producer capabilities, and building limits. They do not change the profile's resource yields or account bonuses.
 

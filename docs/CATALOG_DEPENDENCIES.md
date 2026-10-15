@@ -2,7 +2,7 @@
 
 The planner enforces quantity prerequisites, minimum levels, highest-level building limits, and upgrades of individual buildings, including Castle/Citadel progression through level 4.
 
-The current catalog is `src/game/data.json`; `src/game/gameData.ts` derives its producer and upgrade relationships, and `src/game/buildSimulation.ts` validates scheduling. Light has the expanded catalog documented below. Dark contains Citadel levels 1–4, Sawmill, Pigsty, Barracks, Tower of Mana, Slave, Goon, and the additional level 1 buildings defined in the catalog. Workshop recruits Aeronaut and Dark Gate recruits Necromancer. Altar of Heroes recruits Grokk, Jax, and Eater; its higher-level upgrades await confirmed data. Dark defensive towers each have a limit of one, based on their corresponding level 1 racial building; no higher thresholds are inferred. The Dark action picker offers Citadel levels 2–3; level 4 remains supported by the catalog, imports, and simulator but is hidden from the picker. Pigsty and Tower of Mana follow the same town-hall prerequisites and quantity limits as Light Farm and Tower of Mana. Other Dark artwork does not imply implemented game entries.
+The current catalog is `src/game/data.json`; `src/game/gameData.ts` derives its producer and upgrade relationships, and `src/game/buildSimulation.ts` validates scheduling. Light has the expanded catalog documented below. Dark contains Citadel levels 1–4, Sawmill, Pigsty, Barracks, Tower of Mana, Slave, Goon, and the additional level 1 buildings defined in the catalog. Workshop recruits Aeronaut and Dark Gate recruits Necromancer. Goblin Lab, Totem of Orcs, Undead Obelisk, and Altar of Heroes have confirmed upgrades through level 3. Altar of Heroes recruits Grokk, Jax, and Eater. Dark defensive towers follow the same 1/2/3 capacity thresholds as Light at corresponding racial building levels 1/2/3, confirmed by the owner. The Dark action picker offers Citadel levels 2–4. Pigsty and Tower of Mana follow the same town-hall prerequisites and quantity limits as Light Farm and Tower of Mana. Other Dark artwork does not imply implemented game entries.
 
 ## Copy prices
 
@@ -84,7 +84,7 @@ These additions use the existing Light artwork and do not add Dark equivalents.
 | Sloop | 200 / 400 / 4 | 42 | Shipyard | Shipyard lvl 1 |
 | Caravel | 400 / 650 / 8 | 51 | Shipyard | Shipyard lvl 2 and Elven Tree lvl 1 |
 
-All listed units use existing Light icons, food reservations, and automatic prerequisite insertion, including prerequisite building upgrades. Units share queues with other recruits at their producer. Existing player-level recruitment bonuses apply to Barracks, Factory, and Sanctuary, reducing these base durations; Shipyard has no configured player-level recruitment bonus.
+All listed units use existing Light icons, food reservations, and automatic prerequisite insertion, including prerequisite building upgrades. Units share queues with other recruits at their producer. Player-level recruitment bonuses apply to all production buildings, including Shipyard and Altar of Heroes, reducing catalog base durations.
 
 ## Light building upgrades
 
@@ -148,4 +148,73 @@ Collected from a different account in BlueStacks App Player 1. All three heroes 
 | Jax | 550 / 650 / 9 | 45 | Altar of Heroes lvl 1 | Goblin Lab lvl 1 |
 | Eater | 600 / 300 / 10 | 45 | Altar of Heroes lvl 1 | Undead Obelisk lvl 1 |
 
-The entries use existing hero icons, one-per-type limits, hero food handling, and Altar queues. Any of the three can be selected as the first hero. Higher Altar tiers for recruiting subsequent heroes remain pending confirmed Dark upgrade data. The catalog stores base durations; this collection does not add Altar player-level settings or change the existing hero timing model. No gold was spent, and the carousel was left at Grokk after confirming all three entries.
+The entries use existing hero icons, one-per-type limits, hero food handling, and Altar queues. Any of the three can be selected as the first hero. Altar levels 2 and 3 are now confirmed below, providing the prerequisites for subsequent heroes. The catalog stores base durations; Altar of Heroes recruitment now uses its own account progression level, with the same 1–6% reductions as other producers. No gold was spent, and the carousel was left at Grokk after confirming all three entries.
+
+## Dark Shipyard
+
+Confirmed by screenshots supplied on 2026-10-15:
+
+| Entry | Gold / wood | Base seconds | Requirements |
+| --- | --- | --- | --- |
+| Shipyard | 150 / 300 | 35 | Citadel lvl 2 |
+| Shipyard lvl 2 | 50 / 150 | 40 | Shipyard lvl 1 and Citadel lvl 3 |
+
+Both entries use the Production type and existing Dark Shipyard icon. Displayed times of 34.3 and 39.2 seconds include the user-confirmed 2% construction reduction, so the catalog stores 35 and 40 seconds. The existing worker-level model applies construction reductions during simulation. The Shipyard appears after Tower of Mana in the building picker and has a level 2 upgrade menu. Schooner and Galleon recruitment is confirmed below.
+
+## Dark Workshop and Dark Gate level 2
+
+Confirmed by screenshots supplied on 2026-10-15. Each upgrade requires its own level 1 building and Citadel level 3.
+
+| Upgrade | Gold / wood | Displayed seconds (2% reduction) | Base seconds |
+| --- | --- | --- | --- |
+| Workshop lvl 2 | 100 / 100 | 44.1 | 45 |
+| Dark Gate lvl 2 | 150 / 100 | 39.2 | 40 |
+
+Base durations are `round(displayedSeconds / 0.98)`. Both upgrades use their existing Production type and icon, appear in their building upgrade menus, and retain Aeronaut / Necromancer production through the existing upgrade ownership and queue rules. No additional recruits are inferred.
+
+## Dark racial building upgrades — 2026-10-15
+
+Confirmed from user-supplied screenshots. Displayed 63.7 / 78.4 seconds include the same 2% construction reduction; base times are 65 / 80 seconds.
+
+| Upgrade | Gold / wood | Base seconds | Requirements |
+| --- | --- | --- | --- |
+| Goblin Lab lvl 2 | 300 / 200 | 65 | Goblin Lab lvl 1, Citadel lvl 3 |
+| Goblin Lab lvl 3 | 350 / 250 | 80 | Goblin Lab lvl 2, Citadel lvl 4 |
+| Totem of Orcs lvl 2 | 350 / 250 | 65 | Totem of Orcs lvl 1, Citadel lvl 3 |
+| Totem of Orcs lvl 3 | 400 / 300 | 80 | Totem of Orcs lvl 2, Citadel lvl 4 |
+| Undead Obelisk lvl 2 | 250 / 350 | 65 | Undead Obelisk lvl 1, Citadel lvl 3 |
+| Undead Obelisk lvl 3 | 300 / 400 | 80 | Undead Obelisk lvl 2, Citadel lvl 4 |
+
+All six entries use the Racial type, zero food cost, existing building icons, and sequential upgrade chains in their building upgrade menus. No tower limits or combat bonuses are inferred from these screenshots. Citadel level 4 is now selectable directly from its upgrade menu.
+
+## Dark Altar of Heroes levels 2–3 — 2026-10-15
+
+| Upgrade | Gold / wood | Base seconds | Requirements |
+| --- | --- | --- | --- |
+| Altar of Heroes lvl 2 | 200 / 150 | 65 | Altar of Heroes lvl 1, Citadel lvl 3 |
+| Altar of Heroes lvl 3 | 250 / 200 | 80 | Altar of Heroes lvl 2, Citadel lvl 4 |
+
+Supplied screenshots show 63.7 / 78.4 seconds with the same 2% construction reduction. These Production upgrades use the existing icon, sequential upgrade chain, and hero recruitment queue. Existing hero-tier rules can now insert the Altar upgrades for a second or third distinct Dark hero.
+
+## Remaining Dark units through Galleon — 2026-10-15
+
+Collected from BlueStacks App Player 1, starting on Catapult and stopping on Galleon's stats screen. The user confirmed recruitment reductions between 1% and 3%. For each displayed duration, the table uses an integer base time whose reduced value rounds to the observed tenth of a second.
+
+| Unit | Gold / wood / food | Displayed seconds | Reduction | Base seconds | Producer | Additional requirement |
+| --- | --- | --- | --- | --- | --- | --- |
+| Catapult | 200 / 250 / 6 | 35.3 | 2% | 36 | Workshop lvl 2 | Totem of Orcs lvl 2 |
+| Zombie | 275 / 50 / 5 | 26.7 | 1% | 27 | Dark Gate lvl 2 | Undead Obelisk lvl 1 |
+| Venomspitter | 350 / 175 / 7 | 41.6 | 1% | 42 | Dark Gate lvl 2 | Undead Obelisk lvl 2 |
+| Drill | 300 / 350 / 7 | 38.2 | 2% | 39 | Workshop lvl 2 | Goblin Lab lvl 1 |
+| Rocketeer | 350 / 250 / 7 | 38.2 | 2% | 39 | Barracks lvl 2 | Goblin Lab lvl 2 |
+| Schooner | 250 / 350 / 4 | 41.6 | 1% | 42 | Shipyard lvl 1 | None displayed |
+| Galleon | 350 / 700 / 8 | 50.5 | 1% | 51 | Shipyard lvl 2 | Undead Obelisk lvl 1 |
+
+All seven entries use existing Dark icons, production queues, food costs, and prerequisite insertion. The catalog stores base durations. Producer progression settings control Barracks, Workshop, Dark Gate, Shipyard, and Altar of Heroes recruitment reductions for both factions. No gold was spent and no navigation past Galleon was performed.
+
+
+## Faction parity corrections — 2026-10-15
+
+The owner confirmed Light tower limits also apply to Dark: Tower of Dark Magic, Slingshot Tower, and Napalm Tower allow 1/2/3 copies at corresponding racial building levels 1/2/3. Capacity depends on the highest completed racial building level, not the number of racial buildings. Citadel IV is available directly in the upgrade picker.
+
+Light Sawmill and Farm now explicitly require Castle I, matching Dark Sawmill and Pigsty. Each faction starts with its level 1 town hall already present; these prerequisites do not add a town hall construction order or cost.

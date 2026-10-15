@@ -89,6 +89,8 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
                 {field("player", "barracksLevel", "Barracks level", 1, 1, 24)}
                 {field("player", "industrialBuildingLevel", `${names.industrial} level`, 1, 1, 24)}
                 {field("player", "arcaneBuildingLevel", `${names.arcane} level`, 1, 1, 24)}
+                {field("player", "shipyardLevel", "Shipyard level", 1, 1, 24)}
+                {field("player", "altarOfHeroesLevel", "Altar of Heroes level", 1, 1, 24)}
                 {faction === "light" && <>
                     {field("player", "lightGoldRushLevel", "Gold Rush scroll level", 1, 1, 6)}
                     {field("player", "lightLumberGatheringLevel", "Wood Gathering scroll level", 1, 1, 6)}

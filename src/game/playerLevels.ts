@@ -3,6 +3,7 @@ import { isRecruitable, type PlannerItem } from "./gameData"
 export const playerLevelFields = [
     "townHallLevel", "sawmillLevel", "farmLevel", "barracksLevel",
     "industrialBuildingLevel", "arcaneBuildingLevel", "workerLevel", "manaTowerLevel",
+    "shipyardLevel", "altarOfHeroesLevel",
 ] as const
 export type PlayerLevelField = typeof playerLevelFields[number]
 export type PlayerBuildingLevels = Record<PlayerLevelField, number>
@@ -10,6 +11,7 @@ export type PlayerBuildingLevels = Record<PlayerLevelField, number>
 export const initialPlayerLevels: PlayerBuildingLevels = {
     townHallLevel: 1, sawmillLevel: 1, farmLevel: 1, barracksLevel: 1,
     industrialBuildingLevel: 1, arcaneBuildingLevel: 1, workerLevel: 1, manaTowerLevel: 1,
+    shipyardLevel: 1, altarOfHeroesLevel: 1,
 }
 
 /** Player progression is separate from building upgrades performed during a match. */
@@ -39,6 +41,8 @@ export function productionDuration(item: PlannerItem, levels: PlayerBuildingLeve
         case "barracks": field = "barracksLevel"; break
         case "factory": case "workshop": field = "industrialBuildingLevel"; break
         case "sanctuary": case "dark-gate": field = "arcaneBuildingLevel"; break
+        case "shipyard": field = "shipyardLevel"; break
+        case "altar-of-heroes": field = "altarOfHeroesLevel"; break
     }
     return field ? item.seconds * (1 - (playerLevelTier(levels[field]) + 1) / 100) : item.seconds
 }

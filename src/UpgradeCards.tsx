@@ -11,8 +11,7 @@ type Props = {
 export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd }: Props) {
     const [open, setOpen] = useState<{ building: PlannerItem; anchor: HTMLButtonElement; last: boolean } | null>(null)
     const menu = useRef<HTMLDivElement>(null)
-    const upgrades = open ? faction.items.filter(item => item.kind === "upgrade" && item.buildingId === open.building.id &&
-        !(faction.id === "dark" && item.buildingId === "citadel" && (item.level ?? 0) > 3))
+    const upgrades = open ? faction.items.filter(item => item.kind === "upgrade" && item.buildingId === open.building.id)
         .sort((a, b) => (a.level ?? 0) - (b.level ?? 0)) : []
     const close = () => {
         open?.anchor.focus()

@@ -134,6 +134,13 @@
           },
           "seconds": 20,
           "icon": "lightSawmill",
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
           "limit": {
             "basedOn": "castle",
             "byHighestLevel": [
@@ -168,6 +175,13 @@
           },
           "seconds": 25,
           "icon": "lightFarm",
+          "requires": [
+            {
+              "item": "castle",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
           "limit": {
             "basedOn": "castle",
             "byHighestLevel": [
@@ -1489,7 +1503,8 @@
             "skeleton-archer",
             "bomber",
             "warg-rider",
-            "axe-master"
+            "axe-master",
+            "rocketeer"
           ],
           "icon": "darkBarracks",
           "requires": [
@@ -1548,8 +1563,38 @@
           ],
           "icon": "darkWorkshop",
           "produces": [
-            "aeronaut"
+            "aeronaut",
+            "catapult",
+            "drill"
+          ],
+          "upgrades": [
+            "workshop-lvl-2"
           ]
+        },
+        {
+          "id": "workshop-lvl-2",
+          "name": "Workshop lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 100,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 45,
+          "requires": [
+            {
+              "item": "workshop",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "darkWorkshop"
         },
         {
           "id": "dark-gate",
@@ -1571,8 +1616,38 @@
           ],
           "icon": "darkDarkGate",
           "produces": [
-            "necromancer"
+            "necromancer",
+            "zombie",
+            "venomspitter"
+          ],
+          "upgrades": [
+            "dark-gate-lvl-2"
           ]
+        },
+        {
+          "id": "dark-gate-lvl-2",
+          "name": "Dark Gate lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 150,
+            "wood": 100,
+            "food": 0
+          },
+          "seconds": 40,
+          "requires": [
+            {
+              "item": "dark-gate",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "darkDarkGate"
         },
         {
           "id": "goblin-lab",
@@ -1590,6 +1665,62 @@
               "item": "citadel",
               "count": 1,
               "minLevel": 2
+            }
+          ],
+          "icon": "darkGoblinLab",
+          "upgrades": [
+            "goblin-lab-lvl-2"
+          ]
+        },
+        {
+          "id": "goblin-lab-lvl-2",
+          "name": "Goblin Lab lvl 2",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 300,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 65,
+          "requires": [
+            {
+              "item": "goblin-lab",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "darkGoblinLab",
+          "upgrades": [
+            "goblin-lab-lvl-3"
+          ]
+        },
+        {
+          "id": "goblin-lab-lvl-3",
+          "name": "Goblin Lab lvl 3",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 350,
+            "wood": 250,
+            "food": 0
+          },
+          "seconds": 80,
+          "requires": [
+            {
+              "item": "goblin-lab",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 4
             }
           ],
           "icon": "darkGoblinLab"
@@ -1610,6 +1741,62 @@
               "item": "citadel",
               "count": 1,
               "minLevel": 2
+            }
+          ],
+          "icon": "darkTotemOfOrcs",
+          "upgrades": [
+            "totem-of-orcs-lvl-2"
+          ]
+        },
+        {
+          "id": "totem-of-orcs-lvl-2",
+          "name": "Totem of Orcs lvl 2",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 350,
+            "wood": 250,
+            "food": 0
+          },
+          "seconds": 65,
+          "requires": [
+            {
+              "item": "totem-of-orcs",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "darkTotemOfOrcs",
+          "upgrades": [
+            "totem-of-orcs-lvl-3"
+          ]
+        },
+        {
+          "id": "totem-of-orcs-lvl-3",
+          "name": "Totem of Orcs lvl 3",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 400,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 80,
+          "requires": [
+            {
+              "item": "totem-of-orcs",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 4
             }
           ],
           "icon": "darkTotemOfOrcs"
@@ -1637,6 +1824,62 @@
               "minLevel": 1
             }
           ],
+          "icon": "darkUndeadObelisk",
+          "upgrades": [
+            "undead-obelisk-lvl-2"
+          ]
+        },
+        {
+          "id": "undead-obelisk-lvl-2",
+          "name": "Undead Obelisk lvl 2",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 250,
+            "wood": 350,
+            "food": 0
+          },
+          "seconds": 65,
+          "requires": [
+            {
+              "item": "undead-obelisk",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "darkUndeadObelisk",
+          "upgrades": [
+            "undead-obelisk-lvl-3"
+          ]
+        },
+        {
+          "id": "undead-obelisk-lvl-3",
+          "name": "Undead Obelisk lvl 3",
+          "kind": "upgrade",
+          "type": "Racial",
+          "cost": {
+            "gold": 300,
+            "wood": 400,
+            "food": 0
+          },
+          "seconds": 80,
+          "requires": [
+            {
+              "item": "undead-obelisk",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 4
+            }
+          ],
           "icon": "darkUndeadObelisk"
         },
         {
@@ -1662,7 +1905,63 @@
             "grokk",
             "jax",
             "eater"
+          ],
+          "upgrades": [
+            "altar-of-heroes-lvl-2"
           ]
+        },
+        {
+          "id": "altar-of-heroes-lvl-2",
+          "name": "Altar of Heroes lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 200,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 65,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "darkAltarOfHeroes",
+          "upgrades": [
+            "altar-of-heroes-lvl-3"
+          ]
+        },
+        {
+          "id": "altar-of-heroes-lvl-3",
+          "name": "Altar of Heroes lvl 3",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 250,
+            "wood": 200,
+            "food": 0
+          },
+          "seconds": 80,
+          "requires": [
+            {
+              "item": "altar-of-heroes",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 4
+            }
+          ],
+          "icon": "darkAltarOfHeroes"
         },
         {
           "id": "tower-of-dark-magic",
@@ -1689,6 +1988,14 @@
               {
                 "minLevel": 1,
                 "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
               }
             ]
           }
@@ -1718,6 +2025,14 @@
               {
                 "minLevel": 1,
                 "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
               }
             ]
           }
@@ -1747,9 +2062,69 @@
               {
                 "minLevel": 1,
                 "max": 1
+              },
+              {
+                "minLevel": 2,
+                "max": 2
+              },
+              {
+                "minLevel": 3,
+                "max": 3
               }
             ]
           }
+        },
+        {
+          "id": "shipyard",
+          "name": "Shipyard",
+          "kind": "building",
+          "type": "Production",
+          "cost": {
+            "gold": 150,
+            "wood": 300,
+            "food": 0
+          },
+          "seconds": 35,
+          "requires": [
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkShipyard",
+          "produces": [
+            "schooner",
+            "galleon"
+          ],
+          "upgrades": [
+            "shipyard-lvl-2"
+          ]
+        },
+        {
+          "id": "shipyard-lvl-2",
+          "name": "Shipyard lvl 2",
+          "kind": "upgrade",
+          "type": "Production",
+          "cost": {
+            "gold": 50,
+            "wood": 150,
+            "food": 0
+          },
+          "seconds": 40,
+          "requires": [
+            {
+              "item": "shipyard",
+              "count": 1,
+              "minLevel": 1
+            },
+            {
+              "item": "citadel",
+              "count": 1,
+              "minLevel": 3
+            }
+          ],
+          "icon": "darkShipyard"
         },
         {
           "id": "tower-of-mana",
@@ -1951,6 +2326,169 @@
             }
           ],
           "icon": "darkAxeMaster"
+        },
+        {
+          "id": "catapult",
+          "name": "Catapult",
+          "kind": "unit",
+          "cost": {
+            "gold": 200,
+            "wood": 250,
+            "food": 6
+          },
+          "seconds": 36,
+          "requires": [
+            {
+              "item": "workshop",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "totem-of-orcs",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkCatapult"
+        },
+        {
+          "id": "zombie",
+          "name": "Zombie",
+          "kind": "unit",
+          "cost": {
+            "gold": 275,
+            "wood": 50,
+            "food": 5
+          },
+          "seconds": 27,
+          "requires": [
+            {
+              "item": "dark-gate",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "undead-obelisk",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkZombie"
+        },
+        {
+          "id": "venomspitter",
+          "name": "Venomspitter",
+          "kind": "unit",
+          "cost": {
+            "gold": 350,
+            "wood": 175,
+            "food": 7
+          },
+          "seconds": 42,
+          "requires": [
+            {
+              "item": "dark-gate",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "undead-obelisk",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkVenomspitter"
+        },
+        {
+          "id": "drill",
+          "name": "Drill",
+          "kind": "unit",
+          "cost": {
+            "gold": 300,
+            "wood": 350,
+            "food": 7
+          },
+          "seconds": 39,
+          "requires": [
+            {
+              "item": "workshop",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "goblin-lab",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkDrill"
+        },
+        {
+          "id": "rocketeer",
+          "name": "Rocketeer",
+          "kind": "unit",
+          "cost": {
+            "gold": 350,
+            "wood": 250,
+            "food": 7
+          },
+          "seconds": 39,
+          "requires": [
+            {
+              "item": "barracks",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "goblin-lab",
+              "count": 1,
+              "minLevel": 2
+            }
+          ],
+          "icon": "darkRocketeer"
+        },
+        {
+          "id": "schooner",
+          "name": "Schooner",
+          "kind": "unit",
+          "cost": {
+            "gold": 250,
+            "wood": 350,
+            "food": 4
+          },
+          "seconds": 42,
+          "requires": [
+            {
+              "item": "shipyard",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkSchooner"
+        },
+        {
+          "id": "galleon",
+          "name": "Galleon",
+          "kind": "unit",
+          "cost": {
+            "gold": 350,
+            "wood": 700,
+            "food": 8
+          },
+          "seconds": 51,
+          "requires": [
+            {
+              "item": "shipyard",
+              "count": 1,
+              "minLevel": 2
+            },
+            {
+              "item": "undead-obelisk",
+              "count": 1,
+              "minLevel": 1
+            }
+          ],
+          "icon": "darkGalleon"
         },
         {
           "id": "grokk",

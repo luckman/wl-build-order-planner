@@ -113,7 +113,7 @@ test("Miriel waits for Altar completion, reserves ten food, and is unique across
     expect(heroes[0]).toMatchObject({ blocked: false, cost: { gold: 650, wood: 250 }, workerId: null })
     const tree = required(plan.find(action => action.item.id === "elven-tree"))
     expect(heroes[0].commandTime).toBe(Math.max(altars[0].finishTime!, tree.finishTime!) + economy.orderDelay)
-    expect(heroes[0].finishTime! - heroes[0].startTime!).toBe(45)
+    expect(heroes[0].finishTime! - heroes[0].startTime!).toBeCloseTo(45 * 0.99)
     expect(heroes[1]).toMatchObject({ blocked: true, commandTime: null })
     expect(heroes[1].blockedReason).toContain("Miriel limit reached")
 
@@ -216,9 +216,12 @@ test.each(["guardsman", "ballista", "fox-rider", "wind-mage", "biker", "sniper",
     },
 )
 
-test.each(["tower-of-light-magic", "crossbow-tower", "artillery-tower"])(
-    "%s unlocks 1/2/3 slots from racial upgrades and extra racial buildings do not increase capacity", id => {
-        const faction = factions.light
+test.each([
+    ["light", "tower-of-light-magic"], ["light", "crossbow-tower"], ["light", "artillery-tower"],
+    ["dark", "tower-of-dark-magic"], ["dark", "slingshot-tower"], ["dark", "napalm-tower"],
+] as const)(
+    "%s %s unlocks 1/2/3 slots from racial upgrades and extra racial buildings do not increase capacity", (factionId, id) => {
+        const faction = factions[factionId]
         const tower = required(faction.items.find(item => item.id === id))
         const racial = required(faction.items.find(item => item.id === tower.limit!.basedOn))
         let order = buildOrderWithDependencies(faction, [], tower)
@@ -226,7 +229,7 @@ test.each(["tower-of-light-magic", "crossbow-tower", "artillery-tower"])(
         order = buildOrderWithDependencies(faction, order, tower)
         order = buildOrderWithDependencies(faction, order, tower)
         expect(() => buildOrderWithDependencies(faction, order, tower)).toThrow("limit reached")
-        const { plan } = simulateBuildOrder([...order, tower], abundantEconomy, 0, 100, 20, "Castle", 1000)
+        const { plan } = simulateBuildOrder([...order, tower], abundantEconomy, 0, 100, 20, faction.startingTownHall, 1000)
         const towers = plan.filter(action => action.item.id === id)
         expect(towers.slice(0, 3).every(action => !action.blocked)).toBe(true)
         expect(towers[3].blocked).toBe(true)
@@ -234,13 +237,26 @@ test.each(["tower-of-light-magic", "crossbow-tower", "artillery-tower"])(
             const upgrade = required(plan.find(action => action.item.id === `${racial.id}-lvl-${level}`))
             expect(towers[level - 1].commandTime!).toBeGreaterThanOrEqual(upgrade.finishTime! + economy.orderDelay)
         }
-        const extraRacial = simulateBuildOrder([...firstTier, racial, tower], abundantEconomy, 0, 100, 20, "Castle").plan
+        const extraRacial = simulateBuildOrder([...firstTier, racial, tower], abundantEconomy, 0, 100, 20, faction.startingTownHall).plan
         expect(extraRacial[extraRacial.length - 1].blockedReason).toContain("limit reached")
         const removedUpgrade = simulateBuildOrder(order.filter(item => item.id !== `${racial.id}-lvl-3`),
-            abundantEconomy, 0, 100, 20, "Castle", 1000).plan
+            abundantEconomy, 0, 100, 20, faction.startingTownHall, 1000).plan
         expect(removedUpgrade.filter(action => action.item.id === id)[2].blocked).toBe(true)
     },
 )
+
+test.each([
+    ["light", "sawmill"], ["light", "farm"], ["dark", "sawmill"], ["dark", "pigsty"],
+] as const)("%s %s uses the already-present level 1 town hall", (factionId, id) => {
+    const faction = factions[factionId]
+    const building = required(faction.items.find(item => item.id === id))
+    const order = buildOrderWithDependencies(faction, [], building)
+    expect(order.map(item => item.id)).toEqual([id])
+    const { plan } = simulateBuildOrder(order, abundantEconomy, 0, 100, 20, faction.startingTownHall)
+    expect(plan).toHaveLength(1)
+    expect(plan[0].blocked).toBeFalsy()
+    expect(plan[0].item.id).toBe(id)
+})
 
 test("Miriel remains unique after recruitment completes and still needs a completed Altar and Elven Tree", () => {
     const faction = factions.light

@@ -2,7 +2,7 @@ import { economyFromProfile, initialGameProfile } from "./gameProfile"
 import { factions, type PlannerItem } from "./gameData"
 import { simulateBuildOrder } from "./buildSimulation"
 import { actionDuration, initialPlayerLevels, playerLevelFields, productionDuration } from "./playerLevels"
-import { parseBuildOrder, serializeBuildOrder } from "./buildOrderFile"
+import { parseBuildOrder, parseGameProfile, serializeBuildOrder } from "./buildOrderFile"
 
 test.each([
     [1, 50, 20, 0.99], [4, 50, 20, 0.99], [5, 51, 21, 0.98], [8, 51, 21, 0.98],
@@ -24,9 +24,9 @@ test.each([
     ["barracks", "barracksLevel"], ["factory", "industrialBuildingLevel"],
     ["workshop", "industrialBuildingLevel"], ["sanctuary", "arcaneBuildingLevel"],
     ["dark-gate", "arcaneBuildingLevel"],
+    ["shipyard", "shipyardLevel"], ["altar-of-heroes", "altarOfHeroesLevel"],
 ] as const)("%s uses its own profile level and keeps a sequential production queue", (producerId, field) => {
-    // Factory/Workshop/Sanctuary/Dark Gate have artwork but no confirmed catalog stats yet.
-    // Synthetic producers verify scheduling without inventing their game data.
+    // Isolate producer-level timing and queue behavior from catalog prerequisites.
     const producer: PlannerItem = { ...factions.light.items.find(item => item.id === "barracks")!,
         id: producerId, name: producerId, buildingId: producerId, prerequisites: [], requirements: [], limit: undefined }
     const unit: PlannerItem = { ...factions.light.items.find(item => item.id === "swordsman")!,
@@ -41,7 +41,7 @@ test.each([
     expect(units[1].startTime).toBe(units[0].finishTime)
     const constructed = plan.find(action => action.item.kind === "building")
     if (constructed) expect(constructed.finishTime! - constructed.startTime!).toBe(producer.seconds)
-    expect(productionDuration({ ...unit, producerBuildingId: "altar-of-heroes" }, economy)).toBe(100)
+    expect(productionDuration({ ...unit, producerBuildingId: "unknown-producer" }, economy)).toBe(100)
     expect(productionDuration({ ...unit, kind: "upgrade" }, economy)).toBe(100)
 })
 
@@ -68,7 +68,26 @@ test.each(playerLevelFields)("%s round trips exactly, rejects invalid levels,", 
         doc.gameProfile.player[field] = invalid
         expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(field)
     }
-    expect(Object.values(initialPlayerLevels)).toEqual([1, 1, 1, 1, 1, 1, 1, 1])
+    expect(Object.values(initialPlayerLevels)).toEqual(Array(playerLevelFields.length).fill(1))
+})
+
+test("older profiles default Shipyard and Altar progression to level 1", () => {
+    const { shipyardLevel, altarOfHeroesLevel, ...player } = initialGameProfile.player
+    expect(parseGameProfile({ ...initialGameProfile, player }).player).toEqual(initialGameProfile.player)
+})
+
+test.each([
+    [1, 0.99], [4, 0.99], [5, 0.98], [8, 0.98], [9, 0.97], [12, 0.97],
+    [13, 0.96], [16, 0.96], [17, 0.95], [20, 0.95], [21, 0.94], [24, 0.94],
+])("level %s reduces all catalog ships and heroes for both factions", (level, multiplier) => {
+    const levels = { ...initialPlayerLevels, shipyardLevel: level, altarOfHeroesLevel: level }
+    for (const faction of Object.values(factions)) {
+        const recruits = faction.items.filter(item => item.kind === "hero" || item.producerBuildingId === "shipyard")
+        expect(recruits).toHaveLength(5)
+        for (const recruit of recruits) {
+            expect(actionDuration(recruit, levels)).toBeCloseTo(recruit.seconds * multiplier)
+        }
+    }
 })
 
 test.each([
