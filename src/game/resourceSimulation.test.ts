@@ -206,14 +206,58 @@ test("wood selection prefers an outbound worker, then the least gathered cargo",
     expect(simulation.selectBuilder()?.id).toBe(newer.id) // Partial cargo versus a full returning load.
 })
 
-test("construction cancels interrupted wood and resumes empty at the resource after return travel", () => {
+test("construction preserves partial wood and resumes the remaining gathering after return travel", () => {
     const simulation = new WorkerEconomy({ ...settings, workerCount: 1, goldWorkers: 0, woodWorkers: 1 })
     simulation.advanceTo(5)
-    simulation.construct(requireBuilder(simulation), 30)
-    simulation.advanceTo(58.9)
+    const builder = requireBuilder(simulation)
+    simulation.construct(builder, 30)
+    expect(builder.cargoWood).toBeCloseTo(50 / 12)
+    simulation.advanceTo(57.9)
     expect(simulation.deliveries).toEqual([])
+    simulation.advanceTo(58)
+    expect(simulation.deliveries).toEqual([{ time: 58, gold: 0, wood: 50, worker: 0 }])
+})
+
+test("a full wood load survives construction and is deposited once before another full gathering cycle", () => {
+    const simulation = new WorkerEconomy({ ...settings, workerCount: 1, goldWorkers: 0, woodWorkers: 1 })
+    simulation.scheduleLumberGathering(0, 20, 15)
+    simulation.advanceTo(17) // Gathering finished at 16; the bonus load is on its way to deposit.
+    const builder = requireBuilder(simulation)
+    simulation.construct(builder, 30)
+    expect(builder.cargoWood).toBe(65)
     simulation.advanceTo(59)
-    expect(simulation.deliveries).toEqual([{ time: 59, gold: 0, wood: 50, worker: 0 }])
+    expect(simulation.deliveries).toEqual([{ time: 59, gold: 0, wood: 65, worker: 0 }])
+    expect(builder.cargoWood).toBe(0)
+    simulation.advanceTo(79)
+    expect(simulation.deliveries[1]).toEqual({ time: 79, gold: 0, wood: 50, worker: 0 })
+})
+
+test("repeated construction preserves accumulated wood without counting construction as gathering", () => {
+    const simulation = new WorkerEconomy({ ...settings, workerCount: 1, goldWorkers: 0, woodWorkers: 1 })
+    simulation.advanceTo(10) // Six of twelve gathering seconds completed.
+    const builder = requireBuilder(simulation)
+    simulation.construct(builder, 2)
+    expect(builder.cargoWood).toBe(25)
+    simulation.advanceTo(22) // Returned at 20, then gathered for two more seconds.
+    simulation.construct(builder, 2)
+    expect(builder.cargoWood).toBeCloseTo(50 * 8 / 12)
+    simulation.advanceTo(39.9)
+    expect(simulation.deliveries).toEqual([])
+    simulation.advanceTo(40)
+    expect(simulation.deliveries).toEqual([{ time: 40, gold: 0, wood: 50, worker: 0 }])
+})
+
+test("an outbound wood worker starts a full load after construction, including after a previous deposit", () => {
+    for (const commandTime of [2, 21]) {
+        const simulation = new WorkerEconomy({ ...settings, workerCount: 1, goldWorkers: 0, woodWorkers: 1 })
+        simulation.advanceTo(commandTime)
+        const builder = requireBuilder(simulation)
+        expect(builder.state).toBe("outbound")
+        simulation.construct(builder, 2)
+        expect(builder.cargoWood).toBe(0)
+        simulation.advanceTo(commandTime + 26)
+        expect(simulation.deliveries[simulation.deliveries.length - 1]).toEqual({ time: commandTime + 26, gold: 0, wood: 50, worker: 0 })
+    }
 })
 
 test("taking a queued gold worker does not reserve or block the mine", () => {

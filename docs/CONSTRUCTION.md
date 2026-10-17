@@ -75,15 +75,21 @@ their previous resource assignment for this allocation rule.
 
 ## Interrupted gathering
 
-For this implementation, interrupted cargo and partial gathering progress are
-discarded. Any pending delivery for that worker is cancelled. After the return
-delay, the worker is at its previous resource and starts gathering from zero
-(or queues for the gold mine). No additional normal outbound gathering travel
-is charged on this first resumed trip. Subsequent trips use the normal resource
-outbound, gathering, and deposit travel times.
+Wood workers preserve the exact amount already gathered, using the remaining
+work calculation that accounts for Whip activation and expiry. No gathering occurs
+during builder travel or construction. After the return delay, the worker resumes
+only the remaining work at its current gathering speed. A worker interrupted while
+carrying a completed load keeps that load, including any Lumber Gathering bonus,
+and travels to deposit it after returning without gathering again.
+
+Interrupted gold cargo is discarded; returning gold workers queue for the mine.
+Any pending delivery is rescheduled. No additional normal outbound gathering
+travel is charged on the first resumed trip. Subsequent trips use the normal
+resource outbound, gathering, and deposit travel times.
 
 Wood example: a worker interrupted at 5s for a 30-second building returns at
-43s, chops for 12.1s, then travels 4s to deposit 50 wood at 59.1s. Its originally
+43s, keeps its one second of gathering progress, chops for the remaining 11.1s,
+then travels 4s to deposit 50 wood at 58.1s. Its originally
 scheduled delivery at 20.1s does not occur. This example uses normal four-second
 wood travel with no completed Sawmill, gathering reduction, or scroll effect.
 

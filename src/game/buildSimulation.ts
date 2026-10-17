@@ -179,6 +179,8 @@ function simulateBuildOrderPass(
                 timedEventsByIndex.set(index, scrollPlan[scrollPlan.length - 1])
                 if (!blocked) {
                     lastScrollCommand = eventTime
+                    // Model the player's miner preparation now; the scroll itself activates later.
+                    if (item.scrollId === "whip") simulation.prepareGoldWorkerForWhip()
                     simulation.scheduleScroll(item.scrollId, startTime, finishTime)
                 }
             }

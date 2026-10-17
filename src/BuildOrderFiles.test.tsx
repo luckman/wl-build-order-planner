@@ -58,9 +58,11 @@ test("shared-link error popups also disappear after five seconds", () => {
 })
 
 test.each([
-    ["10 workers t2 on basic account", ["worker", "worker", "worker", "worker", "barracks", "farm", "worker", "castle-lvl-2"]],
-    ["10 workers t2 with swordsman", ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"]],
-] as const)("template order %s keeps the entire game profile and persists the exact order", (name, ids) => {
+    ["light", "10 workers t2 on basic account", ["worker", "worker", "worker", "worker", "barracks", "farm", "worker", "castle-lvl-2"]],
+    ["light", "10 workers t2 with swordsman", ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"]],
+    ["dark", "10 slaves t2 on basic account", ["slave", "slave", "slave", "slave", "barracks", "pigsty", "slave", "citadel-lvl-2"]],
+    ["dark", "10 slaves t2 with goon", ["slave", "slave", "slave", "barracks", "slave", "pigsty", "slave", "goon", "citadel-lvl-2"]],
+] as const)("%s template %s keeps the entire game profile and persists the exact order", (faction, name, ids) => {
     const confirm = jest.spyOn(window, "confirm").mockReturnValue(true)
     const profile = {
         ...initialGameProfile,
@@ -69,22 +71,23 @@ test.each([
         player: { ...initialGameProfile.player, startingGold: 777, workerLevel: 12 },
         delays: { ...initialGameProfile.delays, orderDelay: 2 },
     }
-    window.localStorage.setItem(profileStorageKey("light"), JSON.stringify(profile))
+    window.localStorage.setItem(profileStorageKey(faction), JSON.stringify(profile))
     try {
         const { unmount } = render(<App />)
+        fireEvent.click(screen.getByRole("button", { name: faction === "light" ? "Light" : "Dark", exact: true }))
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name, exact: true }))
         expect(confirm).not.toHaveBeenCalled()
         const expected = [{ type: "allocate-workers", goldWorkers: 3 }, ...ids.map(itemId => ({ itemId }))]
-        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).buildOrder).toEqual(expected)
-        expect(JSON.parse(window.localStorage.getItem(profileStorageKey("light"))!).gameProfile).toEqual(profile)
+        expect(JSON.parse(window.localStorage.getItem(draftStorageKey(faction))!).buildOrder).toEqual(expected)
+        expect(JSON.parse(window.localStorage.getItem(profileStorageKey(faction))!).gameProfile).toEqual(profile)
         expect((screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement).value).toBe("3")
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
         unmount()
         render(<App />)
-        expect(screen.getAllByRole("button", { name: "Remove Worker", exact: true })).toHaveLength(5)
-        expect(screen.getByRole("button", { name: "Remove Castle lvl 2" })).toBeTruthy()
-        expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).buildOrder).toEqual(expected)
+        expect(screen.getAllByRole("button", { name: faction === "light" ? "Remove Worker" : "Remove Slave", exact: true })).toHaveLength(5)
+        expect(screen.getByRole("button", { name: faction === "light" ? "Remove Castle lvl 2" : "Remove Citadel lvl 2" })).toBeTruthy()
+        expect(JSON.parse(window.localStorage.getItem(draftStorageKey(faction))!).buildOrder).toEqual(expected)
     } finally { confirm.mockRestore() }
 })
 
@@ -113,7 +116,10 @@ test("template suggestions follow the selected faction and leave the other facti
     fireEvent.click(screen.getByRole("button", { name: /^Slave \d+ gold/ }))
     const darkDraft = window.localStorage.getItem(draftStorageKey("dark"))
     fireEvent.click(screen.getByText("Import / Export"))
-    expect(screen.queryByRole("region", { name: "Start from template" })).toBeNull()
+    const templates = screen.getByRole("region", { name: "Start from template" })
+    expect(within(templates).getByRole("button", { name: "10 slaves t2 on basic account", exact: true })).toBeTruthy()
+    expect(within(templates).getByRole("button", { name: "10 slaves t2 with goon", exact: true })).toBeTruthy()
+    expect(within(templates).queryByRole("button", { name: /10 workers/ })).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Light", exact: true }))
     fireEvent.click(screen.getByText("Import / Export"))
     fireEvent.click(screen.getByRole("button", { name: "10 workers t2 on basic account", exact: true }))

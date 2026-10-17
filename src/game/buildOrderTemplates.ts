@@ -17,7 +17,16 @@ export const buildOrderTemplates: Record<FactionId, BuildOrderTemplate[]> = {
             itemIds: ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"],
         },
     ],
-    dark: [],
+    dark: [
+        {
+            name: "10 slaves t2 on basic account",
+            itemIds: ["slave", "slave", "slave", "slave", "barracks", "pigsty", "slave", "citadel-lvl-2"],
+        },
+        {
+            name: "10 slaves t2 with goon",
+            itemIds: ["slave", "slave", "slave", "barracks", "slave", "pigsty", "slave", "goon", "citadel-lvl-2"],
+        },
+    ],
 }
 
 export function createBuildOrderFromTemplate(faction: FactionId, template: BuildOrderTemplate): BuildDraft {

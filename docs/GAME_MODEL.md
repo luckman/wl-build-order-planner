@@ -112,7 +112,7 @@ Production and Racial buildings double their base gold/wood cost for each succes
 
 Construction and upgrades expose separate command, start, finish, and builder-return times. At command acceptance, costs are paid and a selected worker stops gathering. The worker travels for `constructionStartDelay` (default 3 seconds), builds for the worker-level-adjusted duration, then travels back for the same delay. The completed building becomes available before the builder returns.
 
-Builders are selected from idle workers, then wood gatherers with the least gathered/carried cargo, then gold workers carrying the least cargo outside the mine. Worker ID breaks ties. Builders are unavailable through both travel legs and construction. Interrupted cargo is discarded, and the worker resumes gathering at its previous resource after return without another outbound trip. These rules also apply to building upgrades.
+Builders are selected from idle workers, then wood gatherers with the least gathered/carried cargo, then gold workers carrying the least cargo outside the mine. Worker ID breaks ties. Builders are unavailable through both travel legs and construction. Wood workers preserve exact partial gathering progress or completed cargo through construction, including progress earned under Whip. On return, they finish the remaining gathering or travel to deposit a completed load. Interrupted gold cargo is discarded. Workers resume at their previous resource without another outbound trip. These rules also apply to building upgrades.
 
 Upgrades reserve an exact preceding-level building instance and its queue. Its completed lower level still satisfies prerequisites and limits during the upgrade; the higher level unlocks at completion. Each producer has one recruitment slot, and additional physical producers have independent queues. Upgrading and training cannot use the same building simultaneously.
 
@@ -136,7 +136,7 @@ Timed events retain explicit command timestamps independently of their position 
 
 For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively. Levels are independent profile settings, editable for Light in Resources collection, and default to 1.
 
-Scroll windows include their start and exclude expiry. Cargo is fixed at mine exit or wood-gathering completion, so a bonus load retains its bonus when delivered after expiry. Overlapping windows of the same scroll do not stack. Interruption or worker loss discards cargo.
+Scroll windows include their start and exclude expiry. Cargo is fixed at mine exit or wood-gathering completion, so a bonus load retains its bonus when delivered after expiry, including wood loads held through construction. Overlapping windows of the same scroll do not stack. Worker loss discards cargo; construction discards only gold cargo.
 
 Dark Whip uses identical confirmed effects at levels 1–6: 50 mana, 30 seconds, wood harvesting −2 seconds, gold mining −0.5 seconds and movement speed +15%. Its per-worker duration refreshes without stacking; construction clears it. See [WHIP.md](WHIP.md) for eligibility, progress and mine-entry rules. Dark Legion’s Call remains stored for future support. Scroll cooldown is shared between a faction’s scrolls: `basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, followed by `orderDelay`. Mana must also have been sufficient for `orderDelay` before the command. Blocked scrolls spend no mana and start no cooldown.
 

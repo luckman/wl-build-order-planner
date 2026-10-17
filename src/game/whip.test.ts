@@ -129,6 +129,28 @@ test("construction travel is faster, but starting construction clears Whip perma
     expect(builder.nextAt - builder.stateSince).toBeCloseTo(12.1)
 })
 
+test.each([false, true])("construction retains wood earned across Whip boundaries (still active: %s)", active => {
+    const workers = new WorkerEconomy(settings)
+    workers.scheduleScroll("whip", 7, active ? 37 : 9)
+    const commandTime = active ? 9 : 10
+    workers.advanceTo(commandTime)
+    const builder = workers.selectBuilder()!
+    const progress = 3 / 12.1 + 2 / 10.1 + (active ? 0 : 1 / 12.1)
+    workers.construct(builder, 2)
+    expect(builder.cargoWood).toBeCloseTo(settings.woodPerTrip * progress)
+    const returnTime = commandTime + (active ? 3 / 1.15 : 3) + 2 + 3
+    workers.advanceTo(returnTime + 0.01)
+    expect(builder.state).toBe("gathering")
+    expect(builder.whipUntil).toBe(-Infinity)
+    expect(builder.nextAt).toBeCloseTo(returnTime + (1 - progress) * 12.1)
+    // A fresh cast after resuming must also preserve the saved progress.
+    workers.scheduleScroll("whip", returnTime + 1, returnTime + 31)
+    workers.advanceTo(40)
+    const remaining = 1 - progress - 1 / 12.1
+    expect(workers.deliveries[0].time).toBeCloseTo(returnTime + 1 + remaining * 10.1 + 4 / 1.15)
+    expect(workers.deliveries[0].wood).toBe(settings.woodPerTrip)
+})
+
 test("construction travel handles expiry before arrival", () => {
     const workers = new WorkerEconomy(settings)
     workers.scheduleScroll("whip", 1, 3)
@@ -186,4 +208,80 @@ test("Whip persists through JSON, links and per-faction drafts", () => {
     saveFactionDrafts({ light: { opening, items: [] }, dark: { opening, items: [whip(10)] } }, { light: profile, dark: profile })
     expect(loadFactionDrafts({ light: profile, dark: profile }).dark.items).toEqual([whip(10)])
     window.localStorage.clear()
+})
+
+test.each([4, 5])("player preparation with %s miners delays exactly the closest outbound worker", count => {
+    const workers = new WorkerEconomy({ ...settings, workerCount: 4, goldWorkers: 4, woodWorkers: 0 })
+    workers.advanceTo(0.5)
+    if (count === 5) workers.addWorker("gold") // A later arrival must not be selected.
+    workers.advanceTo(1)
+    const arrivals = workers.workers.map(worker => worker.nextAt)
+    workers.prepareGoldWorkerForWhip()
+    expect(workers.workers.map(worker => worker.nextAt)).toEqual(arrivals.map((time, id) => time + (id === 0 ? 1 : 0)))
+})
+
+test("player preparation skips queued, mining and returning workers", () => {
+    const workers = new WorkerEconomy({ ...settings, workerCount: 4, goldWorkers: 4, woodWorkers: 0 })
+    workers.advanceTo(12)
+    expect(workers.workers.map(worker => worker.state)).toEqual(["outbound", "deposit", "gathering", "waiting"])
+    const arrivals = workers.workers.map(worker => worker.nextAt)
+    workers.prepareGoldWorkerForWhip()
+    expect(workers.workers.map(worker => worker.nextAt)).toEqual(arrivals.map((time, id) => time + (id === 0 ? 1 : 0)))
+})
+
+test("player preparation adds no travel with fewer than four active miners or no outbound miner", () => {
+    for (const count of [3, 4]) {
+        const workers = new WorkerEconomy({ ...settings, workerCount: count, goldWorkers: count, woodWorkers: 0 })
+        if (count === 4) workers.advanceTo(4) // All have arrived; mine and queue are excluded.
+        const arrivals = workers.workers.map(worker => worker.nextAt)
+        workers.prepareGoldWorkerForWhip()
+        expect(workers.workers.map(worker => worker.nextAt)).toEqual(arrivals)
+    }
+    const workers = new WorkerEconomy({ ...settings, workerCount: 4, goldWorkers: 4, woodWorkers: 0 })
+    workers.advanceTo(1)
+    workers.construct(workers.workers[0], 30)
+    const arrivals = workers.workers.map(worker => worker.nextAt)
+    workers.prepareGoldWorkerForWhip()
+    expect(workers.workers.map(worker => worker.nextAt)).toEqual(arrivals) // Builder is no longer an active miner.
+})
+
+test("player preparation occurs at command time and its extra travel is shortened by activation", () => {
+    const workers = new WorkerEconomy({ ...settings, workerCount: 4, goldWorkers: 4, woodWorkers: 0 })
+    workers.advanceTo(1)
+    workers.prepareGoldWorkerForWhip()
+    expect(workers.workers[0].nextAt).toBe(5) // Already delayed before effect activation at 2.
+    workers.scheduleScroll("whip", 2, 32)
+    workers.advanceTo(2)
+    expect(workers.workers[0].nextAt).toBeCloseTo(2 + 3 / 1.15)
+    expect(workers.workers[1].nextAt).toBeCloseTo(2 + 2 / 1.15)
+})
+
+test("preparing for reapplication adds speed-adjusted travel while the previous effect is active", () => {
+    const workers = new WorkerEconomy({ ...settings, workerCount: 4, goldWorkers: 4, woodWorkers: 0 })
+    workers.scheduleScroll("whip", 1, 31)
+    workers.advanceTo(2)
+    const arrival = workers.workers[0].nextAt
+    workers.prepareGoldWorkerForWhip()
+    expect(workers.workers[0].nextAt).toBeCloseTo(arrival + 1 / 1.15)
+    workers.prepareGoldWorkerForWhip()
+    expect(workers.workers[1].nextAt).toBeCloseTo(arrival + 1 / 1.15) // Next closest after the first delay.
+})
+
+test("successful commands model player preparation in scheduling and replay; blocked commands do not", () => {
+    const economy = { ...settings, workerCount: 4, goldWorkers: 4, woodWorkers: 0, goldGatherTime: 1 }
+    const actual = simulate([whip(12)], economy, 50)
+    expect(actual.plan[0].blocked).toBe(false)
+    const reference = new WorkerEconomy(economy)
+    reference.advanceTo(12)
+    reference.prepareGoldWorkerForWhip()
+    reference.scheduleScroll("whip", 13, 43)
+    reference.advanceTo(50)
+    expect(actual.deliveries).toEqual(reference.deliveries)
+    // First worker was due at 13, is delayed to 14 by the command at 12,
+    // then travels its remaining normal second at boosted speed from 13.
+    expect(actual.deliveries[4].time).toBeCloseTo(13 + 1 / 1.15 + 0.5 + 4 / 1.15)
+    expect(workerAllocationAt(economy, actual.plan, 12)).toMatchObject({ gold: 4, busyOrIdle: 0 })
+
+    const blocked = { ...economy, startingMana: 0, manaPerMinute: 0 }
+    expect(simulate([whip(12)], blocked).deliveries).toEqual(simulate([], blocked).deliveries)
 })

@@ -15,6 +15,22 @@ It survives JSON, links and Dark drafts. The card appears beside Dark heroes and
 uses the owner-provided `dark-whip.png` artwork. Its level is
 editable in Resources collection and resets with basic settings.
 
+## Player preparation approximation
+
+Players commonly stop the miner approaching the mine before casting Whip so it
+receives the effect before entering. The planner approximates this player action
+with extra travel; the delay is not an intrinsic scroll effect.
+
+At each successful Whip command timestamp (before activation), if at least four
+living workers are actively assigned to gold, this preparation adds one second of normal-speed
+travel to the worker traveling toward the mine who is closest to arrival. Skip
+queued miners, workers inside the mine, returning workers and builders. If no
+worker is traveling toward the mine, do nothing. Equal arrival times use worker
+ID as a stable tie-breaker. Existing and subsequent movement bonuses shorten
+this extra travel; it is not a fixed pause. Reapplications repeat this rule.
+Blocked commands do not add travel. Worker-state replay uses the same command
+timestamp and selection logic.
+
 ## Worker eligibility and refresh
 
 At activation, apply the effect to existing workers traveling, waiting for a mine

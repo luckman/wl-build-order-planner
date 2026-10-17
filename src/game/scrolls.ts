@@ -40,7 +40,7 @@ export const SCROLLS = {
     "lumber-gathering": { ...LUMBER_GATHERING, faction: "light", name: "Lumber Gathering", icon: "lightLumberGathering",
         description: "25 mana · starts after 1 second · +15 wood per gathering stage completed in the forest during the next 30 seconds." },
     whip: { ...WHIP, faction: "dark", name: "Whip", icon: "darkWhip",
-        description: "50 mana · starts after 1 second · workers: wood harvesting −2 seconds, gold mining −0.5 seconds, movement speed +15% for 30 seconds. Reapplication refreshes duration. Starting construction removes the effect." },
+        description: "50 mana · starts after 1 second · workers: wood harvesting −2 seconds, gold mining −0.5 seconds, movement speed +15% for 30 seconds." },
 } as const
 
 export function scrollCooldown(settings: { timeBetweenScrolls?: number; scrollCooldownReduction?: number }): number {
