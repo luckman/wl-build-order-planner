@@ -9,18 +9,21 @@ start; any additional initial wood gatherers receive theirs at the configured in
 The UI labels this setting **Order delay**, stored as
 `orderDelay`. Commands also wait this long after a recruitment building
 completes or their building prerequisites (including counted buildings, required
-levels, and capacity increases) become available. The delay runs from completion,
-so it can elapse while resources, workers, or the production queue are unavailable.
-Concurrent unlocks share the same waiting period. Subsequent recruitment from an
-available building starts when the previous recruit finishes, without another delay.
+levels, and capacity increases) become available. Enough gold, wood, and free food
+must also have been available for `orderDelay` before the command, accounting for
+costs and food reserved by earlier orders. This includes gathering deliveries,
+Resources collected events, completed Farms/Pigsties, and food released by unit losses.
+All readiness waits overlap and can elapse while a worker or production queue is
+unavailable. Worker availability adds no delay. Subsequent recruitment starts when
+the previous recruit finishes if its other readiness waits have already elapsed.
 
 For example, Castle level 2 completing at 01:10 unlocks an Altar command at
-01:11, with construction starting at 01:15 using the default four-second builder
+01:11, with construction starting at 01:14 using the default three-second builder
 travel. An Elven Tree completing at 02:10 unlocks Archer recruitment at 02:11
 in an existing available Barracks.
 
 The editable game profile contains `delays.constructionStartDelay`, defaulting to
-4 seconds. It applies to every building and building upgrade, and both directions
+3 seconds. It applies to every building and building upgrade, and both directions
 of builder travel.
 There are no per-building overrides or positioning modes.
 
@@ -33,18 +36,18 @@ For a command accepted at time `t`:
   `src/game/data.json`.
 - The worker returns to its resource after another `constructionStartDelay`.
 
-At worker level 1–4, a 30-second Barracks ordered at 1s therefore starts at 5s, completes at 35s,
-and releases its worker back to gathering at 39s. The Barracks can train units
-at 36s with the default one-second order delay, if resources and food permit. The builder cannot gather or accept another construction command
-before 39s. Multiple buildings can be constructed concurrently when enough
+At worker level 1–4, a 30-second Barracks ordered at 1s therefore starts at 4s, completes at 34s,
+and releases its worker back to gathering at 37s. The Barracks can train units
+at 35s with the default one-second order delay, if resources and food permit. The builder cannot gather or accept another construction command
+before 37s. Multiple buildings can be constructed concurrently when enough
 eligible workers and resources are available.
 
 Player `workerLevel` defaults to 1 and is an integer from 1 to 24. The six tiers
 (1–4, 5–8, 9–12, 13–16, 17–20, 21–24) reduce construction and upgrade
 duration by 0%, 1%, 2%, 3%, 4%, and 5%. Builder travel in both directions,
 order delay, and unit recruitment are unaffected by worker level. For example,
-at level 21 a 30-second Barracks ordered at 1s starts at 5s, completes at
-33.5s, and releases its builder at 37.5s.
+at level 21 a 30-second Barracks ordered at 1s starts at 4s, completes at
+32.5s, and releases its builder at 35.5s.
 
 ## Automatic worker selection
 
@@ -96,3 +99,7 @@ Building upgrades retain their producer-queue behavior while also reserving a
 worker for outbound travel, construction, and the return trip. They appear in
 the construction timeline lane, including their start, completion, and worker
 return timestamps.
+
+## Dark Whip and builder travel
+
+An affected Slave travels toward construction at ×1.15 movement speed while Whip remains active. Activation during travel and expiry preserve distance already traveled. Construction starts at the resulting arrival time and immediately removes Whip; construction duration stays unchanged. Return travel uses normal speed unless a fresh cast activates after construction finishes. A builder already constructing cannot receive the effect. See [WHIP.md](WHIP.md).

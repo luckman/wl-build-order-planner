@@ -1,10 +1,10 @@
-import { MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
+import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, foodUsedAt } from "./unitsKilled"
 import { evaluateManaWells } from "./manaWells"
 import { createResourcesCollectedAction, resourcesCollectedCommand, isTimedEvent } from "./resourcesCollected"
 import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
-import { type EconomySettings, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
+import { type EconomySettings, type WhipWindow, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
 import { createScrollAction, scrollEffect, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
 import { actionDuration } from "./playerLevels"
 
@@ -36,9 +36,33 @@ export function simulateBuildOrder(
     initialTownHall: string,
     until = MAX_PLAN_SECONDS,
 ) {
+    let windows: WhipWindow[] = []
+    // A cast issued while a builder travels can change its future arrival. Replay
+    // with accepted casts as travel forecasts, keeping mana validation chronological.
+    for (let pass = 0; pass <= MAX_PLAN_ACTIONS + 1; pass++) {
+        const result = simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit,
+            foodPerFarm, initialTownHall, until, windows)
+        const next = result.orderedPlan.filter(action => action.item.id === "whip" && !action.blocked)
+            .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime! }))
+        if (JSON.stringify(next) === JSON.stringify(windows)) return result
+        windows = next
+    }
+    throw new Error("Scroll and construction timing did not converge.")
+}
+
+function simulateBuildOrderPass(
+    buildOrder: PlannerItem[],
+    economy: EconomySettings,
+    initialFoodUsed: number,
+    baseFoodLimit: number,
+    foodPerFarm: number,
+    initialTownHall: string,
+    until = MAX_PLAN_SECONDS,
+    constructionWhipWindows: WhipWindow[] = [],
+) {
     validateActionCount(buildOrder.length)
     validatePlanTime(until, "Simulation horizon")
-    const simulation = new WorkerEconomy(economy)
+    const simulation = new WorkerEconomy(economy, constructionWhipWindows)
     const plan: ScheduledAction[] = []
     const spending: Array<{ time: number; gold: number; wood: number }> = []
     const catalog = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!.items
@@ -205,6 +229,10 @@ export function simulateBuildOrder(
                     ? `Requires ${item.producer} earlier in the build order`
                     : missingEarlierName ? `Requires ${missingEarlierName} earlier in the build order` : null
         if (dependencyProblem) blockedReason = dependencyProblem
+        // Earlier orders already reserve their costs, even when checking readiness
+        // before their command time. The same resources cannot unlock two orders.
+        const reservedSpending = spending.map(event => ({ ...event, time: 0 }))
+        const reservedFood = plan.map(action => ({ ...action, commandTime: 0 }))
         while (!dependencyProblem && simulation.time <= until) {
             advanceTo(simulation.time)
             const time = simulation.time
@@ -226,6 +254,12 @@ export function simulateBuildOrder(
                 { item: item.producerBuildingId!, count: 1, minLevel: requiredAltarLevel }, time) >= 1
             const builder = requiresConstructionWorker(item) ? simulation.selectBuilder() : undefined
             const state = resourceAt(economy, simulation.deliveries, spending, time)
+            // Avoid missing a delivery at the exact boundary through subtraction rounding.
+            const readinessTime = Math.max(0, Math.min(time, time - economy.orderDelay + 1e-9))
+            const readyResources = resourceAt(economy, simulation.deliveries, reservedSpending, readinessTime)
+            const readyFoodUsed = foodUsedAt([...reservedFood, ...unitKilledPlan], initialFoodUsed, readinessTime)
+            const readyFoodLimit = baseFoodLimit + completed.filter(action =>
+                (action.item.id === "farm" || action.item.id === "pigsty") && action.finishTime! <= readinessTime).length * foodPerFarm
             const foodUsed = foodUsedAt([...plan, ...unitKilledPlan], initialFoodUsed, time)
             const foodLimit =
                 baseFoodLimit +
@@ -253,12 +287,16 @@ export function simulateBuildOrder(
                 !missingRequirement && withinLimit && heroTierUnlocked && !maxCountReached &&
                 state.gold >= cost.gold &&
                 state.wood >= cost.wood &&
-                (!isRecruitable(item) || foodUsed + item.food <= foodLimit)
+                (cost.gold === 0 || readyResources.gold >= cost.gold) &&
+                (cost.wood === 0 || readyResources.wood >= cost.wood) &&
+                (!isRecruitable(item) || (foodUsed + item.food <= foodLimit && readyFoodUsed + item.food <= readyFoodLimit))
             ) {
-                const startTime = time + (requiresConstructionWorker(item) ? economy.constructionStartDelay : 0)
+                const travelTime = builder ? simulation.constructionTravelTime(builder) : 0
+                const startTime = time + travelTime
                 const duration = actionDuration(item, economy)
                 const finishTime = startTime + duration
-                const workerReturnTime = builder ? finishTime + economy.constructionStartDelay : null
+                const returnTravelTime = builder ? simulation.constructionReturnTravelTime(finishTime) : 0
+                const workerReturnTime = builder ? finishTime + returnTravelTime : null
                 if ((workerReturnTime ?? finishTime) > MAX_PLAN_SECONDS) {
                     blockedReason = "Action would exceed the 30:00 plan limit"
                     break
@@ -277,7 +315,7 @@ export function simulateBuildOrder(
                 if (isRecruitable(item)) unitInstances.push({ item, readyAt: finishTime, killed: false })
                 spending.push({ time, gold: -cost.gold, wood: -cost.wood })
                 if (builder) {
-                    simulation.construct(builder, duration)
+                    simulation.construct(builder, duration, travelTime, returnTravelTime)
                 }
                 if (producer) {
                     producer.availableAt = finishTime
@@ -303,6 +341,11 @@ export function simulateBuildOrder(
                     ...buildings.map(({ availableAt }) => availableAt),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime])),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime + economy.orderDelay])),
+                    simulation.deliveries.reduce((next, event) => {
+                        const readyAt = event.time + economy.orderDelay
+                        return readyAt > time ? Math.min(next, readyAt) : next
+                    }, Infinity),
+                    ...unitKilledPlan.map(action => action.commandTime! + economy.orderDelay),
                 ]
                     // Past events cannot unblock an action.
                     .filter((candidate) => candidate > time),

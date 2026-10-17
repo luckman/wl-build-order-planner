@@ -8,7 +8,7 @@ import { formatDuration, parseDuration, MAX_DURATION_SECONDS } from "./durationT
 
 export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "gold-rush", levels = {}, onAdd, onClose, validationError }: {
     minimumTime: number; automaticTime: number | null; scrollId?: ScrollId; validationError?: string | null
-    levels?: Partial<Pick<GameProfile["player"], "lightGoldRushLevel" | "lightLumberGatheringLevel">>
+    levels?: Partial<Pick<GameProfile["player"], "lightGoldRushLevel" | "lightLumberGatheringLevel" | "darkWhipLevel">>
     onAdd: (time: number) => void; onClose: () => void
 }) {
     const scroll = scrollEffect(scrollId, levels)

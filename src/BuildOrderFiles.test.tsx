@@ -273,8 +273,8 @@ test("Reset all restores every imported profile group while retaining faction, o
         expect(screen.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
         fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
         for (const [label, value] of [
-            ["Gold travel time (seconds each way)", "4"], ["Wood travel time (seconds each way)", "4"],
-            ["Sawmill wood travel time (seconds)", "0.5"], ["Construction start delay (seconds)", "4"],
+            ["Gold travel time (seconds each way)", "4.25"], ["Wood travel time (seconds each way)", "4"],
+            ["Sawmill wood travel time (seconds)", "0.5"], ["Construction start delay (seconds)", "3"],
             ["Order delay (seconds)", "1"],
         ]) expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe(value)
         fireEvent.change(screen.getByLabelText("Order delay (seconds)"), { target: { value: "9" } })

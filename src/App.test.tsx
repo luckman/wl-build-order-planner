@@ -392,8 +392,8 @@ test("Barracks is added before its unit and its training slot is available only 
     fireEvent.click(within(action).getByRole("button", { name: /Swordsman/ }))
     expect(within(order).getByText("Barracks")).toBeTruthy()
     fireEvent.click(within(action).getByRole("button", { name: /Swordsman/ }))
-    expect(within(order).getByText("Command 0:36")).toBeTruthy()
-    expect(within(order).getByText("Command 0:56.8")).toBeTruthy()
+    expect(within(order).getByText("Command 0:35")).toBeTruthy()
+    expect(within(order).getByText("Command 0:55.8")).toBeTruthy()
 })
 
 test("two completed Barracks have independent training slots", () => {
@@ -405,7 +405,7 @@ test("two completed Barracks have independent training slots", () => {
         fireEvent.click(within(action).getByRole("button", { name }))
     }
     const order = container.querySelector(".order") as HTMLElement
-    expect(within(order).getAllByText("Command 0:36")).toHaveLength(2)
+    expect(within(order).getAllByText("Command 0:35")).toHaveLength(2)
 })
 
 test("initial allocations derive food, and hovering reads exact delivery boundaries", () => {
@@ -417,13 +417,13 @@ test("initial allocations derive food, and hovering reads exact delivery boundar
     expect(screen.queryByLabelText("Initial food used")).toBeNull()
     const chart = container.querySelector(".resource-chart") as HTMLElement
     jest.spyOn(chart, "getBoundingClientRect").mockReturnValue({ left: 0, width: 1200 } as DOMRect)
-    fireEvent.mouseMove(chart, { clientX: 100 })
-    expect(within(screen.getByRole("tooltip")).getByText("0:10.0")).toBeTruthy()
+    fireEvent.mouseMove(chart, { clientX: 105 })
+    expect(within(screen.getByRole("tooltip")).getByText("0:10.5")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Gold: 150")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Wood: 50")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Food: 10/20")).toBeTruthy()
-    fireEvent.mouseMove(chart, { clientX: 101 })
-    expect(within(screen.getByRole("tooltip")).getByText("0:10.1")).toBeTruthy()
+    fireEvent.mouseMove(chart, { clientX: 106 })
+    expect(within(screen.getByRole("tooltip")).getByText("0:10.6")).toBeTruthy()
     expect(within(screen.getByRole("tooltip")).getByText("Gold: 200")).toBeTruthy()
     expect(container.querySelectorAll(".hover-line").length).toBe(2)
     fireEvent.mouseLeave(chart)
@@ -486,13 +486,13 @@ test("the editable construction delay changes building and worker return times",
     const { container } = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     const delay = screen.getByLabelText("Construction start delay (seconds)") as HTMLInputElement
-    expect(delay.value).toBe("4")
+    expect(delay.value).toBe("3")
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
     fireEvent.click(
         within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ }),
     )
-    expect(screen.getAllByTitle("Command 0:01 · start 0:05 · finish 0:35 · worker returns 0:39")).toHaveLength(2)
+    expect(screen.getAllByTitle("Command 0:01 · start 0:04 · finish 0:34 · worker returns 0:37")).toHaveLength(2)
     fireEvent.change(delay, { target: { value: "2.5" } })
     expect(screen.getAllByTitle("Command 0:01 · start 0:03.5 · finish 0:33.5 · worker returns 0:36")).toHaveLength(2)
 })
@@ -504,7 +504,7 @@ test("town hall upgrades show builder travel and return time in the construction
     chooseUpgrade("Castle lvl 2")
 
     expect(container.querySelector(".event.upgrade")?.getAttribute("title")).toBe(
-        "Command 0:36 · start 0:40 · finish 1:25 · worker returns 1:29",
+        "Command 0:35 · start 0:38 · finish 1:23 · worker returns 1:26",
     )
     const upgradeRow = screen.getByRole("button", { name: "Remove Castle lvl 2" }).closest("li")!
     expect(upgradeRow.title).toBe(container.querySelector(".event.upgrade")?.getAttribute("title"))

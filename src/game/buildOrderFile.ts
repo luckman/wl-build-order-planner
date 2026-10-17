@@ -11,7 +11,7 @@ import { createScrollAction, isScrollAction, scrollCommand, type ScrollCommand }
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-15.1"
+export const GAME_RULES_VERSION = "2026-10-17.2"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -133,7 +133,7 @@ export function parseBuildOrder(text: string): {
                 wood: number(action.wood, `Action ${index + 1}.wood`) })
         }
         if (action.type === "use-scroll") {
-            if (action.scrollId !== "gold-rush" && action.scrollId !== "lumber-gathering") throw new Error(`Action ${index + 1}: unknown scroll ID ${String(action.scrollId)}.`)
+            if (action.scrollId !== "gold-rush" && action.scrollId !== "lumber-gathering" && action.scrollId !== "whip") throw new Error(`Action ${index + 1}: unknown scroll ID ${String(action.scrollId)}.`)
             return createScrollAction({ type: "use-scroll", scrollId: action.scrollId,
                 commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`) }, faction)
         }

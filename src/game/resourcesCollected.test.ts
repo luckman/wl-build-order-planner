@@ -25,8 +25,8 @@ test.each(["light", "dark"] as const)("%s resource events unblock earlier rows a
     const event = createResourcesCollectedAction({ type: "resources-collected", commandTime: 15.5, gold: 300, wood: 300 })
     const worker = factions[faction].items.find(item => item.id === (faction === "light" ? "worker" : "slave"))!
     const result = simulate([worker, event], factions[faction].startingTownHall)
-    expect(result.plan[0]).toMatchObject({ blocked: false, commandTime: 15.5 })
-    expect(result.orderedPlan.map(action => action.item)).toEqual([worker, event])
+    expect(result.plan[0]).toMatchObject({ blocked: false, commandTime: 25.5 })
+    expect(result.orderedPlan.map(action => action.item)).toEqual([event, worker])
     const parsed = parseBuildOrder(serializeBuildOrder(faction, initialGameProfile, result.plan, true))
     expect(parsed.buildOrder[1]).toEqual(event)
     expect(JSON.parse(serializeBuildOrder(faction, initialGameProfile, result.plan)).buildOrder[2]).toEqual({

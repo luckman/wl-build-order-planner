@@ -460,7 +460,7 @@ test.each(["light", "dark"] as const)("%s completed Sawmill accelerates income a
         4, 100, 20, faction.startingTownHall, 110,
     )
     expect(plan[0]).toMatchObject({ commandTime: 1, finishTime: 25, workerReturnTime: 29 })
-    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 49.5 })
+    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 50.5 })
     expect(deliveries.map(({ time }) => time)).toEqual([20, 36.5, 49.5, 63, 77, 91.5, 106.5])
 })
 
@@ -503,9 +503,9 @@ test("subsequent commands wait for income recomputed around construction", () =>
         20,
         "Castle",
     )
-    expect(plan.map(({ commandTime }) => commandTime)).toEqual([1, 55])
+    expect(plan.map(({ commandTime }) => commandTime)).toEqual([1, 56])
     expect(deliveries[0]).toMatchObject({ time: 55, wood: 50 })
-    expect(deliveries[1]).toMatchObject({ time: 109, wood: 50 })
+    expect(deliveries[1]).toMatchObject({ time: 110, wood: 50 })
 })
 
 test("a completed new worker can build while another worker remains occupied", () => {

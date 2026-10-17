@@ -32,14 +32,15 @@ test("only fully recruited units can be killed, regardless of kill source-row po
     expect(foodUsedAt(plan, 10, finish)).toBe(10)
 })
 
-test("a future kill releases food and unblocks recruitment at that exact timestamp", () => {
+test("a future kill releases food and unblocks recruitment after order delay", () => {
     const worker = factions.light.items.find(item => item.id === "worker")!
     const { plan } = simulate([worker, worker, unitKilledEvent("worker", 30)], settings, 12)
     expect(plan[0].commandTime).toBe(1)
-    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 30 })
+    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 31 })
     expect(plan[2]).toMatchObject({ blocked: false, foodReleased: 2 })
     expect(foodUsedAt(plan, 10, 29.999)).toBe(12)
-    expect(foodUsedAt(plan, 10, 30)).toBe(12)
+    expect(foodUsedAt(plan, 10, 30)).toBe(10)
+    expect(foodUsedAt(plan, 10, 31)).toBe(12)
 })
 
 test("construction workers cannot be killed, including travel, and other wood gatherers precede miners", () => {

@@ -29,7 +29,7 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         woodTravelTimeIncreaseBase: "Travel time each way grows by this many seconds as the forest is logged, with or without a Sawmill.",
         maxWoodTravelTime: "Maximum wood travel time each way, with or without a Sawmill.",
         constructionStartDelay: "Builders stop gathering during travel, construction, and return. This delay applies to their travel in each direction.",
-        orderDelay: "This delay applies before the first build-order command and the second and later initial wood gathering commands. It also applies after a recruitment building or prerequisites complete, before their first eligible command. Subsequent recruitment uses the normal queue. The first initial wood gatherer starts immediately.",
+        orderDelay: "This delay applies before the first build-order command and the second and later initial wood gathering commands. It also applies after a recruitment building or prerequisites complete, and after enough gold, wood, or food becomes available. These waits overlap. Worker availability has no extra delay. Subsequent recruitment uses the normal queue when resources are ready. The first initial wood gatherer starts immediately.",
     }
     function field<Block extends keyof GameProfile>(block: Block, key: keyof GameProfile[Block], label: string, min = 0, step = 1, max?: number, decimalPlaces?: number) {
         if (block === "map" || block === "delays") max = MAX_PLAN_SECONDS
@@ -95,6 +95,7 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
                     {field("player", "lightGoldRushLevel", "Gold Rush scroll level", 1, 1, 6)}
                     {field("player", "lightLumberGatheringLevel", "Wood Gathering scroll level", 1, 1, 6)}
                 </>}
+                {faction === "dark" && field("player", "darkWhipLevel", "Whip scroll level", 1, 1, 6)}
             </div>
             <div className="resource-profile-column">
                 {field("player", "manaTowerLevel", "Tower of Mana level", 1, 1, 24)}
@@ -117,7 +118,7 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
             player: { ...initialGameProfile.player,
                 lightGoldRushLevel: faction === "light" ? initialGameProfile.player.lightGoldRushLevel : profile.player.lightGoldRushLevel,
                 lightLumberGatheringLevel: faction === "light" ? initialGameProfile.player.lightLumberGatheringLevel : profile.player.lightLumberGatheringLevel,
-                darkWhipLevel: profile.player.darkWhipLevel,
+                darkWhipLevel: faction === "dark" ? initialGameProfile.player.darkWhipLevel : profile.player.darkWhipLevel,
                 darkLegionsCallLevel: profile.player.darkLegionsCallLevel,
                 massConstructionCostReduction: profile.player.massConstructionCostReduction,
             },

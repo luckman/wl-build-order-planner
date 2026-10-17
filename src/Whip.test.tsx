@@ -1,0 +1,36 @@
+import { fireEvent, render, screen, within } from "@testing-library/react"
+import App from "./App"
+
+beforeEach(() => window.localStorage.clear())
+afterEach(() => window.localStorage.clear())
+
+test("Dark Whip supports automatic timing, level selection, editing and faction drafts", () => {
+    const { container } = render(<App />)
+    expect(screen.queryByRole("button", { name: /^Whip 50 mana/ })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(screen.queryByRole("button", { name: /^Gold Rush/ })).toBeNull()
+    const level = screen.getByLabelText("Whip scroll level") as HTMLInputElement
+    fireEvent.change(level, { target: { value: "6" } })
+    fireEvent.click(screen.getByRole("button", { name: /^Whip 50 mana/ }))
+    const dialog = within(screen.getByRole("dialog", { name: "Use Whip" }))
+    expect(dialog.getByText(/movement speed \+15% for 30 seconds/)).toBeTruthy()
+    expect((dialog.getByLabelText("Command time (mm:ss)") as HTMLInputElement).value).toBe("01:31")
+    fireEvent.click(dialog.getByRole("button", { name: "Add scroll" }))
+    expect(screen.getByRole("button", { name: "Remove Whip" })).toBeTruthy()
+    expect(container.querySelector("button.event.scroll")?.getAttribute("title")).toContain("start 1:32")
+    const draft = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-dark")!)
+    expect(draft.buildOrder[1]).toMatchObject({ scrollId: "whip", commandTime: 91 })
+    expect(draft.gameProfile.player.darkWhipLevel).toBe(6)
+    fireEvent.click(screen.getByRole("button", { name: "Change Whip timestamp, action 1" }))
+    const editor = within(screen.getByRole("dialog"))
+    fireEvent.change(editor.getByLabelText("Command time (mm:ss)"), { target: { value: "01:40" } })
+    fireEvent.click(editor.getByRole("button", { name: "Save timestamp" }))
+    expect(container.querySelector(".order li")?.textContent).toContain("Command 1:40")
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
+    expect(screen.queryByRole("button", { name: "Remove Whip" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(screen.getByRole("button", { name: "Remove Whip" })).toBeTruthy()
+    expect((screen.getByLabelText("Whip scroll level") as HTMLInputElement).value).toBe("6")
+    fireEvent.click(screen.getByRole("button", { name: "Reset basic to defaults" }))
+    expect((screen.getByLabelText("Whip scroll level") as HTMLInputElement).value).toBe("1")
+})

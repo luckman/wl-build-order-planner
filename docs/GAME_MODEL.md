@@ -27,7 +27,7 @@ Game values are entered manually. Player settings affect simulation without modi
 
 ## Factions and initial state
 
-Exactly two factions are supported: Light and Dark. Light has the expanded building, unit, upgrade, and hero catalog. Dark currently has Citadel levels 1–4, Sawmill, Pigsty, Barracks, Tower of Mana, Slave, and Goon. Its action picker exposes only Citadel level 2; levels 3–4 remain available to catalog validation and simulation, including imports. Dark scrolls and its other illustrated buildings, units, and heroes have no implemented catalog entries.
+Exactly two factions are supported: Light and Dark. Light has the expanded building, unit, upgrade, and hero catalog. Dark currently has Citadel levels 1–4, Sawmill, Pigsty, Barracks, Tower of Mana, Slave, and Goon. Its action picker exposes only Citadel level 2; levels 3–4 remain available to catalog validation and simulation, including imports. Dark Whip is implemented as a timed scroll; its other illustrated buildings, units, heroes and Legion’s Call remain pending.
 
 Each game starts with one completed Castle/Citadel and five Workers/Slaves. The initial town hall costs nothing and can produce workers after the configured order delay. Worker count is a game-rule constant, not a profile field.
 
@@ -39,7 +39,7 @@ Default resources are 150 gold, 50 wood, 20 base food capacity, and 35 mana with
 
 Gold and wood arrive as discrete worker deliveries, rather than a fixed income rate. Spendable resources equal starting resources plus deliveries and Resources collected events, minus accepted catalog commands' costs.
 
-Gold uses one shared mine slot. A worker travels outbound, waits for the slot, gathers, and returns to deposit. Default gathering time is 3.1 seconds, with 4 seconds of travel each way. Initial gold miners' first outbound trip is shortened by `basic.initialGoldTravelReduction` (default 1 second), clamped at zero. Queue waits emerge from arrivals and mine availability.
+Gold uses one shared mine slot. A worker travels outbound, waits for the slot, gathers, and returns to deposit. Default gathering time is 3.1 seconds, with 4.25 seconds of travel each way. Initial gold miners' first outbound trip is shortened by `basic.initialGoldTravelReduction` (default 1 second), clamped at zero. Queue waits emerge from arrivals and mine availability.
 
 Wood workers gather independently, with no shared node capacity. Default gathering time is 12.1 seconds and normal travel is 4 seconds each way. Initial gold miners and the first wood gatherer start at time zero; additional initial wood gatherers start at `delays.orderDelay` (default 1 second).
 
@@ -110,13 +110,13 @@ Catalog actions keep their relative order. The scheduler accepts each command wh
 
 Production and Racial buildings double their base gold/wood cost for each successive copy of the same ID: 1×, 2×, 4×, 8×, or `2^(n - 1)` for copy `n`. Earlier catalog orders count for pricing, including orders whose builders are travelling. Economic/Defensive buildings, units, heroes, and upgrades retain fixed costs. The hidden `massConstructionCostReduction` setting is persisted but currently has no cost effect.
 
-Construction and upgrades expose separate command, start, finish, and builder-return times. At command acceptance, costs are paid and a selected worker stops gathering. The worker travels for `constructionStartDelay` (default 4 seconds), builds for the worker-level-adjusted duration, then travels back for the same delay. The completed building becomes available before the builder returns.
+Construction and upgrades expose separate command, start, finish, and builder-return times. At command acceptance, costs are paid and a selected worker stops gathering. The worker travels for `constructionStartDelay` (default 3 seconds), builds for the worker-level-adjusted duration, then travels back for the same delay. The completed building becomes available before the builder returns.
 
 Builders are selected from idle workers, then wood gatherers with the least gathered/carried cargo, then gold workers carrying the least cargo outside the mine. Worker ID breaks ties. Builders are unavailable through both travel legs and construction. Interrupted cargo is discarded, and the worker resumes gathering at its previous resource after return without another outbound trip. These rules also apply to building upgrades.
 
 Upgrades reserve an exact preceding-level building instance and its queue. Its completed lower level still satisfies prerequisites and limits during the upgrade; the higher level unlocks at completion. Each producer has one recruitment slot, and additional physical producers have independent queues. Upgrading and training cannot use the same building simultaneously.
 
-`orderDelay` applies to the first catalog command and commands unlocked by completed prerequisites, recruitment buildings, and building capacity. The wait runs from completion and overlaps waits for other resources or workers. It does not repeat between recruits on an already available producer. There are no per-action construction-delay overrides or theoretical/practical mode controls.
+`orderDelay` applies to the first catalog command and commands unlocked by completed prerequisites, recruitment buildings, and building capacity. Gold, wood, and free food must also have been sufficient for `orderDelay` before a command, accounting for earlier orders' reserved costs and food. Gathering, Resources collected events, food-building completions, and food released by unit losses follow this rule. All waits overlap. Worker availability adds no delay, and subsequent recruitment adds no repeated wait when its resources are already ready. There are no per-action construction-delay overrides or theoretical/practical mode controls.
 
 Food is reserved at an accepted recruitment command, including for queued heroes. Completed Farms/Pigsties increase capacity. Successful Unit is killed events release the lost unit's food. Hero limits and Altar tiers count living and queued heroes across producers; a successful hero loss allows replacement and reduces the next recruitment tier. See the catalog guide for the Light hero requirements.
 
@@ -138,7 +138,7 @@ For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 s
 
 Scroll windows include their start and exclude expiry. Cargo is fixed at mine exit or wood-gathering completion, so a bonus load retains its bonus when delivered after expiry. Overlapping windows of the same scroll do not stack. Interruption or worker loss discards cargo.
 
-All six stored scroll levels currently use level-1 effects. Dark scroll levels and mass-construction cost reduction are stored for future support. Scroll cooldown is shared between both Light scrolls: `basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, followed by `orderDelay`. Mana must also have been sufficient for `orderDelay` before the command. Blocked scrolls spend no mana and start no cooldown.
+Dark Whip uses identical confirmed effects at levels 1–6: 50 mana, 30 seconds, wood harvesting −2 seconds, gold mining −0.5 seconds and movement speed +15%. Its per-worker duration refreshes without stacking; construction clears it. See [WHIP.md](WHIP.md) for eligibility, progress and mine-entry rules. Dark Legion’s Call remains stored for future support. Scroll cooldown is shared between a faction’s scrolls: `basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, followed by `orderDelay`. Mana must also have been sufficient for `orderDelay` before the command. Blocked scrolls spend no mana and start no cooldown.
 
 Automatic scroll insertion chooses an affordable timestamp once, respecting cooldown, mana, and order delay. Manual scroll insertion may retain a mana-blocked event. Invalid fixed-time events remain editable with warnings and have no effect; the mana-well and unit-is-killed dialogs also validate eligibility before saving.
 

@@ -103,9 +103,9 @@ test.each([
         const { plan } = simulateBuildOrder([barracks, barracks], economy, 2, 100, 20, faction.startingTownHall)
         expect(plan.every(action => !action.blocked)).toBe(true)
         const first = plan[0]
-        expect(first.startTime! - first.commandTime!).toBe(4)
+        expect(first.startTime! - first.commandTime!).toBe(3)
         expect(first.finishTime! - first.startTime!).toBeCloseTo(30 * multiplier)
-        expect(first.workerReturnTime! - first.finishTime!).toBe(4)
+        expect(first.workerReturnTime! - first.finishTime!).toBe(3)
         // The same builder must become free at the reduced return time, not the base return time.
         expect(plan[1].commandTime).toBe(first.workerReturnTime)
         expect(actionDuration(worker, economy)).toBeCloseTo(worker.seconds * 0.99)

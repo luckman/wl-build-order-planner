@@ -49,6 +49,7 @@ const iconSources: Record<string, string> = {
     resourcesCollected: require("./icons/events/resources-collected.png"),
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
+    darkWhip: require("./icons/scrolls/dark-whip.png"),
     lightCastle: require("./icons/buildings/light-castle.png"),
     lightSawmill: require("./icons/buildings/light-sawmill.png"),
     lightFarm: require("./icons/buildings/light-farm.png"),
@@ -448,9 +449,9 @@ export default function App() {
                                                         </button>
                                                     )
                                                 })}
-                                            {kind === "hero" && factionId === "light" && <>
+                                            {kind === "hero" && <>
                                                 <span className="scroll-card-delimiter" aria-hidden="true" />
-                                                {(Object.keys(SCROLLS) as ScrollId[]).map(scrollId => {
+                                                {(Object.keys(SCROLLS) as ScrollId[]).filter(id => SCROLLS[id].faction === factionId).map(scrollId => {
                                                     const scroll = scrollEffect(scrollId, gameProfile.player)
                                                     return <button key={scrollId} className="action scroll-card"
                                                         aria-label={`${scroll.name} ${scroll.manaCost} mana · ${scroll.duration}s`}

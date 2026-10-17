@@ -6,7 +6,8 @@ These War Legends assets were provided by the project owner:
 | --- | --- | --- |
 | `light-gold-rush.png` | Gold Rush | Light |
 | `light-lumber-gathering.png` | Lumber Gathering | Light |
+| `dark-whip.png` | Whip | Dark |
+| `dark-legions-call.png` | Legion's Call | Dark |
 
-Scrolls are a separate entity type. Their costs, requirements, effects, and timing
-are pending game data. These icons are stored for later use and are not displayed
-in the planner or included in build orders.
+Gold Rush, Lumber Gathering, and Whip use these icons in the action picker,
+timeline, and build order. Legion's Call artwork is stored for future implementation.

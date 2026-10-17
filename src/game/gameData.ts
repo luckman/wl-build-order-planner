@@ -22,7 +22,7 @@ export type IconId =
     | "lightUnitIsKilled" | "darkUnitIsKilled"
     | "manaWellIsCaptured" | "manaWellIsLost"
     | "resourcesCollected"
-    | "lightGoldRush" | "lightLumberGathering"
+    | "lightGoldRush" | "lightLumberGathering" | "darkWhip"
     | "lightCastle"
     | "lightSawmill"
     | "lightFarm"
@@ -131,7 +131,7 @@ export type PlannerItem = {
     level?: number
     upgradeFrom?: string
     producerBuildingId?: string
-} & ({ kind: ItemKind } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering"; commandTime: number } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string })
+} & ({ kind: ItemKind } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering" | "whip"; commandTime: number } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string })
 
 export type Faction = {
     id: FactionId
