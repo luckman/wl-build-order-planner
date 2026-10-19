@@ -22,7 +22,8 @@
 .file-notice-error { border-color: #96564f; background: #2d191c; color: #ffb5a9; }
 .file-notice button { border: 0; background: transparent; color: inherit; padding: 0 .3rem; }
 @media (max-width: 700px) {
-    .topbar { height: auto; min-height: 54px; flex-wrap: wrap; padding: .5rem .75rem 0; gap: .5rem; }
-    .topbar nav { display: flex; height: 42px; margin-left: auto; }
+    .sc2-shell > .topbar { height: auto; min-height: 54px; flex-wrap: wrap; padding: .5rem .75rem 0; gap: .5rem; }
+    .topbar nav { display: flex; height: 44px; margin-left: auto; }
     .topbar nav > button { display: none; }
+    .file-menu > summary { justify-content: center; min-width: 44px; padding: 0 .75rem; }
 }

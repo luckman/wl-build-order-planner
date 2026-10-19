@@ -14,6 +14,53 @@ afterEach(() => {
 const value = (label: string) => (screen.getByLabelText(label) as HTMLInputElement).value
 const change = (label: string, next: string) => fireEvent.change(screen.getByLabelText(label), { target: { value: next } })
 
+test("Order delay can be cleared before entering zero and restores an unfinished empty edit on blur", () => {
+    const first = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+    const label = "Order delay (seconds)"
+    const input = screen.getByLabelText(label)
+    expect(input.getAttribute("inputmode")).toBe("decimal")
+    change(label, "2.5")
+    fireEvent.focus(input)
+    change(label, "")
+    expect(value(label)).toBe("")
+    fireEvent.blur(input)
+    expect(value(label)).toBe("2.5")
+    fireEvent.focus(input)
+    change(label, "")
+    expect(value(label)).toBe("")
+    change(label, "0")
+    fireEvent.blur(input)
+    expect(value(label)).toBe("0")
+    fireEvent.click(screen.getByRole("button", { name: "Save profile" }))
+    first.unmount()
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+    expect(value(label)).toBe("0")
+})
+
+test.each([
+    ["Starting gold", "0", "0"],
+    ["Worker level", "3", "3"],
+    ["Gold mining time reduction (seconds)", "0.5", "0.5"],
+    ["Wood travel increase (seconds)", "0.25", "0.25"],
+])("%s supports clearing and replacing its numeric value", (label, replacement, expected) => {
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
+    const input = screen.getByLabelText(label)
+    const previous = value(label)
+    fireEvent.focus(input)
+    change(label, "")
+    expect(value(label)).toBe("")
+    fireEvent.blur(input)
+    expect(value(label)).toBe(previous)
+    fireEvent.focus(input)
+    change(label, "")
+    change(label, replacement)
+    fireEvent.blur(input)
+    expect(value(label)).toBe(expected)
+})
+
 test.each(["Light", "Dark"])("%s Shipyard and Altar levels persist and reset with the profile", faction => {
     const first = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: faction }))

@@ -15,6 +15,7 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
 }) {
     const [advanced, setAdvanced] = useState(false)
     const [durationError, setDurationError] = useState<string | null>(null)
+    const [editingField, setEditingField] = useState<{ key: string; value: string } | null>(null)
     const yields = yieldsFromLevels(profile.player)
     const names = buildingNames[faction]
     const fieldHelp: Record<string, string> = {
@@ -37,20 +38,30 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         const id = `profile-${block}-${String(key)}`
         const help = fieldHelp[String(key)]
         const fieldValue = profile[block][key] as number
+        const editKey = `${faction}-${id}`
+        const isEditing = editingField?.key === editKey
         return <div className="profile-field" key={String(key)}>
             <div className="profile-field-caption">
                 <label htmlFor={id}>{label}</label>
                 {help && <ProfileFieldHelp id={`${id}-help`} label={label} text={help} />}
             </div>
             <input id={id} aria-describedby={help ? `${id}-help` : undefined} type="number" min={min} max={max} step={step}
-            value={decimalPlaces === undefined ? fieldValue : fieldValue.toFixed(decimalPlaces)}
+            inputMode={step < 1 ? "decimal" : "numeric"}
+            value={isEditing ? editingField.value : decimalPlaces === undefined ? fieldValue : fieldValue.toFixed(decimalPlaces)}
+            onFocus={event => setEditingField({ key: editKey, value: event.currentTarget.value })}
+            onBlur={() => setEditingField(null)}
             onChange={event => {
+                if (isEditing) setEditingField({ key: editKey, value: event.target.value })
+                if (event.target.value === "") {
+                    setEditingField({ key: editKey, value: "" })
+                    return
+                }
                 const value = event.target.valueAsNumber
                 if (!Number.isFinite(value)) return
                 const normalized = isLevel ? Math.floor(value) : decimalPlaces === undefined ? value : Number(value.toFixed(decimalPlaces))
                 const bounded = Math.min(max ?? Infinity, Math.max(min, normalized))
                 // Number inputs can retain "1" when React considers it equal to "1.0".
-                if (decimalPlaces !== undefined) event.currentTarget.value = bounded.toFixed(decimalPlaces)
+                if (decimalPlaces !== undefined && !isEditing) event.currentTarget.value = bounded.toFixed(decimalPlaces)
                 if (block === "player" && key === "startingMana") {
                     onChange({ ...profile, player: { ...profile.player, startingMana: bounded,
                         baseManaLimit: Math.max(profile.player.baseManaLimit, bounded) } })
