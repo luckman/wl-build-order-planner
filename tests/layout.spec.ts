@@ -16,7 +16,7 @@ test("Reset all restores main and hidden advanced settings without clearing orde
     await expect(page.getByRole("slider", { name: "Initial gold miners" })).toHaveValue("4")
     await expect(page.getByRole("button", { name: "Remove Worker" })).toHaveCount(1)
     await page.getByRole("button", { name: /^Advanced/ }).click()
-    await expect(page.getByRole("spinbutton", { name: "Gold travel time (seconds each way)", exact: true })).toHaveValue("4")
+    await expect(page.getByRole("spinbutton", { name: "Gold travel time (seconds each way)", exact: true })).toHaveValue("4.25")
     await expect(page.getByRole("spinbutton", { name: "Order delay (seconds)", exact: true })).toHaveValue("1")
 })
 
@@ -88,7 +88,7 @@ for (const width of [1440, 1024, 390]) {
             }
             const firstCard = page.locator(".action").first()
             expect((await firstCard.boundingBox())!.height).toBeLessThan(70)
-            await expect(firstCard.locator("small")).toHaveText("500/500/0")
+            await expect(firstCard.locator("small")).toHaveText("500/500")
             const icon = (await firstCard.locator("img").boundingBox())!
             const costs = (await firstCard.locator("small").boundingBox())!
             expect(costs.y).toBeGreaterThanOrEqual(icon.y + icon.height)
@@ -99,9 +99,9 @@ for (const width of [1440, 1024, 390]) {
             await upgrade.click()
             const menu = page.getByRole("menu", { name: `${townHall} upgrades` })
             await expect(menu.locator(".upgrade-option-name")).toHaveText(
-                (faction === "Light" ? [2, 3, 4] : [2, 3]).map(level => `${townHall} lvl ${level}`),
+                [2, 3, 4].map(level => `${townHall} lvl ${level}`),
             )
-            await expect(menu.locator(".upgrade-option-cost").first()).toHaveText("200 gold · 200 wood · 0 food")
+            await expect(menu.locator(".upgrade-option-cost").first()).toHaveText("200 gold · 200 wood")
             const menuBounds = (await menu.boundingBox())!
             expect(menuBounds.x).toBeGreaterThanOrEqual(0)
             expect(menuBounds.x + menuBounds.width).toBeLessThanOrEqual(width)
@@ -112,7 +112,7 @@ for (const width of [1440, 1024, 390]) {
             const upgradeIcon = (await upgrade.locator("img").boundingBox())!
             expect(name.y + name.height).toBeLessThanOrEqual(upgradeIcon.y)
             await firstCard.hover()
-            await expect(firstCard).toHaveAttribute("title", `${faction === "Light" ? "Castle" : "Citadel"}\nGold: 500\nWood: 500\nFood: 0\nTime: 60s`)
+            await expect(firstCard).toHaveAttribute("title", `${faction === "Light" ? "Castle" : "Citadel"}\nGold: 500\nWood: 500\nTime: 60s`)
             if (width > 700) expect(timeline!.width).toBe(planner!.width)
             else {
                 // Mobile uses display: contents so the order can sit before resources.
@@ -156,6 +156,10 @@ test("120-second graph scale, hover boundaries, and fixed columns survive horizo
     // Browser mouse coordinates round to pixels; use the next pixel past 10 seconds.
     await page.mouse.move(Math.ceil(bounds.x + bounds.width * (10.1 / 120)), bounds.y + 20)
     await expect(page.getByRole("tooltip")).toContainText("0:10.1")
+    await expect(page.getByRole("tooltip")).toContainText("Gold: 150")
+    // The first delivery is at 10.6s: 4.25s each way + 3.1s gathering - 1s opening reduction.
+    await page.mouse.move(Math.ceil(bounds.x + bounds.width * (10.7 / 120)), bounds.y + 20)
+    await expect(page.getByRole("tooltip")).toContainText("0:10.7")
     await expect(page.getByRole("tooltip")).toContainText("Gold: 200")
     await page.getByLabel("Starting gold", { exact: true }).fill("100000")
     await page.getByLabel("Starting wood", { exact: true }).fill("100000")
@@ -228,12 +232,12 @@ test("Build order action hover details match timeline timing and update with con
     const row = page.locator(".order li").filter({ has: page.getByRole("button", { name: "Remove Castle lvl 2" }) })
     const timeline = page.locator(".event.upgrade")
     await row.hover()
-    await expect(row).toHaveAttribute("title", "Command 0:36 · start 0:40 · finish 1:25 · worker returns 1:29")
+    await expect(row).toHaveAttribute("title", "Command 0:35 · start 0:38 · finish 1:23 · worker returns 1:26")
     expect(await row.getAttribute("title")).toBe(await timeline.getAttribute("title"))
     await page.getByRole("button", { name: /^Advanced/ }).click()
     await page.getByRole("spinbutton", { name: "Construction start delay (seconds)", exact: true }).fill("2.5")
     await row.hover()
     expect(await row.getAttribute("title")).toBe(await timeline.getAttribute("title"))
-    // The inserted Barracks prerequisite also completes 1.5 seconds earlier.
+    // The inserted Barracks prerequisite also completes 0.5 seconds earlier.
     await expect(row).toHaveAttribute("title", "Command 0:34.5 · start 0:37 · finish 1:22 · worker returns 1:24.5")
 })

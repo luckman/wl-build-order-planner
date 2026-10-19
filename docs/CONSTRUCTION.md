@@ -17,10 +17,20 @@ All readiness waits overlap and can elapse while a worker or production queue is
 unavailable. Worker availability adds no delay. Subsequent recruitment starts when
 the previous recruit finishes if its other readiness waits have already elapsed.
 
+Every building construction or upgrade command also waits until `orderDelay`
+after the previous successful player command (construction, upgrade, recruitment,
+or scroll). This spacing overlaps with the readiness waits above. Unit and hero
+recruitment have no additional command-spacing wait. Blocked commands, resource
+adjustments, unit losses, and mana-well events do not reset this spacing.
+
 For example, Castle level 2 completing at 01:10 unlocks an Altar command at
 01:11, with construction starting at 01:14 using the default three-second builder
 travel. An Elven Tree completing at 02:10 unlocks Archer recruitment at 02:11
 in an existing available Barracks.
+
+If Citadel level 2 unlocks both Goblin Lab and Altar, the Lab can be ordered one
+second after the upgrade completes and the Altar one second after the Lab order
+with the default Order delay, assuming resources and workers are ready.
 
 The editable game profile contains `delays.constructionStartDelay`, defaulting to
 3 seconds. It applies to every building and building upgrade, and both directions

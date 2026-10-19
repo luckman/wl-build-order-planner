@@ -174,9 +174,9 @@ test("construction travel handles expiry before arrival", () => {
 
 test("a cast during builder travel updates building, worker return and replay allocation timings", () => {
     const barracks = factions.dark.items.find(item => item.id === "barracks")!
-    const { plan, deliveries } = simulate([barracks, whip(1)])
+    const { plan, deliveries } = simulate([barracks, whip(2)])
     const build = plan[0]
-    const travelTime = 1 + 2 / 1.15 // Command at 1, effect at 2, arrival before 4.
+    const travelTime = 2 + 1 / 1.15 // Command at 1, effect at 3, arrival before 4.
     expect(build.commandTime).toBe(1)
     expect(build.startTime).toBeCloseTo(1 + travelTime)
     expect(build.finishTime! - build.startTime!).toBe(barracks.seconds)
@@ -185,7 +185,7 @@ test("a cast during builder travel updates building, worker return and replay al
     expect(workerAllocationAt(settings, plan, build.workerReturnTime!)).toMatchObject({ busyOrIdle: 0, wood: 1 })
     expect(deliveries[0].time).toBeCloseTo(build.workerReturnTime! + 12.1 + 4)
     // Source row placement cannot change timing or income.
-    const reversed = simulate([whip(1), barracks])
+    const reversed = simulate([whip(2), barracks])
     expect(reversed.plan[1]).toEqual(build)
     expect(reversed.deliveries).toEqual(deliveries)
 })

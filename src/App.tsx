@@ -11,6 +11,7 @@ import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
 import ScrollDialog from "./ScrollDialog"
 import UpgradeCards from "./UpgradeCards"
+import TimelineActionMenu from "./TimelineActionMenu"
 import { orderedBuildings } from "./buildingDisplayOrder"
 import EventTimeDialog from "./EventTimeDialog"
 import { createScrollAction, SCROLLS, type ScrollId, isScrollAction, scrollCooldown, scrollEffect } from "./game/scrolls"
@@ -173,6 +174,8 @@ export default function App() {
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
     const [resourcesCollectedDialogOpen, setResourcesCollectedDialogOpen] = useState(false)
     const [editingEventId, setEditingEventId] = useState<string | null>(null)
+    const [timelineMenu, setTimelineMenu] = useState<{ item: PlannerItem; anchor: HTMLButtonElement } | null>(null)
+    const closeTimelineMenu = useCallback(() => setTimelineMenu(null), [])
     const nextOrderId = useRef(0)
     const withOrderIds = useCallback((items: PlannerItem[]) => items.map(item => "orderId" in item
         ? item as PlannerItem & { orderId: string }
@@ -196,6 +199,9 @@ export default function App() {
         return { light: { ...drafts.light, items: withOrderIds(drafts.light.items) }, dark: { ...drafts.dark, items: withOrderIds(drafts.dark.items) } }
     })
     const buildOrder = buildOrders[factionId].items
+    useEffect(() => {
+        if (timelineMenu && !buildOrder.some(item => item === timelineMenu.item)) closeTimelineMenu()
+    }, [buildOrder, timelineMenu, closeTimelineMenu])
     const editingEvent = buildOrder.find(item => item.orderId === editingEventId)
     const opening = buildOrders[factionId].opening
     const setOpeningGoldWorkers = (goldWorkers: number) => {
@@ -570,13 +576,10 @@ export default function App() {
                                                                     width: `${((finishTime! - commandTime!) / endTime) * 100}%`,
                                                                 }}
                                                                 title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime })}
-                                                                onClick={() =>
-                                                                    setBuildOrder((current) =>
-                                                                        current.filter(
-                                                                            entry => entry !== item,
-                                                                        ),
-                                                                    )
-                                                                }
+                                                                aria-haspopup="menu"
+                                                                aria-expanded={timelineMenu?.item === item}
+                                                                aria-controls={timelineMenu?.item === item ? "timeline-action-menu" : undefined}
+                                                                onClick={event => setTimelineMenu(timelineMenu?.item === item ? null : { item, anchor: event.currentTarget })}
                                                             >
                                                                 <img src={iconSources[item.icon]} alt="" />
                                                                 <span>{item.name}</span>
@@ -703,6 +706,9 @@ export default function App() {
                         </div>
                     </aside>
                 </div>
+                {timelineMenu && buildOrder.some(item => item === timelineMenu.item) && <TimelineActionMenu
+                    anchor={timelineMenu.anchor} actionName={timelineMenu.item.name} onClose={closeTimelineMenu}
+                    onDelete={() => setBuildOrder(current => current.filter(item => item !== timelineMenu.item))} />}
                 {(resourcesCollectedDialogOpen || editingEvent?.kind === "resources-collected") && <ResourcesCollectedDialog
                     key={editingEvent?.orderId ?? "new-resources-collected-event"}
                     defaultTime={defaultEventTime}
@@ -890,7 +896,7 @@ function TimelineHelp() {
         <div id="timeline-help-text" className="timeline-help-tooltip" role="tooltip" hidden={!hovered && !focused}>
             Hover a graph to see resources at that time. Otherwise, values show the latest command.
             Hover an action to see its command, start, finish, and worker return times.
-            Left-click a command to remove it from the build order.
+            Left-click a command to open its menu, then choose Delete to remove it from the build order.
         </div>
     </div>
 }

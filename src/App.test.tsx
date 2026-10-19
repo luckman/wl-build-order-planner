@@ -206,6 +206,37 @@ test("action cards expose hover costs and group upgrades in dropdown cards", () 
     }
 })
 
+test("timeline actions require Delete from their menu and dismiss safely", () => {
+    const { container } = render(<App />)
+    fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "1000" } })
+    const addWorker = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Worker / })
+    fireEvent.click(addWorker)
+    fireEvent.click(addWorker)
+    const timeline = within(container.querySelector(".queue-lanes") as HTMLElement)
+    const events = timeline.getAllByRole("button")
+    fireEvent.click(events[0])
+    expect(screen.getAllByRole("button", { name: "Remove Worker" })).toHaveLength(2)
+    expect(screen.getAllByRole("menuitem")).toHaveLength(1)
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBe(document.activeElement)
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
+    expect(screen.queryByRole("menu")).toBeNull()
+    expect(document.activeElement).toBe(events[0])
+    fireEvent.click(events[0])
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole("menu")).toBeNull()
+    expect(timeline.getAllByRole("button")).toHaveLength(2)
+    fireEvent.click(events[1])
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }))
+    expect(screen.queryByRole("menu")).toBeNull()
+    expect(screen.getAllByRole("button", { name: "Remove Worker" })).toHaveLength(1)
+    fireEvent.click(timeline.getByRole("button"))
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }))
+    expect(screen.queryByRole("menu")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Light" }))
+    expect(screen.queryByRole("menu")).toBeNull()
+    expect(screen.getAllByRole("button", { name: "Remove Worker" })).toHaveLength(1)
+})
+
 test("timeline shows a 120-second window and extends 30 seconds past the last completion", () => {
     const { container } = render(<App />)
     const canvas = container.querySelector(".timeline-canvas") as HTMLElement
@@ -403,7 +434,8 @@ test("two completed Barracks have independent training slots", () => {
         fireEvent.click(within(action).getByRole("button", { name }))
     }
     const order = container.querySelector(".order") as HTMLElement
-    expect(within(order).getAllByText("Command 0:35")).toHaveLength(2)
+    expect(within(order).getByText("Command 0:35")).toBeTruthy()
+    expect(within(order).getByText("Command 0:36")).toBeTruthy()
 })
 
 test("initial allocations derive food, and hovering reads exact delivery boundaries", () => {

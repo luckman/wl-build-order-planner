@@ -5,6 +5,9 @@
 .resource-chart { position: relative; cursor: crosshair; }
 
 .timeline { overflow: visible; }
+.timeline-action-menu { position: fixed; z-index: 40; min-width: 140px; padding: 4px; border: 1px solid #759fc0; border-radius: 4px; background: #101d2c; box-shadow: 0 4px 12px #0008; }
+.timeline-action-menu button { width: 100%; padding: .5rem .75rem; border: 0; background: transparent; color: #ffb5a9; text-align: left; }
+.timeline-action-menu button:hover, .timeline-action-menu button:focus-visible { background: #284b68; outline: 1px solid #759fc0; }
 .timeline > .panel-title { position: relative; }
 .timeline-title { display: flex; align-items: center; gap: 8px; }
 .timeline-help-button {

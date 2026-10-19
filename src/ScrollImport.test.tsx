@@ -77,6 +77,8 @@ test("shared scroll commands appear chronologically after recruitment lanes and 
     const timelineScroll = container.querySelector("button.event.scroll") as HTMLElement
     expect(timelineScroll.title).toContain("start 0:06")
     fireEvent.click(timelineScroll)
+    expect(within(order).getByRole("button", { name: "Remove Gold Rush" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }))
     expect(within(order).getAllByRole("button", { name: "Remove Worker" })).toHaveLength(2)
     expect(within(order).queryByRole("button", { name: "Remove Gold Rush" })).toBeNull()
 })

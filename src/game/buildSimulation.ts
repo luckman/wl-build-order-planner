@@ -100,6 +100,7 @@ function simulateBuildOrderPass(
     }))
     const scrollPlan: ScheduledAction[] = []
     let lastScrollCommand = -Infinity
+    let lastCatalogCommand = -Infinity
     const timedEventsByIndex = new Map<number, ScheduledAction>()
     const wellPlan: ScheduledAction[] = evaluateManaWells(buildOrder).map(({ item, index, blocked, blockedReason }) => {
         const action: ScheduledAction = { item, cost: { gold: 0, wood: 0 }, blocked, blockedReason,
@@ -265,6 +266,9 @@ function simulateBuildOrderPass(
         while (!dependencyProblem && simulation.time <= until) {
             advanceTo(simulation.time)
             const time = simulation.time
+            // Only construction commands need spacing; recruitment retains its normal queue.
+            const commandReadyAt = requiresConstructionWorker(item)
+                ? Math.max(lastCatalogCommand, lastScrollCommand) + economy.orderDelay : -Infinity
             const unlockedBuildings = unlockedBuildingsAt(time)
             const maxCountReached = item.maxCount !== undefined && unitInstances.filter(unit => unit.item.id === item.id && !unit.killed).length >= item.maxCount
             if (maxCountReached && !pendingUnitsKilled.some(kill => kill.item.unitId === item.id)) {
@@ -318,6 +322,7 @@ function simulateBuildOrderPass(
                         ? `Insufficient supply: requires ${item.food}, available ${Math.max(0, foodLimit - foodUsed)} (${foodUsed}/${foodLimit} used)`
                     : "Waiting for resources, food, producer, or worker"
             if (
+                time >= commandReadyAt &&
                 (!needsProducer || producer) &&
                 (!requiresConstructionWorker(item) || builder) &&
                 item.prerequisites.every((name) => completedNames.has(name)) &&
@@ -353,6 +358,7 @@ function simulateBuildOrderPass(
                 })
                 if (isRecruitable(item)) unitInstances.push({ item, readyAt: finishTime, killed: false })
                 spending.push({ time, gold: -cost.gold, wood: -cost.wood })
+                lastCatalogCommand = time
                 if (builder) {
                     simulation.construct(builder, duration, travelTime, returnTravelTime)
                 }
@@ -373,6 +379,7 @@ function simulateBuildOrderPass(
             const nextTime = Math.min(
                 ...[
                     simulation.nextEventTime,
+                    commandReadyAt,
                     pendingScrolls[0]?.item.commandTime ?? Infinity,
                     pendingResourcesCollected[0]?.item.commandTime ?? Infinity,
                     pendingUnitsKilled[0]?.item.commandTime ?? Infinity,

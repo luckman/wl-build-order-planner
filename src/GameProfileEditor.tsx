@@ -23,13 +23,13 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         manaAccumulation: "Mana regenerated per minute, up to the current mana capacity.",
         manaFromManaWells: "Extra mana regenerated per minute for each owned mana well, up to mana capacity. Mana well is captured adds one well; Mana well is lost removes one at the selected timestamp, with no delays.",
         scrollCooldownReduction: `Reduces the ${profile.basic.timeBetweenScrolls}-second scroll cooldown by this percentage. Order delay applies afterward.`,
-        goldTravelTime: "Travel time each way to mine gold.",
+        goldTravelTime: "Travel time each way to mine gold. If your worker has no movement speed improvements, set this to 4.25 seconds. If your worker has a movement speed bonus of +10.7/min, set this to 3.75 seconds.",
         woodTravelTime: "Initial travel time each way to gather wood before a Sawmill completes.",
         sawmillWoodTravelTime: "Initial travel time each way to gather wood after each Sawmill completes.",
         woodTravelTimeIncreaseBase: "Travel time each way grows by this many seconds as the forest is logged, with or without a Sawmill.",
         maxWoodTravelTime: "Maximum wood travel time each way, with or without a Sawmill.",
         constructionStartDelay: "Builders stop gathering during travel, construction, and return. This delay applies to their travel in each direction.",
-        orderDelay: "This delay applies before the first build-order command and the second and later initial wood gathering commands. It also applies after a recruitment building or prerequisites complete, and after enough gold, wood, or food becomes available. These waits overlap. Worker availability has no extra delay. Subsequent recruitment uses the normal queue when resources are ready. The first initial wood gatherer starts immediately.",
+        orderDelay: "Applies to most player actions as requirements and resources become ready, and between commands when constructing or upgrading buildings. These waits overlap. Unit production has no extra spacing between commands, and worker availability adds no delay.",
     }
     function field<Block extends keyof GameProfile>(block: Block, key: keyof GameProfile[Block], label: string, min = 0, step = 1, max?: number, decimalPlaces?: number) {
         if (block === "map" || block === "delays") max = MAX_PLAN_SECONDS

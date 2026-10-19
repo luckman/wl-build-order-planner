@@ -90,8 +90,8 @@ test("an old Barracks waits once for the Elven Tree unlock, without repeating or
         { ...tree, seconds: 90, prerequisites: [], requirements: [] }, archer, archer],
         abundantEconomy, 0, 100, 20, "Castle")
     expect(plan[1].commandTime).toBe(36)
-    expect(plan[2].finishTime).toBe(130)
-    expect(plan[3].commandTime).toBe(131)
+    expect(plan[2].finishTime).toBe(131)
+    expect(plan[3].commandTime).toBe(132)
     expect(plan[4].commandTime).toBe(plan[3].finishTime)
 })
 
@@ -585,8 +585,8 @@ test.each(["light", "dark"] as const)("%s Barracks orders reserve escalating pri
         { ...abundantEconomy, workerCount: 4 },
         0, 100, 20, faction.startingTownHall,
     )
-    expect(plan.map(({ commandTime }) => commandTime)).toEqual([1, 1, 1, 1])
-    expect(plan.map(({ startTime }) => startTime)).toEqual([5, 5, 5, 5])
+    expect(plan.map(({ commandTime }) => commandTime)).toEqual([1, 2, 3, 4])
+    expect(plan.map(({ startTime }) => startTime)).toEqual([5, 6, 7, 8])
     expect(plan.map(({ cost }) => cost)).toEqual([
         { gold: 200, wood: 150 },
         { gold: 400, wood: 300 },
