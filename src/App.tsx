@@ -797,6 +797,12 @@ export default function App() {
                         setHoverTime(null)
                     }} />}
             </main>
+            <footer className="site-footer">
+                Please report any bugs or issues on{" "}
+                <a href="https://github.com/luckman/wl-build-order-planner/issues" target="_blank" rel="noopener noreferrer">
+                    GitHub Issues
+                </a>.
+            </footer>
         </div>
     )
 }

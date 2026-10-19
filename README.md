@@ -4,6 +4,8 @@ Create and share build orders for the Light and Dark factions in War Legends. Th
 your browser, calculating action timings and showing your economy and production on an interactive
 timeline.
 
+[Open the live planner](https://luckman.github.io/wl-build-order-planner/).
+
 ## Features
 
 - Buildings, units, heroes, upgrades, and faction scrolls, with automatic prerequisite insertion.

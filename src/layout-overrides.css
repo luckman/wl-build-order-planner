@@ -137,6 +137,11 @@
 .blocked-event img { width: 32px; height: 32px; flex-shrink: 0; }
 .blocked-event p { margin: .2rem 0 0; color: #f6bcc5; font-size: .75rem; }
 
+.site-footer { margin: 0; padding: 1rem 1rem 1.5rem; color: #a9c5df; font-size: .8rem; line-height: 1.5; }
+.site-footer a { color: #e1b55f; text-underline-offset: .2em; }
+.site-footer a:hover { color: #f5d27b; }
+.site-footer a:focus-visible { outline: 2px solid #e1b55f; outline-offset: 3px; }
+
 @media (max-width: 1050px) {
     .workspace { grid-template-columns: minmax(0, 1fr); }
     .workspace > .title-row { grid-column: 1; grid-row: 1; align-items: flex-end; }
