@@ -66,7 +66,7 @@ The `player` block also includes `manaAccumulation` (default 10 mana per minute)
 
 `player.massConstructionCostReduction` is a hidden percentage setting accepting finite values from 0 to 100, defaulting to 0 for new and older profiles. It round-trips through files, shareable links, drafts, and saved profiles. Reset basic preserves it; Reset all restores 0. It is stored for future support and does not yet change construction costs.
 
-`goldTravelTime` and `woodTravelTime` each apply to both outbound and return trips (default 4.25 seconds each way for gold and 4 seconds each way for wood). There are no separate outbound/return profile fields. Initial gold travel reduction and Sawmill overrides still apply; obsolete fields are ignored like other unrecognized fields.
+`goldTravelTime` and `woodTravelTime` each apply to both outbound and return trips (default 4.25 seconds each way for gold and 3.5 seconds each way for wood). There are no separate outbound/return profile fields. Initial gold travel reduction and Sawmill overrides still apply; obsolete fields are ignored like other unrecognized fields.
 
 `player.goldMiningTimeReduction` and `player.woodMiningTimeReduction` subtract seconds from `basic.goldGatherTime` and `basic.woodGatherTime`, respectively. Both default to 0 for older profiles. Gold accepts 0–1.0 seconds; wood accepts 0–5.0 seconds. Import rejects non-numeric, non-finite, negative, or over-limit values. The editor shows one decimal digit and uses 0.1-second steps in the first resource column; food fields appear in the second column. Effective durations apply to every gathering phase, mine queues, worker saturation, builder selection, and resource readiness; travel and yield are unchanged. A 0.001-second minimum protects custom base durations smaller than a reduction. Both values round-trip through files, shareable links, and saved profiles and reset with player settings.
 
@@ -86,7 +86,7 @@ Example profile using the current defaults:
   },
   "map": {
     "goldTravelTime": 4.25,
-    "woodTravelTime": 4,
+    "woodTravelTime": 3.5,
     "sawmillWoodTravelTime": 0.5,
     "woodTravelTimeIncreaseBase": 0.3,
     "maxWoodTravelTime": 5
@@ -182,9 +182,9 @@ Lumber Gathering costs 25 mana at command time, starts exactly one second later,
 
 ## Resources collected events
 
-Both factions can add gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 29:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
+Both factions can adjust gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. Negative amounts subtract resources, with each resulting balance clamped to zero at that timestamp; later income adds normally. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 29:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
 
-The command schema is `{ "type": "resources-collected", "commandTime": 1, "gold": 300, "wood": 300 }`. Resource values must be finite and non-negative; command time must be within 0–1799 seconds. The UI uses whole-second timestamps, while imports/API commands may retain fractional seconds.
+The command schema is `{ "type": "resources-collected", "commandTime": 1, "gold": 300, "wood": 300 }`. Resource values must be finite and may be negative; command time must be within 0–1799 seconds. Negative adjustments cannot reduce either balance below zero. The UI uses whole-second timestamps, while imports/API commands may retain fractional seconds.
 
 ## Mana well commands
 

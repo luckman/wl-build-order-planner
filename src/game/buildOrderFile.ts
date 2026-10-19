@@ -54,6 +54,11 @@ function number(value: unknown, path: string, positive = false, integer = false)
     return value
 }
 
+function resourceAmount(value: unknown, path: string): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${path} must be a finite number.`)
+    return value
+}
+
 /** Shared field validation, independent of document/storage framing. */
 export function parseGameProfile(value: unknown): GameProfile {
     const profile = object(value === undefined ? {} : value, "gameProfile")
@@ -129,8 +134,8 @@ export function parseBuildOrder(text: string): {
         if (action.type === "resources-collected") {
             return createResourcesCollectedAction({ type: "resources-collected",
                 commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
-                gold: number(action.gold, `Action ${index + 1}.gold`),
-                wood: number(action.wood, `Action ${index + 1}.wood`) })
+                gold: resourceAmount(action.gold, `Action ${index + 1}.gold`),
+                wood: resourceAmount(action.wood, `Action ${index + 1}.wood`) })
         }
         if (action.type === "use-scroll") {
             if (action.scrollId !== "gold-rush" && action.scrollId !== "lumber-gathering" && action.scrollId !== "whip" && action.scrollId !== "legions-call") throw new Error(`Action ${index + 1}: unknown scroll ID ${String(action.scrollId)}.`)

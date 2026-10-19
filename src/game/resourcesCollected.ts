@@ -6,8 +6,8 @@ export type ResourcesCollectedAction = PlannerItem & { kind: "resources-collecte
 
 export function createResourcesCollectedAction(command: ResourcesCollectedCommand): ResourcesCollectedAction {
     for (const field of ["commandTime", "gold", "wood"] as const) {
-        if (typeof command[field] !== "number" || !Number.isFinite(command[field]) || command[field] < 0)
-            throw new Error(`Resources collected ${field} must be a finite non-negative number.`)
+        if (typeof command[field] !== "number" || !Number.isFinite(command[field]))
+            throw new Error(`Resources collected ${field} must be a finite number.`)
     }
     validateCommandTime(command.commandTime)
     return { id: "resources-collected", name: "Resources collected", kind: "resources-collected", icon: "resourcesCollected",

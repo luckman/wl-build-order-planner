@@ -25,7 +25,7 @@ test("success notices stay for five seconds after the latest operation and suppo
         render(<App />)
         const loadTemplate = () => {
             fireEvent.click(screen.getByText("Import / Export"))
-            fireEvent.click(screen.getByRole("button", { name: "10 workers t2 on basic account", exact: true }))
+            fireEvent.click(screen.getByRole("button", { name: "10 workers T2 on basic account", exact: true }))
         }
         loadTemplate()
         expect(screen.getByRole("status").classList.contains("file-notice-success")).toBe(true)
@@ -58,11 +58,11 @@ test("shared-link error popups also disappear after five seconds", () => {
 })
 
 test.each([
-    ["light", "10 workers t2 on basic account", ["worker", "worker", "worker", "worker", "barracks", "farm", "worker", "castle-lvl-2"]],
-    ["light", "10 workers t2 with swordsman", ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"]],
-    ["dark", "10 slaves t2 on basic account", ["slave", "slave", "slave", "slave", "barracks", "pigsty", "slave", "citadel-lvl-2"]],
-    ["dark", "10 slaves t2 with goon", ["slave", "slave", "slave", "barracks", "slave", "pigsty", "slave", "goon", "citadel-lvl-2"]],
-    ["dark", "11 slaves t2 on basic account", ["slave", "slave", "sawmill", "slave", "slave", "pigsty", "slave", "barracks", "slave", "citadel-lvl-2"]],
+    ["light", "10 workers T2 on basic account", ["worker", "worker", "worker", "worker", "barracks", "farm", "worker", "castle-lvl-2"]],
+    ["light", "10 workers T2 with swordsman", ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"]],
+    ["dark", "10 slaves T2 on basic account", ["slave", "slave", "slave", "slave", "barracks", "pigsty", "slave", "citadel-lvl-2"]],
+    ["dark", "10 slaves T2 with goon", ["slave", "slave", "slave", "barracks", "slave", "pigsty", "slave", "goon", "citadel-lvl-2"]],
+    ["dark", "11 slaves T2 on basic account", ["slave", "slave", "sawmill", "slave", "slave", "pigsty", "slave", "barracks", "slave", "citadel-lvl-2"]],
 ] as const)("%s template %s keeps the entire game profile and persists the exact order", (faction, name, ids) => {
     const confirm = jest.spyOn(window, "confirm").mockReturnValue(true)
     const profile = {
@@ -79,7 +79,7 @@ test.each([
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name, exact: true }))
         expect(confirm).not.toHaveBeenCalled()
-        const goldWorkers = name === "11 slaves t2 on basic account" ? 4 : 3
+        const goldWorkers = name === "11 slaves T2 on basic account" ? 4 : 3
         const expected = [{ type: "allocate-workers", goldWorkers }, ...ids.map(itemId => ({ itemId }))]
         expect(JSON.parse(window.localStorage.getItem(draftStorageKey(faction))!).buildOrder).toEqual(expected)
         expect(JSON.parse(window.localStorage.getItem(profileStorageKey(faction))!).gameProfile).toEqual(profile)
@@ -100,7 +100,7 @@ test("template orders warn before replacement and cancellation retains the draft
         fireEvent.click(screen.getByRole("button", { name: /^Sawmill \d+ gold/ }))
         const original = window.localStorage.getItem(draftStorageKey("light"))
         fireEvent.click(screen.getByText("Import / Export"))
-        const template = screen.getByRole("button", { name: "10 workers t2 with swordsman", exact: true })
+        const template = screen.getByRole("button", { name: "10 workers T2 with swordsman", exact: true })
         fireEvent.click(template)
         expect(confirm).toHaveBeenCalledWith(expect.stringContaining("will replace your current build order"))
         expect(window.localStorage.getItem(draftStorageKey("light"))).toBe(original)
@@ -119,18 +119,18 @@ test("template suggestions follow the selected faction and leave the other facti
     const darkDraft = window.localStorage.getItem(draftStorageKey("dark"))
     fireEvent.click(screen.getByText("Import / Export"))
     const templates = screen.getByRole("region", { name: "Start from template" })
-    expect(within(templates).getByRole("button", { name: "10 slaves t2 on basic account", exact: true })).toBeTruthy()
-    expect(within(templates).getByRole("button", { name: "10 slaves t2 with goon", exact: true })).toBeTruthy()
+    expect(within(templates).getByRole("button", { name: "10 slaves T2 on basic account", exact: true })).toBeTruthy()
+    expect(within(templates).getByRole("button", { name: "10 slaves T2 with goon", exact: true })).toBeTruthy()
     expect(within(templates).queryByRole("button", { name: /10 workers/ })).toBeNull()
     expect(within(templates).getAllByRole("button").map(button => button.textContent)).toEqual([
-        "10 slaves t2 with goon", "10 slaves t2 on basic account", "11 slaves t2 on basic account",
+        "10 slaves T2 with goon", "10 slaves T2 on basic account", "11 slaves T2 on basic account",
     ])
     fireEvent.click(screen.getByRole("button", { name: "Light", exact: true }))
     fireEvent.click(screen.getByText("Import / Export"))
     expect(within(screen.getByRole("region", { name: "Start from template" })).getAllByRole("button").map(button => button.textContent)).toEqual([
-        "10 workers t2 with swordsman", "10 workers t2 on basic account",
+        "10 workers T2 with swordsman", "10 workers T2 on basic account",
     ])
-    fireEvent.click(screen.getByRole("button", { name: "10 workers t2 on basic account", exact: true }))
+    fireEvent.click(screen.getByRole("button", { name: "10 workers T2 on basic account", exact: true }))
     expect(window.localStorage.getItem(draftStorageKey("dark"))).toBe(darkDraft)
     fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
     expect(screen.getByRole("button", { name: "Remove Slave" })).toBeTruthy()
@@ -287,7 +287,7 @@ test("Reset all restores every imported profile group while retaining faction, o
         expect(screen.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
         fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
         for (const [label, value] of [
-            ["Gold travel time (seconds each way)", "4.25"], ["Wood travel time (seconds each way)", "4"],
+            ["Gold travel time (seconds each way)", "4.25"], ["Map: Wood travel time (seconds each way)", "3.5"],
             ["Sawmill wood travel time (seconds)", "0.5"], ["Construction start delay (seconds)", "3"],
             ["Order delay (seconds)", "1"],
         ]) expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe(value)
@@ -369,7 +369,7 @@ test("export downloads JSON without timings by default and includes timings when
         fireEvent.change(screen.getByLabelText("Order delay (seconds)"), { target: { value: "3.5" } })
         fireEvent.change(screen.getByLabelText("Sawmill wood travel time (seconds)"), { target: { value: "1.25" } })
         fireEvent.change(screen.getByLabelText("Gold travel time (seconds each way)"), { target: { value: "2.5" } })
-        fireEvent.change(screen.getByLabelText("Wood travel time (seconds each way)"), { target: { value: "1.5" } })
+        fireEvent.change(screen.getByLabelText("Map: Wood travel time (seconds each way)"), { target: { value: "1.5" } })
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name: "Export JSON" }))
         const readBlob = (blob: Blob) => new Promise<string>((resolve, reject) => {

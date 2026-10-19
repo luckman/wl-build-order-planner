@@ -92,7 +92,7 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd }
             return <button type="button" role="menuitem" tabIndex={-1} key={item.id} onClick={() => { onAdd(item); close() }}>
                 <img className="upgrade-option-icon" src={iconSources[item.icon]} alt="" />
                 <span className="upgrade-option-name">{item.name}</span>
-                <span className="upgrade-option-cost">{cost.gold} gold · {cost.wood} wood · {item.food} food</span>
+                <span className="upgrade-option-cost">{cost.gold} gold · {cost.wood} wood</span>
             </button>
         })}
     </div>, document.body)}</>

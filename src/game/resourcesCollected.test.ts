@@ -33,7 +33,36 @@ test.each(["light", "dark"] as const)("%s resource events unblock earlier rows a
         type: "resources-collected", commandTime: 15.5, gold: 300, wood: 300 })
 })
 
-test.each([-1, Infinity, NaN])("invalid event values are rejected: %s", value => {
+test.each([Infinity, -Infinity, NaN])("invalid event values are rejected: %s", value => {
     for (const field of ["gold", "wood", "commandTime"] as const)
         expect(() => createResourcesCollectedAction({ type: "resources-collected", commandTime: 1, gold: 300, wood: 300, [field]: value })).toThrow()
+})
+
+test("negative command times remain invalid", () => {
+    expect(() => createResourcesCollectedAction({ type: "resources-collected", commandTime: -1, gold: -300, wood: -300 })).toThrow()
+})
+
+test("negative adjustments clamp each balance at the event time and later income has no debt", () => {
+    const event = (commandTime: number, gold: number, wood: number) =>
+        createResourcesCollectedAction({ type: "resources-collected", commandTime, gold, wood })
+    const events = [event(0, 100, 80), event(1, -150, -20.5), event(2, 30, -100), event(2, 10, 15)]
+    const result = simulate(events)
+    expect(resourceAt(economy, result.deliveries, [], 1)).toMatchObject({ gold: 0, wood: 59.5 })
+    expect(resourceAt(economy, result.deliveries, [], 2)).toMatchObject({ gold: 40, wood: 15 })
+    const parsed = parseBuildOrder(serializeBuildOrder("light", initialGameProfile, result.plan))
+    expect(parsed.buildOrder).toEqual(events)
+})
+
+test("negative adjustments use the balance after earlier command costs", () => {
+    const worker = factions.light.items.find(item => item.id === "worker")!
+    const events = [
+        createResourcesCollectedAction({ type: "resources-collected", commandTime: 0, gold: 200, wood: 0 }),
+        worker,
+        createResourcesCollectedAction({ type: "resources-collected", commandTime: 11, gold: -100, wood: 0 }),
+        createResourcesCollectedAction({ type: "resources-collected", commandTime: 12, gold: 25, wood: 0 }),
+    ]
+    const result = simulate(events)
+    const spending = [{ time: result.plan[1].commandTime!, gold: -worker.gold, wood: -worker.wood }]
+    expect(result.plan[1].blocked).toBe(false)
+    expect(resourceAt(economy, result.deliveries, spending, 12)).toMatchObject({ gold: 25, wood: 0 })
 })

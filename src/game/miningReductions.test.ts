@@ -16,8 +16,8 @@ test("reductions advance opening and queued mine deliveries, and successive wood
     expect(gold[0].time).toBeCloseTo(9.6)
     expect(gold[1].time).toBeCloseTo(11.7)
     const wood = deliveries.filter(delivery => delivery.wood)
-    expect(wood[0].time).toBeCloseTo(15.1)
-    expect(wood[1].time).toBeCloseTo(30.2)
+    expect(wood[0].time).toBeCloseTo(14.1)
+    expect(wood[1].time).toBeCloseTo(28.2)
     expect(gold.every(delivery => delivery.gold === 50)).toBe(true)
     expect(wood.every(delivery => delivery.wood === 50)).toBe(true)
 })
@@ -38,8 +38,8 @@ test.each<FactionId>(["light", "dark"])("%s build-order resource readiness uses 
     const reduced = simulate(economyFromProfile(profile))
     const base = simulate(economyFromProfile({ ...profile, player: { ...profile.player,
         goldMiningTimeReduction: 0, woodMiningTimeReduction: 0 } }))
-    expect(reduced.commandTime).toBeCloseTo(31.2)
-    expect(base.commandTime).toBeCloseTo(41.2)
+    expect(reduced.commandTime).toBeCloseTo(29.2)
+    expect(base.commandTime).toBeCloseTo(39.2)
     expect(reduced.blocked).toBe(false)
 })
 

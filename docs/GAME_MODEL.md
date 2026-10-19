@@ -37,7 +37,7 @@ Default resources are 150 gold, 50 wood, 20 base food capacity, and 35 mana with
 
 ## Resource cycles
 
-Gold and wood arrive as discrete worker deliveries, rather than a fixed income rate. Spendable resources equal starting resources plus deliveries and Resources collected events, minus accepted catalog commands' costs.
+Gold and wood arrive as discrete worker deliveries, rather than a fixed income rate. Spendable resources equal starting resources plus deliveries and Resources collected adjustments, minus accepted catalog commands' costs. Each negative Resources collected adjustment is limited to the available balance at its timestamp, so discarded deficits do not reduce later income.
 
 Gold uses one shared mine slot. A worker travels outbound, waits for the slot, gathers, and returns to deposit. Default gathering time is 3.1 seconds, with 4.25 seconds of travel each way. Initial gold miners' first outbound trip is shortened by `basic.initialGoldTravelReduction` (default 1 second), clamped at zero. Queue waits emerge from arrivals and mine availability.
 
@@ -47,7 +47,7 @@ Wood workers gather independently, with no shared node capacity. Default gatheri
 
 The `growingWoodTravelTime` function models forest logging: as nearby trees are cut down, workers must travel farther to reach the remaining trees. Increasing travel time gradually represents this effect without tracking individual trees or forest positions.
 
-Wood travel increases in steps both before and after a Sawmill. Before the first completion, the initial value is `map.woodTravelTime` (default 4 seconds each way), and growth is measured from game start. Each completed Sawmill resets the value to `map.sawmillWoodTravelTime` (default 0.5 seconds each way) and restarts its growth timer. Growth is global, not tied to individual workers or time spent gathering.
+Wood travel increases in steps both before and after a Sawmill. Before the first completion, the initial value is `map.woodTravelTime` (default 3.5 seconds each way), and growth is measured from game start. Each completed Sawmill resets the value to `map.sawmillWoodTravelTime` (default 0.5 seconds each way) and restarts its growth timer. Growth is global, not tied to individual workers or time spent gathering.
 
 `map.woodTravelTimeIncreaseBase` is the amount added at each increase (default 0.3 seconds). `map.maxWoodTravelTime` caps both initial and subsequent values (default 5 seconds). Each current travel value lasts 30 seconds times its rounded-up value before increasing: values up to 1 second last 30 seconds, values above 1 and up to 2 seconds last 60 seconds, values above 2 and up to 3 seconds last 90 seconds, and so on. Zero travel also lasts 30 seconds before its first increase. Zero increase disables growth; zero maximum makes new wood travel instantaneous.
 
@@ -130,7 +130,7 @@ Timed events retain explicit command timestamps independently of their position 
 | --- | --- |
 | Gold Rush (Light) | Spends 50 mana; starts 1 second after command; adds 10–15 gold to loads exiting the mine during its level-dependent window. |
 | Lumber Gathering (Light) | Spends 25 mana; starts 1 second after command; adds 15–20 wood to loads finishing gathering during its level-dependent window. |
-| Resources collected (both factions) | Instantly adds non-negative gold and wood without mana, worker, or delay requirements. |
+| Resources collected (both factions) | Instantly adjusts gold and wood without mana, worker, or delay requirements. Negative amounts subtract resources, clamping each resulting balance to zero at that timestamp. |
 | Mana well is captured / Mana well is lost (both factions) | Instantly adds/removes one owned well. A loss requires ownership at that timestamp. |
 | Unit is killed (both factions) | Removes one completed living recruit or starting worker, releasing food. Workers assigned to construction, including travel, are ineligible; wood workers are selected before gold workers. |
 

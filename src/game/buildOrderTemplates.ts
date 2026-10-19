@@ -10,25 +10,25 @@ type BuildOrderTemplate = {
 export const buildOrderTemplates: Record<FactionId, BuildOrderTemplate[]> = {
     light: [
         {
-            name: "10 workers t2 with swordsman",
+            name: "10 workers T2 with swordsman",
             itemIds: ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"],
         },
         {
-            name: "10 workers t2 on basic account",
+            name: "10 workers T2 on basic account",
             itemIds: ["worker", "worker", "worker", "worker", "barracks", "farm", "worker", "castle-lvl-2"],
         },
     ],
     dark: [
         {
-            name: "10 slaves t2 with goon",
+            name: "10 slaves T2 with goon",
             itemIds: ["slave", "slave", "slave", "barracks", "slave", "pigsty", "slave", "goon", "citadel-lvl-2"],
         },
         {
-            name: "10 slaves t2 on basic account",
+            name: "10 slaves T2 on basic account",
             itemIds: ["slave", "slave", "slave", "slave", "barracks", "pigsty", "slave", "citadel-lvl-2"],
         },
         {
-            name: "11 slaves t2 on basic account",
+            name: "11 slaves T2 on basic account",
             goldWorkers: 4,
             itemIds: ["slave", "slave", "sawmill", "slave", "slave", "pigsty", "slave", "barracks", "slave", "citadel-lvl-2"],
         },

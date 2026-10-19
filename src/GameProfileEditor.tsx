@@ -105,6 +105,9 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
                 {field("player", "manaAccumulation", "Mana accumulation", 0, 1, 20)}
                 {field("player", "manaFromManaWells", "Mana from mana wells", 0, 1, 100)}
                 {field("player", "scrollCooldownReduction", "Scroll cooldown reduction (%)", 0, 1, 20)}
+                <div className="profile-map-settings">
+                    {field("map", "woodTravelTime", "Map: Wood travel time (seconds each way)", 0, 0.1)}
+                </div>
             </div>
         </div>
         <p className="initial-allocation">
@@ -116,6 +119,7 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         <button className="reset-profile" type="button" aria-label="Load saved profile" title={`Load the saved profile only for the current faction (${faction === "light" ? "Light" : "Dark"}). The build order is preserved.`} disabled={!hasSavedProfile} onClick={onLoad}>Load saved profile</button>
         <button className="reset-profile" type="button" aria-label="Reset basic to defaults" title="Reset the main resource and level fields, keeping advanced settings" onClick={() => onChange({
             ...profile,
+            map: { ...profile.map, woodTravelTime: initialGameProfile.map.woodTravelTime },
             player: { ...initialGameProfile.player,
                 lightGoldRushLevel: faction === "light" ? initialGameProfile.player.lightGoldRushLevel : profile.player.lightGoldRushLevel,
                 lightLumberGatheringLevel: faction === "light" ? initialGameProfile.player.lightLumberGatheringLevel : profile.player.lightLumberGatheringLevel,
@@ -134,7 +138,6 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
         {advanced && <div id="advanced-profile">
         <div className="economy-grid resource-profile-grid">
             {field("map", "goldTravelTime", "Gold travel time (seconds each way)", 0, 0.1)}
-            {field("map", "woodTravelTime", "Wood travel time (seconds each way)", 0, 0.1)}
             {field("map", "sawmillWoodTravelTime", "Sawmill wood travel time (seconds)", 0, 0.1)}
             {field("map", "woodTravelTimeIncreaseBase", "Wood travel increase (seconds)", 0, 0.01, undefined, 2)}
             {field("map", "maxWoodTravelTime", "Maximum wood travel time (seconds each way)", 0, 0.1)}

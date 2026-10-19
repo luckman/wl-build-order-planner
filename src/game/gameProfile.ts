@@ -20,7 +20,7 @@ export type GameProfile = {
 
 export const initialGameProfile: GameProfile = {
     basic: { goldGatherTime: 3.1, woodGatherTime: 12.1, initialGoldTravelReduction: 1, timeBetweenScrolls: 10 },
-    map: { goldTravelTime: 4.25, woodTravelTime: 4, sawmillWoodTravelTime: 0.5, woodTravelTimeIncreaseBase: 0.3, maxWoodTravelTime: 5 },
+    map: { goldTravelTime: 4.25, woodTravelTime: 3.5, sawmillWoodTravelTime: 0.5, woodTravelTimeIncreaseBase: 0.3, maxWoodTravelTime: 5 },
     player: { startingGold: 150, startingWood: 50, baseFoodLimit: 20, startingMana: 35, baseManaLimit: 50,
         lightGoldRushLevel: 1, lightLumberGatheringLevel: 1, darkWhipLevel: 1, darkLegionsCallLevel: 1,
         manaAccumulation: 10, manaFromManaWells: 60, scrollCooldownReduction: 0, massConstructionCostReduction: 0,

@@ -16,6 +16,7 @@
 .economy-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .economy-grid.resource-profile-grid { grid-template-columns: repeat(3, minmax(0, 14.5rem)); column-gap: clamp(1.5rem, 4vw, 4rem); row-gap: 1.25rem; }
 .resource-profile-column { display: grid; align-content: start; gap: .55rem; min-width: 0; }
+.profile-map-settings { margin-top: .75rem; }
 .economy .resource-profile-grid .profile-field { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 5rem; align-items: center; gap: .5rem; }
 .profile-field-caption { display: flex; align-items: center; gap: .3rem; min-width: 0; }
 .profile-help-trigger { flex-shrink: 0; display: inline-flex; }
@@ -76,18 +77,6 @@
 
 /* Each category has one compact row and its own horizontal scroll. */
 .action-panel { min-width: 0; overflow: hidden; order: 0; }
-.faction-implementation-note {
-    margin: .5rem .5rem 0;
-    padding: .65rem .8rem;
-    border: 1px solid #a47c35;
-    border-left: 4px solid #e3b75e;
-    border-radius: 4px;
-    background: #302719;
-    color: #ffe0a0;
-    font-size: .9rem;
-    font-weight: bold;
-    line-height: 1.4;
-}
 .action-groups {
     display: grid;
     gap: .3rem;

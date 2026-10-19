@@ -2,7 +2,7 @@ import Notification, { type NotificationMessage } from "./Notification"
 import { ACTION_LIMIT_MESSAGE, MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, MAX_COMMAND_SECONDS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
 import UnitKilledDialog from "./UnitKilledDialog"
 import { createUnitKilledAction, foodUsedAt } from "./game/unitsKilled"
-import { createManaWellAction, evaluateManaWells, MANA_WELL_EVENTS, manaWellCountAt, type ManaWellEventType } from "./game/manaWells"
+import { createManaWellAction, evaluateManaWells, MANA_WELL_EVENTS, type ManaWellEventType } from "./game/manaWells"
 import ResourcesCollectedDialog from "./ResourcesCollectedDialog"
 import { createResourcesCollectedAction, isTimedEvent } from "./game/resourcesCollected"
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
@@ -428,7 +428,6 @@ export default function App() {
                     <section className="planner-area">
                         <section className="action-panel panel" aria-label="Actions">
                             <div className="panel-title"><h2>Actions</h2></div>
-                            {factionId === "dark" && <p className="faction-implementation-note">Dark faction is in implementation.</p>}
                             <div className="action-groups">
                                 {dependencyError && <p role="alert">{dependencyError}</p>}
                                 {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
@@ -438,19 +437,19 @@ export default function App() {
                                             {(kind === "building" ? orderedBuildings(faction) : faction.items.filter(item => item.kind === kind))
                                                 .map((item) => {
                                                     const cost = itemCost(item, buildOrder, faction.startingTownHall)
-                                                    const food = isRecruitable(item) ? item.food : 0
+                                                    const showFood = isRecruitable(item)
                                                     const duration = Number(actionDuration(item, economy).toFixed(2))
                                                     return (
                                                         <button
                                                             className="action"
                                                             key={item.id}
-                                                            aria-label={`${item.name} ${cost.gold} gold · ${cost.wood} wood · ${food} food · ${duration}s`}
-                                                            title={`${item.name}\nGold: ${cost.gold}\nWood: ${cost.wood}\nFood: ${food}\nTime: ${duration}s`}
+                                                            aria-label={`${item.name} ${cost.gold} gold · ${cost.wood} wood${showFood ? ` · ${item.food} food` : ""} · ${duration}s`}
+                                                            title={`${item.name}\nGold: ${cost.gold}\nWood: ${cost.wood}${showFood ? `\nFood: ${item.food}` : ""}\nTime: ${duration}s`}
                                                             onClick={() => addCatalogItem(item)}
                                                         >
                                                             <img src={iconSources[item.icon]} alt="" />
                                                             <small>
-                                                                <span className="action-stat">{cost.gold}/{cost.wood}/{food}</span>
+                                                                <span className="action-stat">{cost.gold}/{cost.wood}{showFood ? `/${item.food}` : ""}</span>
                                                             </small>
                                                         </button>
                                                     )
@@ -469,7 +468,7 @@ export default function App() {
                                             </>}
                                             {kind === "hero" && <>
                                                 <span className="scroll-card-delimiter" aria-hidden="true" />
-                                                <button className="action resource-card" aria-label="Resources collected" title="Add gold and wood instantly at a chosen timestamp"
+                                                <button className="action resource-card" aria-label="Resources collected" title="Adjust gold and wood instantly at a chosen timestamp"
                                                     onClick={() => setResourcesCollectedDialogOpen(true)}>
                                                     <span className="action-name">Resources collected</span>
                                                     <img src={iconSources.resourcesCollected} alt="" />
@@ -657,7 +656,7 @@ export default function App() {
                                             <b>{item.name}</b>
                                             {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}</small>}
-                                            {item.kind === "resources-collected" && <small>+{item.collectedGold} gold · +{item.collectedWood} wood</small>}
+                                            {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
                                             <small>
                                                 {blocked || commandTime === null
                                                     ? blockedReason
@@ -695,7 +694,6 @@ export default function App() {
                                     <span>Wood <b>{Math.round(latestResources.wood)}</b></span>
                                     <span>Food <b>{latestFoodUsed} / {latestFoodLimit}</b></span>
                                     {latestMana && <span>Mana <b>{Math.floor(latestMana.mana)} / {latestMana.limit}</b></span>}
-                                    <span>Mana wells <b>{manaWellCountAt(plan, latestCommandTime)}</b></span>
                                     <span>Total workers <b>{latestWorkers.total}</b></span>
                                     <span>Gathering gold <b>{latestWorkers.gold}</b></span>
                                     <span>Gathering wood <b>{latestWorkers.wood}</b></span>

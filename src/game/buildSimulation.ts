@@ -155,7 +155,10 @@ function simulateBuildOrderPass(
             }
             while (pendingResourcesCollected[0]?.item.commandTime === eventTime) {
                 const { item, index } = pendingResourcesCollected.shift()!
-                simulation.deliveries.push({ time: eventTime, gold: item.collectedGold, wood: item.collectedWood, worker: -1 })
+                const available = resourceAt(economy, simulation.deliveries, spending, eventTime)
+                simulation.deliveries.push({ time: eventTime,
+                    gold: Math.max(-available.gold, item.collectedGold),
+                    wood: Math.max(-available.wood, item.collectedWood), worker: -1 })
                 timedEventsByIndex.set(index, { item, cost: { gold: 0, wood: 0 }, blocked: false,
                     commandTime: eventTime, startTime: eventTime, finishTime: eventTime,
                     workerReturnTime: null, workerId: null })

@@ -16,7 +16,7 @@ test.each([
 })
 
 test("default travel grows from game start without a Sawmill", () => {
-    for (const [time, travel] of [[0, 4], [119.999, 4], [120, 4.3], [269.999, 4.3], [270, 4.6], [420, 4.9], [569.999, 4.9], [570, 5], [1800, 5]]) {
+    for (const [time, travel] of [[0, 3.5], [119.999, 3.5], [120, 3.8], [239.999, 3.8], [240, 4.1], [390, 4.4], [540, 4.7], [689.999, 4.7], [690, 5], [1800, 5]]) {
         expect(growingWoodTravelTime(woodTravelTime, time, woodTravelTimeIncreaseBase, maxWoodTravelTime)).toBeCloseTo(travel)
     }
 })

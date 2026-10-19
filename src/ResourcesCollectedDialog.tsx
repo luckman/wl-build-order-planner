@@ -26,7 +26,7 @@ export default function ResourcesCollectedDialog({ defaultTime, action, onSave, 
 
     const commandTime = parseDuration(time)
 
-    const valid = commandTime !== null && Number.isInteger(commandTime) && [gold, wood].every(value => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0)
+    const valid = commandTime !== null && Number.isInteger(commandTime) && [gold, wood].every(value => value.trim() !== "" && Number.isFinite(Number(value)))
 
     useEffect(() => {
 
@@ -62,17 +62,17 @@ export default function ResourcesCollectedDialog({ defaultTime, action, onSave, 
 
             <h2 id="resources-collected-dialog-title">{action ? "Edit Resources collected" : "Resources collected"}</h2>
 
-            <p>Gold and wood are added instantly at the command time, with no delays.</p>
+            <p>Gold and wood are adjusted instantly at the command time, with no delays. Negative amounts subtract resources; balances cannot fall below zero.</p>
 
             <form onSubmit={event => { event.preventDefault(); if (valid && !validationError) onSave({ type: "resources-collected", commandTime: commandTime!, gold: Number(gold), wood: Number(wood) }) }}>
 
                 <DurationInput wholeSeconds label="Command time (mm:ss)" value={time} onChange={setTime} />
 
-                <label>Gold<input type="number" min="0" step="any" value={gold} onChange={event => setGold(event.target.value)} /></label>
+                <label>Gold<input type="number" step="any" value={gold} onChange={event => setGold(event.target.value)} /></label>
 
-                <label>Wood<input type="number" min="0" step="any" value={wood} onChange={event => setWood(event.target.value)} /></label>
+                <label>Wood<input type="number" step="any" value={wood} onChange={event => setWood(event.target.value)} /></label>
 
-                {!valid && <p role="alert">Enter a valid time from 00:00 to 29:59 and non-negative resource amounts.</p>}
+                {!valid && <p role="alert">Enter a valid time from 00:00 to 29:59 and finite resource amounts.</p>}
 
                 {validationError && <p role="alert">{validationError}</p>}
 

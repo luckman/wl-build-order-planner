@@ -120,11 +120,14 @@ test("reset basic restores main fields while preserving advanced settings, hidde
     expect(value("Starting gold")).toBe("150")
     expect(value("Worker level")).toBe("1")
     expect(value("Gold travel time (seconds each way)")).toBe("8")
+    expect(value("Map: Wood travel time (seconds each way)")).toBe("3.5")
     expect(value("Order delay (seconds)")).toBe("3")
     expect(value("Initial gold miners")).toBe("2")
     expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
     expect(screen.getByRole("button", { name: "Hide advanced" })).toBeTruthy()
     const draftProfile = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).gameProfile
+    expect(draftProfile.map).toEqual({ ...editedProfile.map, woodTravelTime: initialGameProfile.map.woodTravelTime })
+    expect(draftProfile.delays).toEqual(editedProfile.delays)
     for (const field of scrollLevelFields) {
         const visible = field === "lightGoldRushLevel" || field === "lightLumberGatheringLevel"
         expect(draftProfile.player[field]).toBe(visible ? 1 : editedProfile.player[field])
@@ -137,6 +140,8 @@ test("reset basic restores main fields while preserving advanced settings, hidde
     expect(loadFactionProfiles().light.player).toEqual(draftProfile.player)
     fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
     const resetProfile = JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).gameProfile
+    expect(resetProfile.map).toEqual(initialGameProfile.map)
+    expect(resetProfile.delays).toEqual(initialGameProfile.delays)
     for (const field of scrollLevelFields) expect(resetProfile.player[field]).toBe(1)
     expect(resetProfile.player.massConstructionCostReduction).toBe(0)
 })
@@ -179,9 +184,11 @@ test("advanced help is brief and specific to each field and appears on hover or 
 test("resource settings persist independently for each faction across remounts, including advanced settings and reset", () => {
     const first = render(<App />)
     const manaColumn = screen.getByLabelText("Starting mana").closest(".resource-profile-column")
-    for (const label of ["Mana accumulation", "Mana from mana wells", "Scroll cooldown reduction (%)"]) {
+    for (const label of ["Mana accumulation", "Mana from mana wells", "Scroll cooldown reduction (%)", "Map: Wood travel time (seconds each way)"]) {
         expect(screen.getByLabelText(label).closest(".resource-profile-column")).toBe(manaColumn)
     }
+    expect(screen.getByLabelText("Map: Wood travel time (seconds each way)").closest("#advanced-profile")).toBeNull()
+    expect(screen.queryByLabelText("Gold travel time (seconds each way)")).toBeNull()
     change("Starting gold", "777")
     change("Starting wood", "321")
     change("Base food limit", "40")
@@ -197,7 +204,7 @@ test("resource settings persist independently for each faction across remounts, 
     change("Castle level", "15")
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     change("Gold travel time (seconds each way)", "6.5")
-    change("Wood travel time (seconds each way)", "7.5")
+    change("Map: Wood travel time (seconds each way)", "7.5")
     change("Sawmill wood travel time (seconds)", "1.5")
     change("Wood travel increase (seconds)", "0.75")
     change("Maximum wood travel time (seconds each way)", "8")
@@ -229,7 +236,7 @@ test("resource settings persist independently for each faction across remounts, 
     expect(value("Castle level")).toBe("15")
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     expect(value("Gold travel time (seconds each way)")).toBe("6.5")
-    expect(value("Wood travel time (seconds each way)")).toBe("7.5")
+    expect(value("Map: Wood travel time (seconds each way)")).toBe("7.5")
     expect(value("Sawmill wood travel time (seconds)")).toBe("1.5")
     expect(value("Wood travel increase (seconds)")).toBe("0.75")
     expect(value("Maximum wood travel time (seconds each way)")).toBe("8")

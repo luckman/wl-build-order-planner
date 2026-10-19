@@ -72,6 +72,24 @@ test("resource dialog defaults reset, allows any valid timestamp, edits amounts 
 
 
 
+test("negative amounts save, display correctly, clamp balances and survive draft restore", () => {
+    const view = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Resources collected", exact: true }))
+    const dialog = within(screen.getByRole("dialog"))
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "00:00" } })
+    fireEvent.change(dialog.getByLabelText("Gold"), { target: { value: "-500" } })
+    fireEvent.change(dialog.getByLabelText("Wood"), { target: { value: "-20.5" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Resources collected" }))
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(screen.getByText("-500 gold · -20.5 wood")).toBeTruthy()
+    expect(view.container.querySelector(".resource-summary")?.textContent).toContain("Gold 0")
+    view.unmount()
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Change Resources collected timestamp, action 1" }))
+    expect((within(screen.getByRole("dialog")).getByLabelText("Gold") as HTMLInputElement).value).toBe("-500")
+    expect((within(screen.getByRole("dialog")).getByLabelText("Wood") as HTMLInputElement).value).toBe("-20.5")
+})
+
 test("default timestamp excludes blocked scrolls and follows the latest active command", () => {
 
     render(<App />)
