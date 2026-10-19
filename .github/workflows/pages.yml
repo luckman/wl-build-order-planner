@@ -26,13 +26,14 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "24.21.0"
           cache: npm
 
-      - uses: actions/configure-pages@v5
+      - name: Match local npm version
+        run: npm install --global npm@11.19.0
 
       - run: npm ci
-      - run: npm run buildNode17
+      - run: npm run build
 
       - uses: actions/upload-pages-artifact@v4
         with:
