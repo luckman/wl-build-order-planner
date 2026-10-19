@@ -403,7 +403,10 @@ export default function App() {
             <header className="topbar">
                 <div>
                     <img className="brand-logo" src={warLegendsLogo} alt="" />
-                    <strong>War Legends Build Order Planner</strong>
+                    <strong>
+                        <span className="brand-title-full">War Legends Build Order Planner</span>
+                        <span className="brand-title-mobile">WL Planner</span>
+                    </strong>
                 </div>
                 <nav>
                     <button className="active">Planner</button>
