@@ -1,97 +1,102 @@
 # War Legends Build Order Planner
 
-A React starter for planning War Legends mobile RTS build orders. It was bootstrapped from the SC2 Planner UI shell, but the active application uses only War Legends data.
+Create and share build orders for the Light and Dark factions in War Legends. The planner runs in
+your browser, calculating action timings and showing your economy and production on an interactive
+timeline.
 
-## Current scope
+## Features
 
-- Player gold mining and wood gathering time reductions subtract seconds from the base gathering durations. Both default to 0.0 seconds, with limits of 1.0 for gold and 5.0 for wood. The first resource column displays them with one decimal and 0.1-second steps; base food limit and Farm/Pigsty level appear in the second column. Reductions affect resource deliveries and build-order timing and persist per faction, in JSON, and in shareable links.
+- Buildings, units, heroes, upgrades, and faction scrolls, with automatic prerequisite insertion.
+- Gold, wood, food, and mana simulation, including gathering, construction, and production queues.
+- Editable account and map settings, plus timed events for resources, mana wells, and unit losses.
+- Reorderable build orders, starter templates, and warnings for blocked actions.
+- Shareable links, JSON import/export, and separate browser-saved drafts for each faction.
 
-- The mana settings column includes player mana accumulation (default 10 per minute), mana from mana wells (default 60 mana per minute per owned well), and scroll cooldown reduction (default 0%, UI range 0–20%; import/API range 0–100%). A 5% reduction makes the default 10-second cooldown 9.5 seconds; order delay applies afterward. Settings persist per faction and are included in JSON and shareable links.
+## Getting started
 
-- Gold Rush and Lumber Gathering have cards beside the Light heroes, separated by a small divider. Clicking a scroll opens a mm:ss timing dialog with automatic timing selected: it chooses a fixed timestamp as soon as mana and the scroll cooldown allow. Unchecking it enables manual timing. Scroll levels are stored in `gameProfile.player` fields: `lightGoldRushLevel`, `lightLumberGatheringLevel`, `darkWhipLevel`, and `darkLegionsCallLevel` (each defaults to 1, maximum 6). All four scroll levels are editable in Resources collection. Calculations use the configured level for Gold Rush and Lumber Gathering. The hidden `gameProfile.basic.timeBetweenScrolls` setting defaults to 10 seconds of cooldown after a successful scroll command; orderDelay then applies before the next command. Mana readiness also requires orderDelay, with both waits overlapping. All scroll effects start one second after command time. Scroll rows are ordered by timestamp and cannot be dragged; left-click a row (or activate its clock button with the keyboard) to edit its command time in mm:ss and save or cancel. Saving preserves the command identity, reorders rows, and recalculates the plan; later recalculation preserves timestamps and warns when mana or cooldown blocks a cast. Commands survive JSON, saved drafts, and shareable links, including exports without calculated timings. See `docs/BUILD_ORDER_FILES.md` for the schema and exact gathering-completion rules. Lumber Gathering costs 25 mana and adds 15–20 wood per completed gathering stage at levels 1–6 (65–70 instead of 50 at default yield). Gold Rush adds 10–15 gold per mine exit. Both scrolls last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively. Returning cargo keeps its value after expiry.
+Choose a faction, set your opening workers and **Resource collection** settings, then add
+**Actions** or load a template from **Import / Export**. Reorder actions and review the **Timeline**
+to refine your opening. Click timed-event rows to edit them.
 
-- Dark Whip costs 50 mana and affects existing moving/gathering workers with movement speed +15% at every level. Levels 1–6 reduce wood harvesting by 2.0/2.1/2.2/2.3/2.4/2.5 seconds and gold mining by 0.5/0.6/0.6/0.7/0.7/0.8 seconds, for 30.0/30.3/30.8/31.5/32.4/33.5 seconds respectively. Recasting refreshes the configured duration without stacking. Wood progress and travel update immediately; gold duration is fixed at mine entry. Builders travel faster until construction starts, which clears the effect; construction speed is unchanged. Its card, automatic timing, timestamp editing, profile level, JSON, drafts and links are supported. It uses the owner-provided Dark Whip artwork. The planner also approximates the player stopping an approaching miner before casting: with at least four active gold workers, it adds one normal-speed second of travel to the closest worker heading toward the mine at command time. This models player preparation rather than a scroll effect. See [Whip mechanics](docs/WHIP.md).
+Use **Copy link** to share a build or **Import / Export** to save a `.wl-build-order.json` file.
+Drafts save automatically in your browser; export important builds for backup. **Save profile**
+stores personal resource settings separately from your build.
 
-- Dark Legion’s Call costs 25 mana, activates one second after its command, and reduces recruitment time by 20/21/22/23/24/25% for 25.0/25.1/25.3/25.6/26.0/26.5 seconds at levels 1–6 respectively. Select a completed production building or Citadel at its exact level at Command time; the JSON command stores `targetItemId` (for example, `barracks-lvl-2`). With multiple matching instances, the scroll targets the one with the most recruitment time remaining. Its productivity bonus (`1 / (1 − reduction)`) applies to remaining work and subsequent recruits until expiry; recasts refresh duration without stacking. Recruitment chooses the building that will finish the unit earliest. Citadels at every level are eligible because they recruit Slaves. The bonus affects recruitment only; construction and upgrade durations are unchanged. The target selector appears above timing and lists eligible buildings/levels that existed anywhere in the plan, including the starting Citadel. Final building levels appear first, followed by a disabled separator and earlier levels. The timing checkbox defaults to one second after the latest successful build-order command, waits only for the selected target and mana/cooldown readiness, then rounds up to whole seconds. Switching targets recalculates this suggestion. For an earlier level that is no longer available, it suggests a time when that level existed. Uncheck it for a manual timestamp; the selected target stays fixed and availability is validated at that time. The target can be edited alongside the timestamp, and persists through JSON, links and drafts.
+Plans support **100 actions** after the opening allocation and a **30-minute** simulation. The
+catalog is still expanding, and timings are estimates to check in-game. See the
+[game model](docs/GAME_MODEL.md) and [file-format guide](docs/BUILD_ORDER_FILES.md) for details.
 
-- The header displays the owner-provided War Legends logo. Gold Rush and Lumber Gathering use the Light scroll artwork in `src/icons/scrolls/`.
+## Run locally
 
-- The top Import / Export menu closes when you click outside it. It downloads and imports `.wl-build-order.json` files containing the faction, exact action order, and complete game profile. Export can optionally include calculated timings inside each action; import ignores those timings and recalculates using current rules. Different game-rules revisions produce a non-blocking warning. Import replaces the current order and profile only after validation succeeds. Missing profile settings use defaults and unrecognized fields are discarded. Version 1 browser profiles are no longer loaded. See `docs/BUILD_ORDER_FILES.md`.
-
-- Below a divider, Import / Export offers faction-specific build order templates. Light has “10 workers T2 on basic account” and “10 workers T2 with swordsman”, both starting with 3 gold miners / 2 wood gatherers. Selecting a template replaces only the selected faction's order and opening allocation, preserves all Resource collection settings, and recalculates timings. A confirmation warns before replacing an order containing actions. Dark has “10 slaves T2 with goon”, “10 slaves T2 on basic account”, and “11 slaves T2 on basic account” templates. The 11-Slave order starts with 4 gold miners / 1 wood gatherer and includes a Sawmill, Pigsty, Barracks, and Citadel lvl 2. Basic-account templates appear at the bottom for both factions.
-
-- Light faction: Castle, Castle lvl 2, Sawmill, Farm, Barracks, Factory, Sanctuary, Shipyard, Dwarven Forge, Human Monument, Elven Tree, Altar of Heroes, Tower of Light Magic, Crossbow Tower, Artillery Tower, Worker, Swordsman, Archer, Warsmith, Knight, Copter, Healer, Guardsman, Ballista, Fox Rider, Wind Mage, Biker, Sniper, Sloop, Caravel, and the heroes Miriel, Gilbert, and Berin.
-- Dark faction: Citadel, Citadel lvl 2, Citadel lvl 3, Citadel lvl 4, Sawmill, Pigsty, Barracks, Barracks lvl 2, Workshop, Workshop lvl 2, Dark Gate, Dark Gate lvl 2, Shipyard, Shipyard lvl 2, Goblin Lab (levels 1–3), Totem of Orcs (levels 1–3), Undead Obelisk (levels 1–3), Altar of Heroes (levels 1–3), Tower of Dark Magic, Slingshot Tower, Napalm Tower, Slave, Goon, Skeleton Archer, Bomber, Warg Rider, Aeronaut, Necromancer, Axe Master, Catapult, Zombie, Venomspitter, Drill, Rocketeer, Schooner, Galleon, and the heroes Grokk, Jax, and Eater. Dark Barracks upgrades to level 2 for 50 gold / 100 wood in 35 seconds with Citadel level 3. Dark Workshop upgrades to level 2 for 100 gold / 100 wood in 45 seconds; Dark Gate upgrades to level 2 for 150 gold / 100 wood in 40 seconds. Both require Citadel level 3. Further recruitment entries and upgrades await confirmed data. Each Dark defensive tower allows 1/2/3 copies at levels 1/2/3 of its corresponding racial building, matching Light. Dark Shipyard costs 150 gold / 300 wood and takes 35 seconds with Citadel level 2; its level 2 upgrade costs 50 gold / 150 wood and takes 40 seconds with Citadel level 3. Dark units are cataloged through Galleon.
-- Castle/Citadel levels 3–4 and Tower of Mana are available for both factions. The planner enforces quantity and minimum-level prerequisites, per-building upgrade ownership, and highest-town-hall-level limits for Farm/Pigsty, Sawmill, and Tower of Mana. See `docs/CATALOG_DEPENDENCIES.md`.
-- Each Light defensive tower is limited to 1/2/3 copies at the highest level 1/2/3 of its racial prerequisite: Elven Tree for Tower of Light Magic, Human Monument for Crossbow Tower, and Dwarven Forge for Artillery Tower. Additional racial buildings do not add capacity; selecting another tower inserts the required upgrade when possible.
-- Light Barracks, Factory, Sanctuary, and Shipyard upgrade to level 2 with Castle lvl 3. Dwarven Forge, Human Monument, and Elven Tree upgrade to level 2 with Castle lvl 3 and level 3 with Castle lvl 4. Each upgrade needs its building at the preceding level and preserves its production queue.
-- Light Altar of Heroes upgrades to level 2 for 200 gold / 150 wood in 65 seconds with Castle lvl 3, then level 3 for 250 gold / 200 wood in 80 seconds with Castle lvl 4. Hero recruitment remains available after upgrades.
-- A trip-based gold and wood simulator: gold workers queue for one mine slot, while wood workers gather independently.
-- Wood travel increases in steps with or without a Sawmill. Initial travel each way is `woodTravelTime` (default 3.5 seconds); each completed Sawmill resets it to `sawmillWoodTravelTime` (default 0.5 seconds). `woodTravelTimeIncreaseBase` sets each increase (default 0.3 seconds), and `maxWoodTravelTime` caps travel (default 5 seconds). Each value lasts 30 seconds times its rounded-up travel value; see [the game model](docs/GAME_MODEL.md). Travel already in progress keeps its original duration.
-- Editable starting gold/wood, worker allocation, and player building levels, with a resource timeline that delays orders until deliveries cover their costs.
-- Starting gold defaults to 150 and remains editable in the Resource collection panel.
-- Mana starts at 35/50 and regenerates continuously at 10 per minute, capped at current capacity (40/50 after 30 seconds and 45/50 after one minute). Each completed Tower of Mana adds 50–55 capacity, based on its player level: 1–4 adds 50, 5–8 adds 51, 9–12 adds 52, 13–16 adds 53, 17–20 adds 54, and 21–24 adds 55. Tower level defaults to 1 and is limited to 24. Capacity increases do not grant mana or restore income lost while capped. Resource collection exposes starting mana, base capacity, and tower level; the Mana graph, hover tooltip, and latest-command snapshot show current mana/capacity. Mana settings persist per faction and round-trip through files and links; older profiles receive the new defaults.
-- A shared, horizontally scrollable 120-second timeline viewport with resource graphs, one timestamp ruler, and non-overlapping parallel production/construction rows.
-- The timeline always shows at least 120 seconds and extends 30 seconds past the latest completed command. Its explanation appears when hovering or focusing the question mark beside the Timeline title. Clicking a timeline action opens a menu with Delete; selecting Delete removes the action. Escape or clicking outside dismisses the menu.
-- Timeline resource labels and amounts share one left-side legend with four equal-height rows in Gold, Wood, Mana, Food order. Labels, amounts, and queue names stay fixed while the time-based graph and queue content scroll together.
-- Gold and wood share one 66px timeline graph with unfilled lines in their existing colors and a common amount scale set by the larger plotted maximum. Food and mana share a second 44px graph: solid purple/blue lines show current amounts, dashed lines show their respective capacities, and both use the larger capacity/current amount as their common scale. Food and capacity changes use steps at their event times. The fixed left-side legend shows each resource with its current/capacity value in equal 27.5px rows, matching the combined 110px height of both graphs.
-- Current mana is rounded down to a whole number in graph heights, hover tooltips, left-side amounts, and latest-command snapshots; the simulation retains fractional precision.
-- Actions sits directly above the timeline with four horizontally scrolling rows for buildings, units, heroes, and upgrades. Buildings, units, heroes, and scrolls use 70px cards with 2px padding, icons, and resource costs; hover details show names and duration. Upgrades use one 84px card per building type, labeled Upgrade with its icon and dropdown arrow. Opening the themed dropdown shows each level and its gold/wood costs; selecting a level adds it with the existing prerequisite and duplicate-upgrade rules. Menus match the dark site styling, support keyboard navigation and Escape, and close on outside interaction. The build-order sidebar stays on the right on wide screens and moves below the planner on smaller screens.
-- Hovering a Build order action shows the same command, start, finish, and applicable worker-return times as its Timeline event. Blocked actions show their blocking reason, a red Build order row, and a prominent red warning below the timeline graphs and queues with the action icon, order number, name, and reason. Food shortages explicitly show the food required, available food, and current usage/capacity, including queued recruits. These indicators clear when the action can be scheduled. The Build order panel includes a latest-command state snapshot: timestamp, resources, food, total workers, and the gold/wood/busy-or-idle worker allocation.
-- The timeline defaults to the Build order's latest-command timestamp, with a yellow vertical line confined to the resource graphs and its timestamp overlaid inside the gold/wood graph and matching resource amounts beside the labels on the left, without a tooltip. Hovering a resource graph keeps the yellow line and its timestamp visible alongside the shared hover marker, updates the amounts to the cursor time in 0.1-second increments, and shows a tooltip with gold, wood, and food used/limit together. With no scheduled command, resource amounts show the timeline horizon and no latest-command line or timestamp label is displayed.
-- Every build order starts with a fixed opening worker-allocation action, defaulting to 4 gold miners and 1 wood gatherer. Its slider assigns five starting workers between gold and wood, with 1–4 gold miners and the remaining workers gathering wood. Initial food usage is 2 per starting worker.
-- Resource collection sits below the timeline with three columns: starting gold/wood, Castle/Sawmill/Worker levels, and gathering time reductions; base food limit, Farm/Barracks/Factory/Sanctuary/Shipyard/Altar of Heroes levels, plus Gold Rush and Wood Gathering levels for Light or Whip and Legion’s Call levels for Dark; and Tower of Mana level, starting mana, base mana capacity, mana accumulation, mana from wells, and scroll cooldown reduction (using faction-specific names). Labels sit beside their values, and the groups stack on narrow screens. Map: Wood travel time (seconds each way) sits below the mana settings in the third basic column with a small gap. Advanced reveals the remaining travel and delay settings with the same compact label/value layout and column spacing. Each advanced field has a question-mark tooltip for its mechanics, available on hover or keyboard focus. The reset controls form one column beside the main settings on wide panels, aligned with the first settings row. On narrower panels, the resets move below the settings. Advanced sits at the lower right of the basic section, beside the resource-yield summary on wide panels, and stays in place as advanced settings expand underneath. Reset basic to defaults restores the main resource and level fields, including visible faction scroll levels and map wood travel time, while preserving advanced and hidden settings; Reset all restores the full resource profile. Both preserve the build's opening allocation and subsequent actions. Basic settings remain included in JSON import/export.
-- Starting wood defaults to 50 and remains editable.
-- Plans support at most 100 actions after the opening allocation. Scroll/event command times run from 00:00 to 29:59; simulation and graphs stop at 30:00. Actions whose completion or builder return would exceed 30:00 are blocked. Scrolls whose effects would finish after 30:00 are also blocked. The same limits apply to editing, JSON files, shareable links, and saved drafts. Rejected action additions show the reason in a red notification; event dialogs retain entered values and show the limit message at capacity, while existing events remain editable. Custom profile durations are capped at 1,800 seconds, and extremely short gathering cycles that exceed the simulation work budget are rejected.
-- Export JSON opens the native Save As picker for folder and filename selection in supporting browsers (HTTPS or localhost). Unsupported browsers use their normal download flow; no custom filename dialog is shown.
-- Import / Export closes after a successful operation. Floating notices dismiss automatically after five seconds and retain a manual close button. Success notices are green, rules-version warnings are amber, and shared-link error notices are red. Inline errors keep the menu open.
-- Copy link copies a compressed URL containing the full profile and exact action order, without calculated timings. Opening the link restores the plan and recalculates with current rules; rules mismatches warn as with JSON import. If clipboard access is unavailable, copy the displayed link manually. Oversized links suggest JSON export instead.
-- JSON format version 2 and shareable-link version 2 store the opening allocation as the first buildOrder entry, followed by catalog actions. Version 1 files and links are rejected. Worker assignments are no longer part of resource profiles.
-- Basic settings expose map-specific `woodTravelTime` (default 3.5 seconds), while Advanced keeps `goldTravelTime` (default 4.25 seconds). Each value applies to both outbound and return travel. Initial gold-trip reduction and Sawmill wood-travel rules still apply.
-- The delays profile's `orderDelay` controls the first build-order command and additional initial wood gatherers' commands (default 1.0 seconds), plus commands unlocked by recruitment-building completion, completed prerequisites, or increased building capacity. Gold, wood, and free food must also have been sufficient for `orderDelay` before a command, after reserving earlier orders' costs. This includes collected resources and food released by unit losses. These waits overlap; worker availability adds no delay, and recruitment adds no repeated wait when its resources are already ready. Buildings and upgrades also require `orderDelay` after the previous successful player command (building, upgrade, recruitment, or scroll); this wait overlaps with other readiness waits. Unit and hero production have no additional command-spacing wait. Blocked commands, resource adjustments, unit losses, and mana-well events do not reset spacing. Initial gold miners and the first wood gatherer start immediately. The basic profile's `initialGoldTravelReduction` shortens initial miners' opening outbound trip (default 1 second), clamped at zero travel; later trips and newly trained miners use full configured travel.
-- Newly trained Workers/Slaves automatically join gold up to calculated mine saturation, then gather wood.
-- Construction start delay is editable in the game profile (default 3 seconds), and is also used for the builder's return trip. Buildings and building upgrades reserve a builder for both trips and their construction time.
-- Builders are selected automatically: idle workers, then wood gatherers carrying the least wood, then eligible gold workers carrying the least gold. Workers inside the mine cannot be selected. Wood gatherers preserve their exact partial progress or full carried load through construction and resume from it on return, accounting for Whip. Interrupted gold cargo is discarded.
-- One completed Castle/Citadel is present initially. Each producer trains one unit at a time; additional Castles/Citadels and Barracks have independent queues available after construction completes.
-- Temporary source artwork: Terran icons for Light, Protoss icons for Dark.
-- Game content is declared in `src/game/data.json`. The app derives each item's producer and explicit prerequisite set in `src/game/gameData.ts`, so expanding the catalog does not require editing the planner UI.
-- Choosing an action inserts missing prerequisite quantities and limit-unlocking upgrades in dependency order. Duplicate upgrades require another building at the preceding level; the planner explains rejected actions and blocked orders.
-- Save profile and Load saved profile sit above the reset controls and affect only the current faction, as their hover tips explain. Only Save profile replaces the personal saved settings; Load restores them without changing the build order. Load is disabled until a valid profile is saved. Edits, resets, JSON imports, and shared links leave personal saved settings untouched.
-- Light and Dark keep separate working drafts in browser local storage, including the active profile, opening allocation, and exact action sequence. Direct visits resume a draft when available, otherwise use the saved personal profile or defaults. JSON imports and shared links always use their supplied profile and build. Drafts and the selected faction survive page reloads. Clear resets only the selected faction's actions and opening allocation, preserving its profile. Only complete build-order documents are loaded as drafts; unreadable or incompatible drafts reset to an empty build/default opening with the saved personal profile or defaults, show a brief notice, and are removed to avoid repeated notices when storage works. Working drafts may be reset by incompatible updates; public JSON files and shared links retain their compatibility policy.
-- Resource collection profiles are saved independently per faction, including resources, food limit, levels, and all advanced/hidden settings. Personal profiles use a validated `wl-personal-profile` envelope sharing the existing JSON schema version; valid raw profiles in the current storage keys migrate automatically. Invalid saved profiles fall back to defaults, and invalid drafts fall back to the personal profile or defaults; storage failures leave editing usable in memory. Version 1 resource profiles are not read or migrated.
-- Build-order rows can be reordered with their drag handles using mouse or touch. Keyboard users can focus a handle, press Space, move with the arrow keys, and press Space to drop (Escape cancels). Each drop fully recalculates timings, dependencies, resource/food charts, queues, and blocked-action warnings. Invalid orders remain editable; moving a prerequisite after its dependent action shows a warning without silently changing the chosen order.
-- Heroes use production queues and food like units. Miriel requires Altar of Heroes lvl 1 and Elven Tree lvl 1. Each hero type is limited to one across all Altars, including queued recruitment, allowing at most three Light heroes total (Miriel, Gilbert, and Berin). Removing a hero's order releases that type's reservation.
-- The first hero requires at least one Altar level 1 or higher, the second level 2 or higher, and the third level 3. Queued heroes count across all Altars; once the required Altar level is unlocked, any available Altar can recruit that hero. Selecting a hero inserts missing Altar upgrades and their prerequisites automatically.
-- Gilbert costs 500 gold / 500 wood / 8 food and requires Altar of Heroes lvl 1 and Human Monument lvl 1. Berin costs 500 gold / 700 wood / 9 food and requires Altar of Heroes lvl 1 and Dwarven Forge lvl 1. Both recruit at the Altar in 45 seconds.
-- Production and Racial buildings double their gold/wood price for each successive copy (1×, 2×, 4×, 8×, ...), counting earlier planned copies including builders in transit. The nth copy costs its base price × 2^(n−1). Action cards show the next copy's price. Upgrades and Economic/Defensive buildings retain fixed prices.
-
-The Dark faction's Citadel upgrade menu offers levels 2–4. Selecting level 4 inserts Citadel levels 2–3, three Pigsties, two Towers of Mana, and one Barracks as needed. Both factions start with their level 1 town hall already present; Sawmill and Farm/Pigsty prerequisites use that existing building.
-
-Additional game content will be added when its War Legends values are known. Starting resources and base food limit remain editable. Shipyard and Altar of Heroes levels reduce ship and hero recruitment time by 1%/2%/3%/4%/5%/6% at account levels 1–4/5–8/9–12/13–16/17–20/21–24, matching other production buildings. Older profiles default both new levels to 1. Player building levels (integers 1–24, default 1) determine gold/wood yields, Farm/Pigsty food, recruitment bonuses, and worker construction/upgrade bonuses. Worker level reduces construction and upgrade duration by 0–5%, leaving builder travel unchanged. These levels replace direct yield fields in profiles and imports/exports; see `docs/BUILD_ORDER_FILES.md`. SC2-specific active logic (MULEs, larva, gas, and a third faction) is not used. Construction timing and worker selection are detailed in `docs/CONSTRUCTION.md`.
-
-## Run
+Install Node.js and npm, then run these commands from the project directory containing
+`package.json`:
 
 ```sh
-npm install
+npm ci
 npm start
 ```
 
-Build the production app with `npm run build`.
+Open the development URL printed in the terminal, normally `https://localhost:3000`. The start
+script enables HTTPS and does not open a browser automatically; local development may show a
+certificate warning.
 
-The site includes GoatCounter visitor analytics for `luckman.goatcounter.com`, loaded asynchronously from the HTML template in `public/index.html`.
-Custom events count successful clipboard copies (`copy-link`) and openings of URLs containing a `build` fragment parameter (`open-build-link`, including invalid links). Repeated actions are counted separately. Events wait for the analytics script to load and contain only fixed names and titles, without the shared link or build contents.
+Create and preview a production build:
 
-See [docs/README.md](docs/README.md) for the documentation index and current implementation guides.
+```sh
+npm run build
+npm run serve
+```
 
+The generated static site is written to `build/`. Open the preview URL printed by the server. If
+your Node.js environment reports an OpenSSL compatibility error during the build, use
+`npm run buildNode17`, which enables the legacy OpenSSL provider.
 
-## Resources collected events
+### Development commands
 
-Both factions can adjust gold and wood at an explicit timestamp with no delays, mana costs, or worker requirements. Negative amounts subtract resources, with each resulting balance clamped to zero at that timestamp; later income adds normally. The action card follows scrolls in the heroes row. The dialog defaults to 300 gold and 300 wood and one second after the latest active command; users can choose any timestamp from 00:00 to 29:59. Click the Build order row to edit the timestamp or amounts. Events persist in drafts, JSON files and share links.
+| Command | Purpose |
+| --- | --- |
+| `npm start` | Start the development server with HTTPS. |
+| `npm run build` | Generate the production site in `build/`. |
+| `npm run serve` | Serve an existing production build locally. |
+| `npm run typecheck` | Check TypeScript types. |
+| `npm run testAll -- --runInBand` | Run the Jest suite without watch mode. |
+| `npm run teste2e` | Run the Playwright browser tests. |
+| `npm run lint` | Check formatting and lint rules with Biome. |
 
-## Mana well events
+Playwright tests require its Chromium browser to be installed (`npx playwright install chromium`).
+The test configuration builds and serves the app automatically.
 
-Mana well is captured and Mana well is lost are available to both factions beside Resources collected. Select a whole-second timestamp only. Ownership changes instantly without costs or delays, starting from zero wells. Each owned well adds the Mana from mana wells setting to mana regeneration per minute, subject to mana capacity. Loss requires an owned well at that timestamp; invalid losses are flagged and have no effect. Automatic scroll timing, drafts, JSON files and share links include these events.
+## Contributing
 
-## Unit is killed
+Bug reports and confirmed War Legends data are welcome through the repository's GitHub Issues. For a
+timing problem, include the faction, a shared build link or exported JSON, the expected result, and
+what happened in-game. Include your browser and reproduction steps for interface issues.
 
-Both factions can record one worker, unit or hero being killed at a selected timestamp. Only completed, living units are eligible; starting workers exist at 00:00. Loss releases food immediately, and killed workers stop gathering. Construction workers are excluded; wood gatherers are killed before gold miners. The dialog accepts whole seconds and defaults to one second after the latest active command. Invalid events have no effect and show a warning. Events are editable and included in drafts, JSON and share links.
+For code changes, read the [documentation index](docs/README.md). Game content is declared in
+`src/game/data.json`; profile defaults and progression rules live alongside it in `src/game/`. Use
+confirmed game values and document assumptions or missing data. Run the production build, TypeScript
+check, and relevant tests before submitting a pull request.
+
+## Storage and analytics
+
+Build drafts and personal profiles are stored locally in your browser. Shared URLs contain the build
+and profile, so anyone with the link can open those settings.
+
+The site loads GoatCounter visitor analytics for `luckman.goatcounter.com`. It also counts
+successful **Copy link** actions and openings of URLs containing a build parameter, including
+invalid build links. These custom events send fixed event names and titles, without the shared URL
+or build contents. The integration is defined in `public/index.html` and `src/analytics.ts`.
+
+To disable analytics in your own deployment, remove the GoatCounter `<script>` tag from
+`public/index.html` and rebuild the app. The existing event hooks safely do nothing without that
+script.
+
+## License and credits
+
+The source code is available under the [MIT License](LICENSE), retaining the original BurnySc2
+copyright notice. The project was adapted from SC2 Planner and now implements War Legends factions
+and mechanics.
+
+Game names, logos, and artwork belong to their respective owners. Some icons are temporary assets
+inherited from the original planner; the source-code license does not grant rights to third-party
+game artwork.

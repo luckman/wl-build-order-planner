@@ -25,3 +25,6 @@ temp.txt
 
 /ai-changelog/
 /debug.log
+
+# Local agent instructions
+/AGENTS.md

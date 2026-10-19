@@ -1,0 +1,8 @@
+# Markdown prose uses a 100-character line limit; keep table rows intact.
+# max_line_length is an editor preference; automatic wrapping depends on the editor.
+[*.md]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
