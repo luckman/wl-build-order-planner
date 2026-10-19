@@ -2,6 +2,25 @@ import { manaWellCountAt } from "./manaWells"
 import type { ScheduledAction } from "./buildSimulation"
 import { manaAt, type EconomySettings } from "./resourceSimulation"
 import { SCROLLS, type ScrollId, scrollCooldown } from "./scrolls"
+import { factions } from "./gameData"
+import { legionsCallTargetWindows } from "./recruitment"
+
+/** Prefer after the latest command, waiting only for the selected exact building level. */
+export function earliestLegionsCallTime(settings: EconomySettings, plan: ScheduledAction[], targetItemId: string): number | null {
+    const active = plan.filter(action => !action.blocked)
+    const afterLatestCommand = Math.max(0, ...active.map(action => action.commandTime ?? 0)) + 1
+    const initial = factions.dark.items.find(item => item.id === "citadel")!
+    const windows = legionsCallTargetWindows(plan, initial).filter(window => window.item.id === targetItemId)
+        .sort((a, b) => a.startTime - b.startTime)
+    const candidates = windows.some(window => window.finishTime > afterLatestCommand)
+        ? windows.filter(window => window.finishTime > afterLatestCommand).map(window => ({ window, minimum: Math.max(afterLatestCommand, window.startTime) }))
+        : [...windows].reverse().map(window => ({ window, minimum: window.startTime }))
+    for (const { window, minimum } of candidates) {
+        const time = earliestScrollTime(settings, plan, minimum, "legions-call")
+        if (time !== null && Math.ceil(time) < window.finishTime) return Math.ceil(time)
+    }
+    return null
+}
 
 /** Resolve once when adding a command; later simulation never changes its timestamp. */
 export function earliestScrollTime(settings: EconomySettings, plan: ScheduledAction[], minimumTime: number, scrollId: ScrollId = "gold-rush"): number | null {

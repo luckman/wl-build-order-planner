@@ -5,8 +5,9 @@ import { createResourcesCollectedAction, resourcesCollectedCommand, isTimedEvent
 import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
 import { type EconomySettings, type WhipWindow, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
-import { createScrollAction, scrollEffect, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
+import { createScrollAction, scrollEffect, legionsCallEffect, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
 import { actionDuration } from "./playerLevels"
+import { productionBuildingsAt, recruitmentFinish, recruitmentWork, type RecruitmentWindow } from "./recruitment"
 
 export type ScheduledAction = {
     item: PlannerItem
@@ -37,17 +38,21 @@ export function simulateBuildOrder(
     until = MAX_PLAN_SECONDS,
 ) {
     let windows: WhipWindow[] = []
-    // A cast issued while a builder travels can change its future arrival. Replay
-    // with accepted casts as travel forecasts, keeping mana validation chronological.
+    let recruitmentWindows: RecruitmentWindow[] = []
+    // Casts can change work already scheduled into the future. Replay with accepted
+    // travel/recruitment forecasts, keeping target and mana validation chronological.
     for (let pass = 0; pass <= MAX_PLAN_ACTIONS + 1; pass++) {
         const result = simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit,
-            foodPerFarm, initialTownHall, until, windows)
+            foodPerFarm, initialTownHall, until, windows, recruitmentWindows)
         const next = result.orderedPlan.filter(action => action.item.id === "whip" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime! }))
-        if (JSON.stringify(next) === JSON.stringify(windows)) return result
+        const nextRecruitment = result.orderedPlan.filter(action => action.item.id === "legions-call" && !action.blocked)
+            .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime!, buildingInstanceId: action.buildingInstanceId! }))
+        if (JSON.stringify(next) === JSON.stringify(windows) && JSON.stringify(nextRecruitment) === JSON.stringify(recruitmentWindows)) return result
         windows = next
+        recruitmentWindows = nextRecruitment
     }
-    throw new Error("Scroll and construction timing did not converge.")
+    throw new Error("Scroll, construction and recruitment timing did not converge.")
 }
 
 function simulateBuildOrderPass(
@@ -59,10 +64,12 @@ function simulateBuildOrderPass(
     initialTownHall: string,
     until = MAX_PLAN_SECONDS,
     constructionWhipWindows: WhipWindow[] = [],
+    recruitmentWindows: RecruitmentWindow[] = [],
 ) {
     validateActionCount(buildOrder.length)
     validatePlanTime(until, "Simulation horizon")
     const simulation = new WorkerEconomy(economy, constructionWhipWindows)
+    const recruitmentReduction = legionsCallEffect(economy).recruitmentTimeReduction
     const plan: ScheduledAction[] = []
     const spending: Array<{ time: number; gold: number; wood: number }> = []
     const catalog = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!.items
@@ -165,11 +172,28 @@ function simulateBuildOrderPass(
                 const startTime = eventTime + scroll.startDelay
                 const finishTime = startTime + scroll.duration
                 const horizonBlocked = finishTime > MAX_PLAN_SECONDS
-                const blocked = cooldownBlocked || manaBlocked || orderDelayBlocked || horizonBlocked
+                const targets = item.scrollId === "legions-call"
+                    ? productionBuildingsAt(plan, initial, catalog, eventTime).filter(({ item: target }) => target.id === item.targetItemId) : []
+                // Compare remaining work, undoing forecast speedups after this command.
+                // This prevents a cast from changing its own target on the next replay.
+                const earlierRecruitmentWindows = scrollPlan.filter(action => action.item.id === "legions-call" && !action.blocked)
+                    .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime!, buildingInstanceId: action.buildingInstanceId! }))
+                const timeLeft = (id: number) => {
+                    const work = plan.filter(action => !action.blocked && isRecruitable(action.item) &&
+                    action.buildingInstanceId === id && action.commandTime! <= eventTime && action.finishTime! > eventTime)
+                    .reduce((work, action) => work + recruitmentWork(eventTime, action.finishTime!, id, recruitmentWindows, recruitmentReduction), 0)
+                    return recruitmentFinish(eventTime, work, id, earlierRecruitmentWindows, recruitmentReduction) - eventTime
+                }
+                targets.sort((a, b) => timeLeft(b.buildingInstanceId) - timeLeft(a.buildingInstanceId) || a.buildingInstanceId - b.buildingInstanceId)
+                const targetBlocked = item.scrollId === "legions-call" && !targets.length
+                const blocked = cooldownBlocked || manaBlocked || orderDelayBlocked || horizonBlocked || targetBlocked
                 scrollPlan.push({ item, cost: { gold: 0, wood: 0 }, commandTime: eventTime,
+                    buildingInstanceId: targets[0]?.buildingInstanceId,
                     startTime: blocked ? null : startTime, finishTime: blocked ? null : finishTime,
                     workerReturnTime: null, workerId: null, manaCost: scroll.manaCost, blocked,
-                    ...(blocked ? { blockedReason: horizonBlocked
+                    ...(blocked ? { blockedReason: targetBlocked
+                        ? `Legion's Call requires an available ${namesById.get(item.targetItemId!) ?? item.targetItemId} at the command timestamp`
+                        : horizonBlocked
                         ? "Scroll effect would exceed the 30:00 plan limit"
                         : cooldownBlocked
                         ? `Scroll cooldown: next scroll can be used at ${cooldownUntil} seconds`
@@ -251,7 +275,15 @@ function simulateBuildOrderPass(
             const matching = buildings.filter(building => item.kind === "upgrade"
                 ? (item.upgradeFrom ? building.itemId === item.upgradeFrom : building.name === item.producer) && !building.upgrade
                 : item.producerBuildingId ? building.buildingId === item.producerBuildingId : building.name === item.producer)
-            const producer = matching.find(building => building.readyAt + economy.orderDelay <= time && building.availableAt <= time && !building.upgrade)
+            const readyProducers = isRecruitable(item) ? [...matching]
+                : matching.filter(building => building.readyAt + economy.orderDelay <= time && !building.upgrade)
+            if (isRecruitable(item)) readyProducers.sort((a, b) =>
+                recruitmentFinish(Math.max(time, a.readyAt + economy.orderDelay, a.availableAt), actionDuration(item, economy), buildings.indexOf(a), recruitmentWindows, recruitmentReduction) -
+                recruitmentFinish(Math.max(time, b.readyAt + economy.orderDelay, b.availableAt), actionDuration(item, economy), buildings.indexOf(b), recruitmentWindows, recruitmentReduction))
+            const producer = isRecruitable(item)
+                ? readyProducers[0]?.availableAt <= time && readyProducers[0].readyAt + economy.orderDelay <= time && !readyProducers[0].upgrade
+                    ? readyProducers[0] : undefined
+                : readyProducers.find(building => building.availableAt <= time)
             const heroTierUnlocked = item.kind !== "hero" || requirementCount(unlockedBuildings,
                 { item: item.producerBuildingId!, count: 1, minLevel: requiredAltarLevel }, time) >= 1
             const builder = requiresConstructionWorker(item) ? simulation.selectBuilder() : undefined
@@ -296,7 +328,9 @@ function simulateBuildOrderPass(
                 const travelTime = builder ? simulation.constructionTravelTime(builder) : 0
                 const startTime = time + travelTime
                 const duration = actionDuration(item, economy)
-                const finishTime = startTime + duration
+                const finishTime = isRecruitable(item) && producer
+                    ? recruitmentFinish(startTime, duration, buildings.indexOf(producer), recruitmentWindows, recruitmentReduction)
+                    : startTime + duration
                 const returnTravelTime = builder ? simulation.constructionReturnTravelTime(finishTime) : 0
                 const workerReturnTime = builder ? finishTime + returnTravelTime : null
                 if ((workerReturnTime ?? finishTime) > MAX_PLAN_SECONDS) {

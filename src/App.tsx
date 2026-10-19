@@ -14,7 +14,8 @@ import UpgradeCards from "./UpgradeCards"
 import { orderedBuildings } from "./buildingDisplayOrder"
 import EventTimeDialog from "./EventTimeDialog"
 import { createScrollAction, SCROLLS, type ScrollId, isScrollAction, scrollCooldown, scrollEffect } from "./game/scrolls"
-import { earliestScrollTime } from "./game/scrollTiming"
+import { earliestLegionsCallTime, earliestScrollTime } from "./game/scrollTiming"
+import { productionBuildingsAt, legionsCallTargetOptions } from "./game/recruitment"
 import GameProfileEditor from "./GameProfileEditor"
 import warLegendsLogo from "./icons/war-legends-logo.png"
 import { type ScheduledAction, simulateBuildOrder } from "./game/buildSimulation"
@@ -50,6 +51,7 @@ const iconSources: Record<string, string> = {
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     darkWhip: require("./icons/scrolls/dark-whip.png"),
+    darkLegionsCall: require("./icons/scrolls/dark-legions-call.png"),
     lightCastle: require("./icons/buildings/light-castle.png"),
     lightSawmill: require("./icons/buildings/light-sawmill.png"),
     lightFarm: require("./icons/buildings/light-farm.png"),
@@ -300,6 +302,10 @@ export default function App() {
     )
     const deliveries = scheduled.deliveries
     const plan = scheduled.plan
+    const scrollTargetOptions = legionsCallTargetOptions(plan, faction.items.find(item => item.name === faction.startingTownHall)!)
+    const scrollTargetsAt = (time: number) => Array.from(new Map(productionBuildingsAt(plan,
+        faction.items.find(item => item.name === faction.startingTownHall)!, faction.items, time)
+        .map(({ item }) => [item.id, item])).values())
     const scrollTimes = plan.filter(action => action.item.kind === "scroll").map(action => action.commandTime!)
     const minimumScrollTime = scrollTimes.length ? Math.max(...scrollTimes) + scrollCooldown(economy) + economy.orderDelay : 0
     const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime, scrollDialogOpen ?? "gold-rush")
@@ -649,6 +655,7 @@ export default function App() {
                                         <img src={iconSources[item.icon]} alt="" />
                                         <div>
                                             <b>{item.name}</b>
+                                            {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}</small>}
                                             {item.kind === "resources-collected" && <small>+{item.collectedGold} gold · +{item.collectedWood} wood</small>}
                                             <small>
@@ -760,7 +767,16 @@ export default function App() {
                         setDependencyError(null)
                         setHoverTime(null)
                     }} />}
-                {editingEvent && isScrollAction(editingEvent) && <EventTimeDialog key={editingEvent.orderId}
+                {editingEvent && isScrollAction(editingEvent) && editingEvent.scrollId === "legions-call" && <ScrollDialog key={editingEvent.orderId}
+                    scrollId="legions-call" levels={gameProfile.player} minimumTime={0} automaticTime={null}
+                    initialCommandTime={editingEvent.commandTime} initialTargetItemId={editingEvent.targetItemId} targetsAt={scrollTargetsAt} targetOptions={scrollTargetOptions}
+                    onClose={() => setEditingEventId(null)} onAdd={(commandTime, targetItemId) => {
+                        setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime, targetItemId } : item))
+                        setEditingEventId(null)
+                        setDependencyError(null)
+                        setHoverTime(null)
+                    }} />}
+                {editingEvent && isScrollAction(editingEvent) && editingEvent.scrollId !== "legions-call" && <EventTimeDialog key={editingEvent.orderId}
                     name={editingEvent.name} commandTime={editingEvent.commandTime}
                     onClose={() => setEditingEventId(null)} onSave={commandTime => {
                         setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime } : item))
@@ -768,9 +784,10 @@ export default function App() {
                         setDependencyError(null)
                         setHoverTime(null)
                     }} />}
-                {scrollDialogOpen && <ScrollDialog validationError={additionError} scrollId={scrollDialogOpen} levels={gameProfile.player} minimumTime={minimumScrollTime} automaticTime={automaticScrollTime}
-                    onClose={() => setScrollDialogOpen(null)} onAdd={commandTime => {
-                        if (!setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime }, factionId)])) return
+                {scrollDialogOpen && <ScrollDialog validationError={additionError} scrollId={scrollDialogOpen} levels={gameProfile.player} minimumTime={scrollDialogOpen === "legions-call" ? 0 : minimumScrollTime} automaticTime={automaticScrollTime}
+                    targetsAt={scrollTargetsAt} targetOptions={scrollTargetOptions} automaticTimeForTarget={targetItemId => earliestLegionsCallTime(economy, plan, targetItemId)}
+                    onClose={() => setScrollDialogOpen(null)} onAdd={(commandTime, targetItemId) => {
+                        if (!setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime, targetItemId }, factionId)])) return
                         setScrollDialogOpen(null)
                         setDependencyError(null)
                         setHoverTime(null)

@@ -1,11 +1,46 @@
-import { earliestScrollTime } from "./scrollTiming"
+import { earliestLegionsCallTime, earliestScrollTime } from "./scrollTiming"
 import { economyFromProfile, initialGameProfile, scrollLevelFields } from "./gameProfile"
 import { simulateBuildOrder } from "./buildSimulation"
 import { createScrollAction, scrollCooldown } from "./scrolls"
 import { parseBuildOrder, serializeBuildOrder } from "./buildOrderFile"
+import { factions } from "./gameData"
+import type { ScheduledAction } from "./buildSimulation"
 
 const economy = economyFromProfile(initialGameProfile)
 const scroll = (commandTime: number) => createScrollAction({ type: "use-scroll", scrollId: "gold-rush", commandTime }, "light")
+
+test("Legion's Call waits only for the selected building, rounded up to whole seconds", () => {
+    const action = (id: string, commandTime: number, finishTime: number, blocked = false): ScheduledAction => {
+        const item = factions.dark.items.find(item => item.id === id)!
+        return { item, cost: { gold: 0, wood: 0 }, buildingInstanceId: item.buildingId === "citadel" ? 0
+            : factions.dark.items.findIndex(candidate => candidate.id === item.buildingId) + 1,
+            commandTime, startTime: commandTime, finishTime, blocked, workerReturnTime: null, workerId: null }
+    }
+    const settings = { ...economy, startingMana: 100, baseManaLimit: 100 }
+    const plan = [action("barracks", 5, 35.2), action("workshop", 10, 50.1),
+        action("sawmill", 15, 100), action("goon", 20, 200), action("dark-gate", 25, 300, true)]
+    expect(earliestLegionsCallTime(settings, plan, "barracks")).toBe(36)
+    expect(earliestLegionsCallTime(settings, plan, "workshop")).toBe(51)
+    expect(earliestLegionsCallTime(settings, [...plan, action("barracks-lvl-2", 40, 61.4)], "barracks-lvl-2")).toBe(62)
+    expect(earliestLegionsCallTime(settings, [...plan, action("barracks-lvl-2", 40, 61.4)], "barracks")).toBe(36)
+    expect(earliestLegionsCallTime(settings, [action("barracks", 1, 31), action("goon", 40.2, 100)], "barracks")).toBe(42)
+})
+
+test("Legion's Call automatic timing also waits for mana and cooldown before rounding", () => {
+    const settings = { ...economy, startingMana: 0, manaPerMinute: 7 }
+    // 25 mana becomes ready at 214.2857 seconds, then the one-second order delay.
+    expect(earliestLegionsCallTime(settings, [], "citadel")).toBe(216)
+    expect(earliestLegionsCallTime({ ...settings, manaPerMinute: 0 }, [], "citadel")).toBeNull()
+    const rich = { ...economy, startingMana: 100, baseManaLimit: 100 }
+    const whip = createScrollAction({ type: "use-scroll", scrollId: "whip", commandTime: 20.2 }, "dark")
+    const plan = simulateBuildOrder([whip], rich, 10, 20, 20, "Citadel").plan
+    expect(earliestLegionsCallTime(rich, plan, "citadel")).toBe(32)
+    const time = earliestLegionsCallTime(settings, [], "citadel")!
+    const cast = createScrollAction({ type: "use-scroll", scrollId: "legions-call", commandTime: time, targetItemId: "barracks" }, "dark")
+    const barracks = factions.dark.items.find(item => item.id === "barracks")!
+    const result = simulateBuildOrder([barracks, cast], { ...settings, startingGold: 10000, startingWood: 10000 }, 10, 20, 20, "Citadel").plan
+    expect(result[1].blocked).toBe(false)
+})
 
 test.each([0, 5, 100])("%s percent reduction applies to automatic timing and fixed command validation", reduction => {
     const profile = { ...initialGameProfile, player: { ...initialGameProfile.player,

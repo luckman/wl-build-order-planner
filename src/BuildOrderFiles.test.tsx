@@ -62,6 +62,7 @@ test.each([
     ["light", "10 workers t2 with swordsman", ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"]],
     ["dark", "10 slaves t2 on basic account", ["slave", "slave", "slave", "slave", "barracks", "pigsty", "slave", "citadel-lvl-2"]],
     ["dark", "10 slaves t2 with goon", ["slave", "slave", "slave", "barracks", "slave", "pigsty", "slave", "goon", "citadel-lvl-2"]],
+    ["dark", "11 slaves t2 on basic account", ["slave", "slave", "sawmill", "slave", "slave", "pigsty", "slave", "barracks", "slave", "citadel-lvl-2"]],
 ] as const)("%s template %s keeps the entire game profile and persists the exact order", (faction, name, ids) => {
     const confirm = jest.spyOn(window, "confirm").mockReturnValue(true)
     const profile = {
@@ -78,14 +79,15 @@ test.each([
         fireEvent.click(screen.getByText("Import / Export"))
         fireEvent.click(screen.getByRole("button", { name, exact: true }))
         expect(confirm).not.toHaveBeenCalled()
-        const expected = [{ type: "allocate-workers", goldWorkers: 3 }, ...ids.map(itemId => ({ itemId }))]
+        const goldWorkers = name === "11 slaves t2 on basic account" ? 4 : 3
+        const expected = [{ type: "allocate-workers", goldWorkers }, ...ids.map(itemId => ({ itemId }))]
         expect(JSON.parse(window.localStorage.getItem(draftStorageKey(faction))!).buildOrder).toEqual(expected)
         expect(JSON.parse(window.localStorage.getItem(profileStorageKey(faction))!).gameProfile).toEqual(profile)
-        expect((screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement).value).toBe("3")
+        expect((screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement).value).toBe(String(goldWorkers))
         expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
         unmount()
         render(<App />)
-        expect(screen.getAllByRole("button", { name: faction === "light" ? "Remove Worker" : "Remove Slave", exact: true })).toHaveLength(5)
+        expect(screen.getAllByRole("button", { name: faction === "light" ? "Remove Worker" : "Remove Slave", exact: true })).toHaveLength(ids.filter(id => id === "worker" || id === "slave").length)
         expect(screen.getByRole("button", { name: faction === "light" ? "Remove Castle lvl 2" : "Remove Citadel lvl 2" })).toBeTruthy()
         expect(JSON.parse(window.localStorage.getItem(draftStorageKey(faction))!).buildOrder).toEqual(expected)
     } finally { confirm.mockRestore() }
@@ -120,8 +122,14 @@ test("template suggestions follow the selected faction and leave the other facti
     expect(within(templates).getByRole("button", { name: "10 slaves t2 on basic account", exact: true })).toBeTruthy()
     expect(within(templates).getByRole("button", { name: "10 slaves t2 with goon", exact: true })).toBeTruthy()
     expect(within(templates).queryByRole("button", { name: /10 workers/ })).toBeNull()
+    expect(within(templates).getAllByRole("button").map(button => button.textContent)).toEqual([
+        "10 slaves t2 with goon", "10 slaves t2 on basic account", "11 slaves t2 on basic account",
+    ])
     fireEvent.click(screen.getByRole("button", { name: "Light", exact: true }))
     fireEvent.click(screen.getByText("Import / Export"))
+    expect(within(screen.getByRole("region", { name: "Start from template" })).getAllByRole("button").map(button => button.textContent)).toEqual([
+        "10 workers t2 with swordsman", "10 workers t2 on basic account",
+    ])
     fireEvent.click(screen.getByRole("button", { name: "10 workers t2 on basic account", exact: true }))
     expect(window.localStorage.getItem(draftStorageKey("dark"))).toBe(darkDraft)
     fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))

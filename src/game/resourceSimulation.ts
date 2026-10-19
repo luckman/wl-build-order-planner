@@ -1,7 +1,7 @@
 import { growingWoodTravelTime } from "./gatheringRules"
 import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
 import type { PlayerBuildingLevels } from "./playerLevels"
-import { scrollEffect, WHIP, type ScrollId } from "./scrolls"
+import { scrollEffect, whipEffect, type ScrollId } from "./scrolls"
 
 export type EconomySettings = PlayerBuildingLevels & {
     startingGold: number
@@ -118,8 +118,10 @@ export class WorkerEconomy {
     private lumberGatheringWindows: Array<{ startTime: number; finishTime: number; bonus: number }> = []
     private goldRushWindows: Array<{ startTime: number; finishTime: number; bonus: number }> = []
     private whipStarts: WhipWindow[] = []
+    private readonly whip: ReturnType<typeof whipEffect>
 
     constructor(private settings: EconomySettings, private constructionWhipWindows: WhipWindow[] = []) {
+        this.whip = whipEffect(settings)
         validateEconomyDurations(settings, Math.max(settings.workerCount, settings.goldWorkers + settings.woodWorkers))
         for (const count of [settings.workerCount, settings.goldWorkers, settings.woodWorkers]) {
             if (!Number.isInteger(count) || count < 0 || count > MAX_PLAN_ACTIONS + 5) throw new Error("Unsupported worker count.")
@@ -198,7 +200,7 @@ export class WorkerEconomy {
         const { incomeBonus } = scrollEffect(id, this.settings)
         if (id === "gold-rush") this.scheduleGoldRush(startTime, finishTime, incomeBonus)
         else if (id === "lumber-gathering") this.scheduleLumberGathering(startTime, finishTime, incomeBonus)
-        else this.whipStarts.push({ startTime, finishTime })
+        else if (id === "whip") this.whipStarts.push({ startTime, finishTime })
     }
 
     /** Planner approximation of the player stopping an approaching miner before casting.
@@ -218,9 +220,9 @@ export class WorkerEconomy {
         // Builder travel already includes future activation/expiry in its projection.
         // Rescaling it again here would apply the same movement bonus twice.
         if (!active) return 1
-        if (worker.state === "outbound" || worker.state === "deposit") return WHIP.movementMultiplier
+        if (worker.state === "outbound" || worker.state === "deposit") return this.whip.movementMultiplier
         if (worker.state === "gathering" && worker.assignment === "wood") {
-            return Math.max(0.001, this.settings.woodGatherTime) / Math.max(0.001, this.settings.woodGatherTime - WHIP.woodTimeReduction)
+            return Math.max(0.001, this.settings.woodGatherTime) / Math.max(0.001, this.settings.woodGatherTime - this.whip.woodTimeReduction)
         }
         return 1
     }
@@ -250,7 +252,7 @@ export class WorkerEconomy {
             .sort((a, b) => a.startTime - b.startTime)
         for (;;) {
             while (starts[0]?.startTime === time) until = starts.shift()!.finishTime
-            const rate = until > time ? WHIP.movementMultiplier : 1
+            const rate = until > time ? this.whip.movementMultiplier : 1
             const boundary = Math.min(starts[0]?.startTime ?? Infinity, until > time ? until : Infinity)
             const finish = time + remaining / rate
             if (finish <= boundary) return finish - startTime
@@ -303,7 +305,7 @@ export class WorkerEconomy {
             this.mineWorker = next.id
             // Mining speed is locked on entry, unlike continuously updated wood progress.
             this.transition(next, "gathering", Math.max(0.001, this.settings.goldGatherTime -
-                (next.whipUntil > this.time ? WHIP.goldTimeReduction : 0)))
+                (next.whipUntil > this.time ? this.whip.goldTimeReduction : 0)))
         }
     }
 

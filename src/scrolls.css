@@ -23,7 +23,7 @@
 .scroll-dialog :focus-visible { outline: 2px solid #e1b55f; outline-offset: 2px; }
 
 
-.dark-events-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px var(--action-card-width) 10px repeat(4, var(--action-card-width)); }
+.dark-events-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 10px repeat(4, var(--action-card-width)); }
 .event.resources-collected { background: linear-gradient(#8b723a, #52421f); border-color: #e1b55f; }
 
 .action.resource-card { min-height: 64px; align-self: stretch; padding: 3px 2px; }

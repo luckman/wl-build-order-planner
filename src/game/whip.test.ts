@@ -1,4 +1,4 @@
-import { createScrollAction, scrollEffect, WHIP } from "./scrolls"
+import { createScrollAction, scrollEffect } from "./scrolls"
 import { economyFromProfile, initialGameProfile } from "./gameProfile"
 import { WorkerEconomy, workerAllocationAt, manaAt } from "./resourceSimulation"
 import { simulateBuildOrder } from "./buildSimulation"
@@ -16,8 +16,22 @@ const whip = (commandTime: number) => createScrollAction({ type: "use-scroll", s
 const simulate = (items: PlannerItem[], economy = settings, until = 150) =>
     simulateBuildOrder(items, economy, 2, 20, economy.foodPerFarm, "Citadel", until)
 
-test.each([1, 2, 3, 4, 5, 6])("Whip level %s uses the same confirmed stats", level => {
-    expect(scrollEffect("whip", { darkWhipLevel: level })).toMatchObject(WHIP)
+test.each([
+    [1, 0.5, 2, 30], [2, 0.6, 2.1, 30.3], [3, 0.6, 2.2, 30.8],
+    [4, 0.7, 2.3, 31.5], [5, 0.7, 2.4, 32.4], [6, 0.8, 2.5, 33.5],
+])("Whip level %s applies its gathering reductions and duration", (level, goldReduction, woodReduction, duration) => {
+    const economy = { ...settings, darkWhipLevel: level }
+    expect(scrollEffect("whip", economy)).toMatchObject({ manaCost: 50, movementMultiplier: 1.15,
+        goldTimeReduction: goldReduction, woodTimeReduction: woodReduction, duration })
+    const wood = new WorkerEconomy(economy)
+    wood.scheduleScroll("whip", 0, duration)
+    wood.advanceTo(20)
+    expect(wood.deliveries[0].time).toBeCloseTo(8 / 1.15 + economy.woodGatherTime - woodReduction)
+    const gold = new WorkerEconomy({ ...economy, goldWorkers: 1, woodWorkers: 0 })
+    gold.scheduleScroll("whip", 0, duration)
+    gold.advanceTo(20)
+    expect(gold.deliveries[0].time).toBeCloseTo(8 / 1.15 + economy.goldGatherTime - goldReduction)
+    expect(simulate([whip(1)], economy).plan[0]).toMatchObject({ startTime: 2, finishTime: 2 + duration })
 })
 
 test("Whip uses shared mana readiness, cooldown, one-second activation and faction validation", () => {

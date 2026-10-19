@@ -4,34 +4,40 @@ import type { BuildDraft } from "./draftStorage"
 type BuildOrderTemplate = {
     name: string
     itemIds: string[]
+    goldWorkers?: number
 }
 
 export const buildOrderTemplates: Record<FactionId, BuildOrderTemplate[]> = {
     light: [
         {
-            name: "10 workers t2 on basic account",
-            itemIds: ["worker", "worker", "worker", "worker", "barracks", "farm", "worker", "castle-lvl-2"],
-        },
-        {
             name: "10 workers t2 with swordsman",
             itemIds: ["worker", "worker", "worker", "barracks", "worker", "farm", "worker", "swordsman", "castle-lvl-2"],
         },
+        {
+            name: "10 workers t2 on basic account",
+            itemIds: ["worker", "worker", "worker", "worker", "barracks", "farm", "worker", "castle-lvl-2"],
+        },
     ],
     dark: [
+        {
+            name: "10 slaves t2 with goon",
+            itemIds: ["slave", "slave", "slave", "barracks", "slave", "pigsty", "slave", "goon", "citadel-lvl-2"],
+        },
         {
             name: "10 slaves t2 on basic account",
             itemIds: ["slave", "slave", "slave", "slave", "barracks", "pigsty", "slave", "citadel-lvl-2"],
         },
         {
-            name: "10 slaves t2 with goon",
-            itemIds: ["slave", "slave", "slave", "barracks", "slave", "pigsty", "slave", "goon", "citadel-lvl-2"],
+            name: "11 slaves t2 on basic account",
+            goldWorkers: 4,
+            itemIds: ["slave", "slave", "sawmill", "slave", "slave", "pigsty", "slave", "barracks", "slave", "citadel-lvl-2"],
         },
     ],
 }
 
 export function createBuildOrderFromTemplate(faction: FactionId, template: BuildOrderTemplate): BuildDraft {
     return {
-        opening: { type: "allocate-workers", goldWorkers: 3 },
+        opening: { type: "allocate-workers", goldWorkers: template.goldWorkers ?? 3 },
         items: template.itemIds.map(id => {
             const item = factions[faction].items.find(candidate => candidate.id === id)
             if (!item) throw new Error(`Unknown build order template item: ${id}`)

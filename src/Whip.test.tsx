@@ -13,7 +13,7 @@ test("Dark Whip supports automatic timing, level selection, editing and faction 
     fireEvent.change(level, { target: { value: "6" } })
     fireEvent.click(screen.getByRole("button", { name: /^Whip 50 mana/ }))
     const dialog = within(screen.getByRole("dialog", { name: "Use Whip" }))
-    expect(dialog.getByText(/movement speed \+15% for 30 seconds/)).toBeTruthy()
+    expect(dialog.getByText(/wood harvesting −2.5 seconds, gold mining −0.8 seconds, movement speed \+15% for 33.5 seconds/)).toBeTruthy()
     expect((dialog.getByLabelText("Command time (mm:ss)") as HTMLInputElement).value).toBe("01:31")
     fireEvent.click(dialog.getByRole("button", { name: "Add scroll" }))
     expect(screen.getByRole("button", { name: "Remove Whip" })).toBeTruthy()

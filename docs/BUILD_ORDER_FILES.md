@@ -29,6 +29,16 @@ This policy applies from now, including before the first deployment. The current
 
 Stored `itemId`, `scrollId`, and command `type` values are stable identifiers. Display names may change independently. Do not reuse an existing identifier for a different entity or command meaning. Adding Dark units and scrolls under existing structures is a catalog/rules update, not a schema change.
 
+Legion's Call is a Dark scroll with an explicit production-building target:
+
+```json
+{ "type": "use-scroll", "scrollId": "legions-call", "commandTime": 90, "targetItemId": "barracks-lvl-2" }
+```
+
+`targetItemId` is required and must identify a Dark building or upgrade classified as Production, or Citadel at any level (the Economic-building exception because it recruits Slaves). At least one completed instance at that exact level must exist at the command timestamp; instances undergoing an upgrade are unavailable. Invalid target IDs are rejected on import. A valid ID with no available instance produces a blocked action without spending mana or applying an effect. Timings remain derived and are recalculated on import.
+
+`player.darkLegionsCallLevel` selects levels 1–6: recruitment time −20/21/22/23/24/25%, duration 25.0/25.1/25.3/25.6/26.0/26.5 seconds respectively. Each costs 25 mana and starts one second after command time. The simulator uses productivity `1 / (1 − recruitmentTimeReduction)` while active, preserving completed recruitment progress and applying the effect to subsequent units until expiry. Overlapping effects on one instance refresh the duration without stacking. Multiple matching instances are resolved by remaining recruitment time at command time, with ties choosing the first instance. New recruits use the producer with the earliest projected completion, including any wait for that producer. Construction and upgrades are unaffected.
+
 Compatibility is directional: the updated app must read supported older builds, but an older app is not required to recognize IDs or commands introduced later. A recipient with a cached older app may need to reload/update before opening a new build. Unknown IDs must produce a clear rejection rather than silently dropping actions. Rules revisions do not select historical engines; supported builds continue to use current rules and may acquire different timings or blocked actions.
 
 Missing-field defaults are part of import semantics. When changing a default, assess its effect on supported documents that omit that field. Preserve their established interpretation through migration/default handling, or treat the change as an intentional rules change and bump `GAME_RULES_VERSION`; do not silently change interpretation under the same revision. Renamed or removed supported profile settings must follow the compatibility policy above rather than relying on unknown-field removal to discard their values.
@@ -190,4 +200,4 @@ The shared policy permits 100 subsequent actions plus the opening worker allocat
 
 ## Dark Whip
 
-`{ "type": "use-scroll", "scrollId": "whip", "commandTime": 91 }` is accepted for Dark only. It costs 50 mana, starts one second later, and uses `player.darkWhipLevel` (1–6, all currently identical). It follows the shared mana readiness and cooldown rules. See [WHIP.md](WHIP.md) for per-worker refresh, mining, harvesting and construction behavior. Command identity and level persist in JSON, links and drafts; imported timing caches are recalculated.
+`{ "type": "use-scroll", "scrollId": "whip", "commandTime": 91 }` is accepted for Dark only. It costs 50 mana, starts one second later, and uses `player.darkWhipLevel` (1–6, with the reductions and durations in [WHIP.md](WHIP.md)). It follows the shared mana readiness and cooldown rules. See [WHIP.md](WHIP.md) for per-worker refresh, mining, harvesting and construction behavior. Command identity and level persist in JSON, links and drafts; imported timing caches are recalculated.

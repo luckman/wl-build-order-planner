@@ -3,12 +3,16 @@
 Whip costs 50 mana and activates one second after its fixed command timestamp.
 It uses the existing mana readiness and shared scroll cooldown rules, including
 the configured order delay (one second by default). `player.darkWhipLevel` accepts
-levels 1–6; all six currently have identical effects:
+levels 1–6. Movement speed is ×1.15 at every level.
 
-- Wood harvesting time: −2 seconds per load.
-- Gold mining time: −0.5 seconds per visit.
-- Movement speed: ×1.15.
-- Duration: 30 seconds per affected worker.
+| Level | Gold mining reduction | Wood harvesting reduction | Duration |
+|---|---|---|---|
+| 1 | 0.5 seconds | 2.0 seconds | 30.0 seconds |
+| 2 | 0.6 seconds | 2.1 seconds | 30.3 seconds |
+| 3 | 0.6 seconds | 2.2 seconds | 30.8 seconds |
+| 4 | 0.7 seconds | 2.3 seconds | 31.5 seconds |
+| 5 | 0.7 seconds | 2.4 seconds | 32.4 seconds |
+| 6 | 0.8 seconds | 2.5 seconds | 33.5 seconds |
 
 The command is stored as `{ "type": "use-scroll", "scrollId": "whip", "commandTime": 91 }`.
 It survives JSON, links and Dark drafts. The card appears beside Dark heroes and
@@ -36,7 +40,7 @@ timestamp and selection logic.
 At activation, apply the effect to existing workers traveling, waiting for a mine
 slot, or gathering. Idle workers, workers constructing buildings, and workers
 created afterward do not inherit it. A new application sets each eligible worker's
-expiry to activation + 30 seconds. Neither strength nor remaining duration stacks.
+expiry to activation + the configured level’s duration. Neither strength nor remaining duration stacks.
 The active interval includes activation and excludes expiry.
 
 A builder retains the movement benefit on the way to construction, including
@@ -52,18 +56,18 @@ for another command throughout travel, construction and return, as before.
 The normal gathering times already include equipment reductions. Effective
 gathering durations are clamped to at least 0.001 seconds.
 
-Gold visit duration is chosen on mine entry: normal time minus 0.5 seconds if the
+Gold visit duration is chosen on mine entry: normal time minus the configured gold reduction if the
 worker has Whip then. Activation or expiry inside the mine does not change that
 visit. A waiting worker checks its effect when admitted to the mine.
 
 Wood progress is continuous. For normal load time T, the progress rates are 1/T
-without Whip and 1/max(0.001, T−2) with Whip. Activation and expiry preserve the
+without Whip and 1/max(0.001, T−R) with Whip, where R is the configured wood reduction. Activation and expiry preserve the
 work already done. If Whip begins after S normal gathering seconds and lasts
 until completion, total gathering time is:
 
-`S + (1 − S/T) × (T − 2)`
+`S + (1 − S/T) × (T − R)`
 
-For T = 12.1 and S = 6.05, this is 11.1 seconds. At S = 6.25 it is approximately
+At level 1 (R = 2), for T = 12.1 and S = 6.05, this is 11.1 seconds. At S = 6.25 it is approximately
 11.1331 seconds. Carrying capacity is unchanged.
 
 Movement uses normal speed ×1.15 while active. Activation and expiry preserve

@@ -96,6 +96,7 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
                     {field("player", "lightLumberGatheringLevel", "Wood Gathering scroll level", 1, 1, 6)}
                 </>}
                 {faction === "dark" && field("player", "darkWhipLevel", "Whip scroll level", 1, 1, 6)}
+                {faction === "dark" && field("player", "darkLegionsCallLevel", "Legion's Call scroll level", 1, 1, 6)}
             </div>
             <div className="resource-profile-column">
                 {field("player", "manaTowerLevel", "Tower of Mana level", 1, 1, 24)}
@@ -119,7 +120,7 @@ export default function GameProfileEditor({ faction, profile, onChange, onSave, 
                 lightGoldRushLevel: faction === "light" ? initialGameProfile.player.lightGoldRushLevel : profile.player.lightGoldRushLevel,
                 lightLumberGatheringLevel: faction === "light" ? initialGameProfile.player.lightLumberGatheringLevel : profile.player.lightLumberGatheringLevel,
                 darkWhipLevel: faction === "dark" ? initialGameProfile.player.darkWhipLevel : profile.player.darkWhipLevel,
-                darkLegionsCallLevel: profile.player.darkLegionsCallLevel,
+                darkLegionsCallLevel: faction === "dark" ? initialGameProfile.player.darkLegionsCallLevel : profile.player.darkLegionsCallLevel,
                 massConstructionCostReduction: profile.player.massConstructionCostReduction,
             },
         })}>Reset basic to defaults</button>
