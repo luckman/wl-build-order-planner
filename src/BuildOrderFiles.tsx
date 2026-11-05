@@ -136,7 +136,6 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
                 <div className="json-export">
                     <button type="button" onClick={exportFile} disabled={busy}>Export JSON</button>
                     <label><input type="checkbox" checked={includeTimings} onChange={event => setIncludeTimings(event.target.checked)} /> Include calculated timings</label>
-                    <small>Export only</small>
                 </div>
                 <div className="json-import">
                     <button type="button" onClick={() => input.current?.click()} disabled={busy}>Import JSON</button>

@@ -40,7 +40,7 @@ test("Share / Import puts sharing and templates before initially collapsed JSON 
     expect(screen.getByRole("button", { name: "Export JSON" })).toBeVisible()
     expect(screen.getByRole("button", { name: "Import JSON" })).toBeVisible()
     expect((screen.getByRole("checkbox", { name: "Include calculated timings" }) as HTMLInputElement).checked).toBe(false)
-    expect(screen.getByText("Export only")).toBeTruthy()
+    expect(screen.queryByText("Export only")).not.toBeInTheDocument()
     expect(screen.getByText(/Replaces build order and game profile/)).toBeVisible()
     fireEvent.click(disclosure)
     expect(screen.getByRole("button", { name: "Import JSON" })).not.toBeVisible()

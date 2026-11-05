@@ -44,11 +44,15 @@ for (const width of [1440, 390]) {
         await page.keyboard.press("Tab")
         await expect(importAction).toBeFocused()
         await expect(importAction).toBeInViewport()
-        await expect(page.getByText("Export only", { exact: true })).toBeVisible()
+        await expect(page.getByText("Export only", { exact: true })).toHaveCount(0)
         await expect(page.getByText(/Replaces build order and game profile/)).toBeVisible()
         const exportBox = (await exportAction.boundingBox())!
         const importBox = (await importAction.boundingBox())!
-        expect(importBox.y).toBeGreaterThan(exportBox.y + exportBox.height)
+        const optionBox = (await page.getByText("Include calculated timings", { exact: true }).boundingBox())!
+        const exportOptionGap = optionBox.y - exportBox.y - exportBox.height
+        const importGap = importBox.y - optionBox.y - optionBox.height
+        expect(exportOptionGap).toBeGreaterThanOrEqual(0)
+        expect(importGap).toBeGreaterThan(exportOptionGap)
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
         await page.screenshot({ path: `test-results/share-import-${width}-expanded.png`, fullPage: true })
         await page.keyboard.press("Escape")

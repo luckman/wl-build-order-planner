@@ -14,7 +14,7 @@
 .json-files > summary { cursor: pointer; color: #c4d5e5; font-size: .85rem; padding: .35rem 0; }
 .json-file-actions { display: grid; gap: 1rem; padding-top: .7rem; }
 .json-export, .json-import { display: grid; gap: .5rem; }
-.json-export > small { padding-left: 1.25rem; }
+.json-export { gap: .25rem; }
 .build-order-files :is(button, summary, input):focus-visible { outline: 2px solid #e3b75e; outline-offset: 2px; }
 .build-order-files label { display: flex; align-items: center; gap: .4rem; font-size: .76rem; }
 .build-order-files small { color: #a9c1d3; font-size: .72rem; line-height: 1.4; }
