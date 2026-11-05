@@ -176,6 +176,8 @@ export default function App() {
     const [editingEventId, setEditingEventId] = useState<string | null>(null)
     const [timelineMenu, setTimelineMenu] = useState<{ item: PlannerItem; anchor: HTMLButtonElement } | null>(null)
     const closeTimelineMenu = useCallback(() => setTimelineMenu(null), [])
+    const timelineScroll = useRef<HTMLDivElement>(null)
+    const timelineEdit = useRef<{ item: PlannerItem & { orderId: string }; anchor: HTMLButtonElement } | null>(null)
     const nextOrderId = useRef(0)
     const withOrderIds = useCallback((items: PlannerItem[]) => items.map(item => "orderId" in item
         ? item as PlannerItem & { orderId: string }
@@ -203,6 +205,21 @@ export default function App() {
         if (timelineMenu && !buildOrder.some(item => item === timelineMenu.item)) closeTimelineMenu()
     }, [buildOrder, timelineMenu, closeTimelineMenu])
     const editingEvent = buildOrder.find(item => item.orderId === editingEventId)
+    useEffect(() => {
+        if (editingEventId || !timelineEdit.current) return
+        const { item, anchor } = timelineEdit.current
+        timelineEdit.current = null
+        const updated = buildOrder.find(entry => entry.orderId === item.orderId)
+        const button = Array.from(timelineScroll.current?.querySelectorAll<HTMLButtonElement>("button[data-order-id]") ?? [])
+            .find(element => element.dataset.orderId === item.orderId)
+        if (updated && updated !== item) {
+            button?.scrollIntoView({ block: "nearest", inline: "center" })
+        }
+        const focusTarget = button ?? (anchor.isConnected ? anchor : null)
+        // Backdrop mouse-down can clear focus after React closes the dialog.
+        const frame = requestAnimationFrame(() => focusTarget?.focus({ preventScroll: true }))
+        return () => cancelAnimationFrame(frame)
+    }, [buildOrder, editingEventId])
     const opening = buildOrders[factionId].opening
     const setOpeningGoldWorkers = (goldWorkers: number) => {
         updateBuildOrders(current => ({ ...current, [factionId]: { ...current[factionId], opening: { type: "allocate-workers", goldWorkers } } }))
@@ -519,7 +536,7 @@ export default function App() {
                                         <div className="queue-label" key={lane.label}>{lane.label}</div>
                                     ))}
                                 </div>
-                                <div className="timeline-scroll">
+                                <div className="timeline-scroll" ref={timelineScroll}>
                                     <div className="timeline-canvas" style={{ width: timelineWidth }}>
                                     <ResourceRow
                                         endTime={endTime}
@@ -580,6 +597,7 @@ export default function App() {
                                                                 }}
                                                                 title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime })}
                                                                 aria-haspopup="menu"
+                                                                data-order-id={(item as typeof buildOrder[number]).orderId}
                                                                 aria-expanded={timelineMenu?.item === item}
                                                                 aria-controls={timelineMenu?.item === item ? "timeline-action-menu" : undefined}
                                                                 onClick={event => setTimelineMenu(timelineMenu?.item === item ? null : { item, anchor: event.currentTarget })}
@@ -711,6 +729,11 @@ export default function App() {
                 </div>
                 {timelineMenu && buildOrder.some(item => item === timelineMenu.item) && <TimelineActionMenu
                     anchor={timelineMenu.anchor} actionName={timelineMenu.item.name} onClose={closeTimelineMenu}
+                    onEdit={isTimedEvent(timelineMenu.item) ? () => {
+                        const item = timelineMenu.item as typeof buildOrder[number]
+                        timelineEdit.current = { item, anchor: timelineMenu.anchor }
+                        setEditingEventId(item.orderId)
+                    } : undefined}
                     onDelete={() => setBuildOrder(current => current.filter(item => item !== timelineMenu.item))} />}
                 {(resourcesCollectedDialogOpen || editingEvent?.kind === "resources-collected") && <ResourcesCollectedDialog
                     key={editingEvent?.orderId ?? "new-resources-collected-event"}
@@ -905,7 +928,8 @@ function TimelineHelp() {
         <div id="timeline-help-text" className="timeline-help-tooltip" role="tooltip" hidden={!hovered && !focused}>
             Hover a graph to see resources at that time. Otherwise, values show the latest command.
             Hover an action to see its command, start, finish, and worker return times.
-            Left-click a command to open its menu, then choose Delete to remove it from the build order.
+            Left-click a command to open its menu. Choose Edit for scrolls and timed events, or Delete to remove a command.
+            After editing a timeline event, the timeline follows its new position.
         </div>
     </div>
 }

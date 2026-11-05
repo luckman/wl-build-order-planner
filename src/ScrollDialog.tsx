@@ -77,7 +77,7 @@ export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "g
                 <DurationInput label="Command time (mm:ss)" disabled={automatic}
                     value={automatic ? suggestedTime === null || suggestedTime > MAX_DURATION_SECONDS ? "" : formatDuration(suggestedTime) : manualTime}
                     onChange={setManualTime} />
-                <p className="scroll-time-hint">The timestamp is fixed when added. Click its Build order row to change it.</p>
+                <p className="scroll-time-hint">The timestamp is fixed when added. Edit it from its Build order row or timeline menu.</p>
                 {automatic && suggestedTime === null && <p role="alert">{scrollId === "legions-call"
                     ? "No automatic time is available for the selected building with enough mana. Choose another target or a manual timestamp."
                     : "Enough mana cannot be reached with the current plan. Choose a manual timestamp to add a blocked command."}</p>}

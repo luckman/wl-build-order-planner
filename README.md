@@ -18,7 +18,8 @@ timeline.
 
 Choose a faction, set your opening workers and **Resource collection** settings, then add
 **Actions** or load a template from **Import / Export**. Reorder actions and review the **Timeline**
-to refine your opening. Click timed-event rows to edit them.
+to refine your opening. Click timed-event rows to edit them, or click a scroll or event on the
+timeline and choose **Edit**. After saving a timeline edit, the timeline follows the event's new position.
 
 Use **Copy link** to share a build or **Import / Export** to save a `.wl-build-order.json` file.
 Drafts save automatically in your browser; export important builds for backup. **Save profile**

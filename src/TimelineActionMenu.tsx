@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 
-export default function TimelineActionMenu({ anchor, actionName, onDelete, onClose }: {
-    anchor: HTMLButtonElement; actionName: string; onDelete: () => void; onClose: () => void
+export default function TimelineActionMenu({ anchor, actionName, onEdit, onDelete, onClose }: {
+    anchor: HTMLButtonElement; actionName: string; onEdit?: () => void; onDelete: () => void; onClose: () => void
 }) {
     const menu = useRef<HTMLDivElement>(null)
     useLayoutEffect(() => {
@@ -34,13 +34,25 @@ export default function TimelineActionMenu({ anchor, actionName, onDelete, onClo
     }, [anchor, onClose])
     return createPortal(<div ref={menu} id="timeline-action-menu" className="timeline-action-menu" role="menu"
         aria-label={`${actionName} actions`} onKeyDown={event => {
-            if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) event.preventDefault()
+            if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+                event.preventDefault()
+                const buttons = Array.from(menu.current!.querySelectorAll("button"))
+                const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
+                const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
+                    : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length
+                buttons[next]?.focus()
+            }
             if (event.key === "Escape" || event.key === "Tab") {
                 if (event.key === "Escape") event.preventDefault()
                 anchor.focus({ preventScroll: true })
                 onClose()
             }
         }}>
-        <button type="button" role="menuitem" onClick={() => { onClose(); onDelete() }}>Delete</button>
+        {onEdit && <button type="button" role="menuitem" onClick={() => {
+            anchor.focus({ preventScroll: true })
+            onClose()
+            onEdit()
+        }}>Edit</button>}
+        <button type="button" role="menuitem" className="delete-action" onClick={() => { onClose(); onDelete() }}>Delete</button>
     </div>, document.body)
 }
