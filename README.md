@@ -10,20 +10,25 @@ timeline.
 
 - Buildings, units, heroes, upgrades, and faction scrolls, with automatic prerequisite insertion.
 - Gold, wood, food, and mana simulation, including gathering, construction, and production queues.
-- Editable account and map settings, plus timed events for resources, mana wells, and unit losses.
+- Editable account and map settings, plus timed events for resources, mana spending, mana wells, and unit losses.
 - Reorderable build orders, starter templates, and warnings for blocked actions.
 - Shareable links, JSON import/export, and separate browser-saved drafts for each faction.
 
 ## Getting started
 
 Choose a faction, set your opening workers and **Resource collection** settings, then add
-**Actions** or load a template from **Import / Export**. Reorder actions and review the **Timeline**
+**Actions** or load a template from **Share / Import**. Reorder actions and review the **Timeline**
 to refine your opening. Click timed-event rows to edit them, or click a scroll or event on the
 timeline and choose **Edit**. After saving a timeline edit, the timeline follows the event's new position.
 
-Use **Copy link** to share a build or **Import / Export** to save a `.wl-build-order.json` file.
+In **Share / Import**, use the primary **Copy link** action to share a build, choose a starter
+template, or expand **JSON files** to import or export a `.wl-build-order.json` file.
 Drafts save automatically in your browser; export important builds for backup. **Save profile**
 stores personal resource settings separately from your build.
+
+**Mana spent** records immediate mana expenditure for an unmodeled spell. Choose a positive whole
+number (default 75) and fixed command time. It respects and starts shared scroll cooldown without
+an order delay or spell effect; edit or delete it like other timed events.
 
 Plans support **100 actions** after the opening allocation and a **30-minute** simulation. The
 catalog is still expanding, and timings are estimates to check in-game. See the

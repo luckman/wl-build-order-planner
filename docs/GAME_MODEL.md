@@ -215,13 +215,15 @@ Timed events retain explicit command timestamps independently of their position 
 Moving other actions or changing the profile recalculates validation without moving event
 timestamps. Events are edited through their build-order rows and have no drag handles. Equal-time
 commands of the same event type use source order; different types follow the simulator's processing
-order.
+order. Mana spent cannot share its command timestamp with another Mana spent event or any scroll,
+including blocked commands.
 
 | Command | Current behavior |
 | --- | --- |
 | Gold Rush (Light) | Spends 50 mana; starts 1 second after command; adds 10–15 gold to loads exiting the mine during its level-dependent window. |
 | Lumber Gathering (Light) | Spends 25 mana; starts 1 second after command; adds 15–20 wood to loads finishing gathering during its level-dependent window. |
 | Resources collected (both factions) | Instantly adjusts gold and wood without mana, worker, or delay requirements. Negative amounts subtract resources, clamping each resulting balance to zero at that timestamp. |
+| Mana spent (both factions) | Immediately spends a chosen finite positive whole-number amount (default 75). Respects and starts shared scroll cooldown, with no order delay or other spell effect. |
 | Mana well is captured / Mana well is lost (both factions) | Instantly adds/removes one owned well. A loss requires ownership at that timestamp. |
 | Unit is killed (both factions) | Removes one completed living recruit or starting worker, releasing food. Workers assigned to construction, including travel, are ineligible; wood workers are selected before gold workers. |
 
@@ -248,12 +250,15 @@ target selection and command validation.
 Scroll cooldown is shared between a faction’s scrolls:
 `basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)` , followed by `orderDelay` .
 Mana must also have been sufficient for `orderDelay` before the command. Blocked scrolls spend no
-mana and start no cooldown.
+mana and start no cooldown. Mana spent checks mana and cooldown exactly at command time, without
+adding order delay; exact-balance spending is valid. Scrolls following Mana spent still apply their
+normal order delay. Blocked Mana spent events consume no mana and start no cooldown.
 
 Automatic scroll insertion chooses an affordable timestamp once, respecting cooldown, mana, and
 order delay. Manual scroll insertion may retain a mana-blocked event. Invalid fixed-time events
 remain editable with warnings and have no effect; the mana-well and unit-is-killed dialogs also
-validate eligibility before saving.
+validate eligibility before saving. Mana spent also rejects unaffordable or cooldown-blocked saves;
+profile or earlier-command changes retain invalid saved expenditures with a blocked reason.
 
 ## Limits, persistence, and UI boundaries
 

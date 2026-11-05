@@ -1,3 +1,5 @@
+import ManaSpentDialog from "./ManaSpentDialog"
+import { createManaSpentAction, manaSpentCollision } from "./game/manaSpent"
 import Notification, { type NotificationMessage } from "./Notification"
 import { ACTION_LIMIT_MESSAGE, MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, MAX_COMMAND_SECONDS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
 import UnitKilledDialog from "./UnitKilledDialog"
@@ -48,6 +50,8 @@ const iconSources: Record<string, string> = {
     darkUnitIsKilled: require("./icons/events/dark-unit-is-killed.png"),
     manaWellIsCaptured: require("./icons/events/mana-well-is-captured.png"),
     manaWellIsLost: require("./icons/events/mana-well-is-lost.png"),
+    lightManaSpent: require("./icons/events/light-mana-spent.png"),
+    darkManaSpent: require("./icons/events/dark-mana-spent.png"),
     resourcesCollected: require("./icons/events/resources-collected.png"),
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
@@ -172,6 +176,7 @@ export default function App() {
     const [scrollDialogOpen, setScrollDialogOpen] = useState<ScrollId | null>(null)
     const [unitKilledDialogOpen, setUnitKilledDialogOpen] = useState(false)
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
+    const [manaSpentDialogOpen, setManaSpentDialogOpen] = useState(false)
     const [resourcesCollectedDialogOpen, setResourcesCollectedDialogOpen] = useState(false)
     const [editingEventId, setEditingEventId] = useState<string | null>(null)
     const [timelineMenu, setTimelineMenu] = useState<{ item: PlannerItem; anchor: HTMLButtonElement } | null>(null)
@@ -329,7 +334,11 @@ export default function App() {
     const scrollTargetsAt = (time: number) => Array.from(new Map(productionBuildingsAt(plan,
         faction.items.find(item => item.name === faction.startingTownHall)!, faction.items, time)
         .map(({ item }) => [item.id, item])).values())
-    const scrollTimes = plan.filter(action => action.item.kind === "scroll").map(action => action.commandTime!)
+    const scrollTimes = plan.filter(action => action.item.kind === "scroll" || (action.item.kind === "mana-spent" && !action.blocked)).map(action => action.commandTime!)
+    const scrollCollision = (commandTime: number, selected?: PlannerItem) => manaSpentCollision([
+        ...buildOrder.filter(item => item !== selected),
+        createScrollAction({ type: "use-scroll", scrollId: "gold-rush", commandTime }, "light"),
+    ])
     const minimumScrollTime = scrollTimes.length ? Math.max(...scrollTimes) + scrollCooldown(economy) + economy.orderDelay : 0
     const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime, scrollDialogOpen ?? "gold-rush")
     const displayPlan = buildOrder.some(isTimedEvent) ? scheduled.orderedPlan : plan
@@ -368,7 +377,7 @@ export default function App() {
     const manaSampleTimes = Array.from(new Set([
         ...samples.map(({ time }) => time),
         ...plan.flatMap(({ item, finishTime }) => item.id === "tower-of-mana" && finishTime !== null ? [finishTime] : []),
-        ...plan.flatMap(({ item, commandTime }) => (item.kind === "scroll" || item.kind === "mana-well") && commandTime !== null ? [commandTime] : []),
+        ...plan.flatMap(({ item, commandTime }) => (item.kind === "scroll" || item.kind === "mana-spent" || item.kind === "mana-well") && commandTime !== null ? [commandTime] : []),
     ])).sort((a, b) => a - b)
     const manaSamples = manaSampleTimes.map(time => manaAt(economy, plan, time))
     const inspectedMana = manaAt(economy, plan, inspectedTime)
@@ -498,6 +507,11 @@ export default function App() {
                                                     onClick={() => setResourcesCollectedDialogOpen(true)}>
                                                     <span className="action-name">Resources collected</span>
                                                     <img src={iconSources.resourcesCollected} alt="" />
+                                                </button>
+                                                <button className="action resource-card" aria-label="Mana spent" title="Spend mana instantly and start the shared scroll cooldown"
+                                                    onClick={() => setManaSpentDialogOpen(true)}>
+                                                    <span className="action-name">Mana spent</span>
+                                                    <img src={iconSources[factionId === "light" ? "lightManaSpent" : "darkManaSpent"]} alt="" />
                                                 </button>
                                                 {(Object.keys(MANA_WELL_EVENTS) as ManaWellEventType[]).map(type => <button key={type}
                                                     className="action resource-card" aria-label={MANA_WELL_EVENTS[type].name}
@@ -680,6 +694,7 @@ export default function App() {
                                             <b>{item.name}</b>
                                             {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}</small>}
+                                            {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
                                             <small>
                                                 {blocked || commandTime === null
@@ -735,6 +750,30 @@ export default function App() {
                         setEditingEventId(item.orderId)
                     } : undefined}
                     onDelete={() => setBuildOrder(current => current.filter(item => item !== timelineMenu.item))} />}
+                {(manaSpentDialogOpen || editingEvent?.kind === "mana-spent") && <ManaSpentDialog
+                    key={editingEvent?.orderId ?? "new-mana-spent"} defaultTime={defaultEventTime}
+                    action={editingEvent?.kind === "mana-spent" ? editingEvent : undefined}
+                    validate={command => {
+                        const item = createManaSpentAction(command, factionId)
+                        const proposed = editingEvent?.kind === "mana-spent"
+                            ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
+                        if (proposed.length > MAX_PLAN_ACTIONS) return ACTION_LIMIT_MESSAGE
+                        const collision = manaSpentCollision(proposed)
+                        if (collision) return collision
+                        return simulateBuildOrder(proposed, economy, initialFoodUsed, baseFoodLimit, foodPerFarm, faction.startingTownHall)
+                            .plan.find(action => action.item === item)?.blockedReason ?? null
+                    }}
+                    onClose={() => { setManaSpentDialogOpen(false); setEditingEventId(null) }}
+                    onSave={command => {
+                        const action = createManaSpentAction(command, factionId)
+                        if (!setBuildOrder(current => editingEvent?.kind === "mana-spent"
+                            ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
+                            : [...current, action])) return
+                        setManaSpentDialogOpen(false)
+                        setEditingEventId(null)
+                        setDependencyError(null)
+                        setHoverTime(null)
+                    }} />}
                 {(resourcesCollectedDialogOpen || editingEvent?.kind === "resources-collected") && <ResourcesCollectedDialog
                     key={editingEvent?.orderId ?? "new-resources-collected-event"}
                     defaultTime={defaultEventTime}
@@ -799,7 +838,7 @@ export default function App() {
                     }} />}
                 {editingEvent && isScrollAction(editingEvent) && editingEvent.scrollId === "legions-call" && <ScrollDialog key={editingEvent.orderId}
                     scrollId="legions-call" levels={gameProfile.player} minimumTime={0} automaticTime={null}
-                    initialCommandTime={editingEvent.commandTime} initialTargetItemId={editingEvent.targetItemId} targetsAt={scrollTargetsAt} targetOptions={scrollTargetOptions}
+                    validateTime={commandTime => scrollCollision(commandTime, editingEvent)} initialCommandTime={editingEvent.commandTime} initialTargetItemId={editingEvent.targetItemId} targetsAt={scrollTargetsAt} targetOptions={scrollTargetOptions}
                     onClose={() => setEditingEventId(null)} onAdd={(commandTime, targetItemId) => {
                         setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime, targetItemId } : item))
                         setEditingEventId(null)
@@ -807,14 +846,14 @@ export default function App() {
                         setHoverTime(null)
                     }} />}
                 {editingEvent && isScrollAction(editingEvent) && editingEvent.scrollId !== "legions-call" && <EventTimeDialog key={editingEvent.orderId}
-                    name={editingEvent.name} commandTime={editingEvent.commandTime}
+                    name={editingEvent.name} commandTime={editingEvent.commandTime} validateTime={commandTime => scrollCollision(commandTime, editingEvent)}
                     onClose={() => setEditingEventId(null)} onSave={commandTime => {
                         setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime } : item))
                         setEditingEventId(null)
                         setDependencyError(null)
                         setHoverTime(null)
                     }} />}
-                {scrollDialogOpen && <ScrollDialog validationError={additionError} scrollId={scrollDialogOpen} levels={gameProfile.player} minimumTime={scrollDialogOpen === "legions-call" ? 0 : minimumScrollTime} automaticTime={automaticScrollTime}
+                {scrollDialogOpen && <ScrollDialog validateTime={commandTime => scrollCollision(commandTime)} validationError={additionError} scrollId={scrollDialogOpen} levels={gameProfile.player} minimumTime={scrollDialogOpen === "legions-call" ? 0 : minimumScrollTime} automaticTime={automaticScrollTime}
                     targetsAt={scrollTargetsAt} targetOptions={scrollTargetOptions} automaticTimeForTarget={targetItemId => earliestLegionsCallTime(economy, plan, targetItemId)}
                     onClose={() => setScrollDialogOpen(null)} onAdd={(commandTime, targetItemId) => {
                         if (!setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime, targetItemId }, factionId)])) return

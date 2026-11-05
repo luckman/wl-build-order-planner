@@ -9,7 +9,8 @@ import type { PlannerItem } from "./game/gameData"
 import type { ScrollTargetOption } from "./game/recruitment"
 
 export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "gold-rush", levels = {}, onAdd, onClose, validationError,
-    targetsAt, targetOptions = [], automaticTimeForTarget, initialCommandTime, initialTargetItemId }: {
+    targetsAt, targetOptions = [], automaticTimeForTarget, initialCommandTime, initialTargetItemId, validateTime }: {
+    validateTime?: (time: number) => string | null
     minimumTime: number; automaticTime: number | null; scrollId?: ScrollId; validationError?: string | null
     levels?: Partial<Pick<GameProfile["player"], "lightGoldRushLevel" | "lightLumberGatheringLevel" | "darkWhipLevel" | "darkLegionsCallLevel">>
     targetsAt?: (time: number) => PlannerItem[]
@@ -32,6 +33,7 @@ export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "g
     const currentTargets = targetOptions.filter(option => option.current)
     const earlierTargets = targetOptions.filter(option => !option.current)
     const valid = commandTime !== null && Number.isFinite(commandTime) && commandTime >= minimumTime && commandTime <= MAX_DURATION_SECONDS && targetValid
+    const timeError = commandTime !== null ? validateTime?.(commandTime) : null
     useEffect(() => {
         const previousFocus = document.activeElement as HTMLElement | null
         dialog.current?.querySelector<HTMLElement>("input, select")?.focus()
@@ -52,7 +54,7 @@ export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "g
             <p>{scroll.description}</p>
             <form onSubmit={event => {
                 event.preventDefault()
-                if (valid && !validationError) {
+                if (valid && !validationError && !timeError) {
                     if (scrollId === "legions-call") onAdd(commandTime!, targetItemId)
                     else onAdd(commandTime!)
                 }
@@ -83,8 +85,9 @@ export default function ScrollDialog({ minimumTime, automaticTime, scrollId = "g
                     : "Enough mana cannot be reached with the current plan. Choose a manual timestamp to add a blocked command."}</p>}
                 {!automatic && (commandTime === null || commandTime < minimumTime || commandTime > MAX_DURATION_SECONDS) && <p role="alert">Enter a valid mm:ss time between {formatDuration(minimumTime)} and 29:59.</p>}
                 {automatic && suggestedTime !== null && suggestedTime > MAX_DURATION_SECONDS && <p role="alert">The earliest available command exceeds the maximum time of 29:59.</p>}
+                {timeError && <p role="alert">{timeError}</p>}
                 {validationError && <p role="alert">{validationError}</p>}
-                <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid || !!validationError}>{editing ? "Save scroll" : "Add scroll"}</button></div>
+                <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!valid || !!validationError || !!timeError}>{editing ? "Save scroll" : "Add scroll"}</button></div>
             </form>
         </div>
     </div>

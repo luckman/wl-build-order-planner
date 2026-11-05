@@ -110,15 +110,40 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
             event.currentTarget.querySelector("summary")?.focus()
         }
     }}>
-        <summary>Import / Export</summary>
+        <summary>Share / Import</summary>
         <div className="build-order-files">
-        <small>Import replaces the build order and game profile. Timings are always recalculated.</small>
-        <div className="file-buttons">
-            <button type="button" onClick={exportFile} disabled={busy}>Export JSON</button>
+        <div className="share-link-row">
             <button type="button" onClick={shareLink} disabled={busy}>Copy link</button>
-            <button type="button" onClick={() => input.current?.click()} disabled={busy}>Import JSON</button>
+            <small>Share this build order</small>
         </div>
-        <label><input type="checkbox" checked={includeTimings} onChange={event => setIncludeTimings(event.target.checked)} /> Include calculated timings</label>
+        {buildOrderTemplates[faction].length > 0 && <section className="build-order-templates" aria-label="Start from template">
+            <strong>Start from template</strong>
+            <small>Keeps Resource collection settings.</small>
+            <div className="file-buttons">
+                {buildOrderTemplates[faction].map(template => <button key={template.name} type="button" disabled={busy} onClick={() => {
+                    if (plan.length > 0 && !window.confirm(`“${template.name}” will replace your current build order. Continue?`)) return
+                    onSelectTemplate(createBuildOrderFromTemplate(faction, template))
+                    setError(null)
+                    setManualLink(null)
+                    setNotice({ text: "Build order template loaded. Resource collection settings preserved. Timings recalculated.", kind: "success" })
+                    closeMenu()
+                }}>{template.name}</button>)}
+            </div>
+        </section>}
+        <details className="json-files">
+            <summary>JSON files</summary>
+            <div className="json-file-actions">
+                <div className="json-export">
+                    <button type="button" onClick={exportFile} disabled={busy}>Export JSON</button>
+                    <label><input type="checkbox" checked={includeTimings} onChange={event => setIncludeTimings(event.target.checked)} /> Include calculated timings</label>
+                    <small>Export only</small>
+                </div>
+                <div className="json-import">
+                    <button type="button" onClick={() => input.current?.click()} disabled={busy}>Import JSON</button>
+                    <small>Replaces build order and game profile.<br />Timings are recalculated.</small>
+                </div>
+            </div>
+        </details>
         <input ref={input} type="file" accept=".json,application/json" aria-label="Import build order JSON" hidden
             onChange={async event => {
                 const file = event.target.files?.[0]
@@ -141,20 +166,6 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
         {error && <p role="alert">{error}</p>}
         {manualLink && <label>Shareable link<input readOnly value={manualLink}
             ref={element => { element?.focus(); element?.select() }} onFocus={event => event.target.select()} /></label>}
-        {buildOrderTemplates[faction].length > 0 && <section className="build-order-templates" aria-label="Start from template">
-            <strong>Start from template</strong>
-            <small>Replace the build order while keeping your Resource collection settings.</small>
-            <div className="file-buttons">
-                {buildOrderTemplates[faction].map(template => <button key={template.name} type="button" disabled={busy} onClick={() => {
-                    if (plan.length > 0 && !window.confirm(`“${template.name}” will replace your current build order. Continue?`)) return
-                    onSelectTemplate(createBuildOrderFromTemplate(faction, template))
-                    setError(null)
-                    setManualLink(null)
-                    setNotice({ text: "Build order template loaded. Resource collection settings preserved. Timings recalculated.", kind: "success" })
-                    closeMenu()
-                }}>{template.name}</button>)}
-            </div>
-        </section>}
         </div>
     </details>
     <Notification notice={notice} onDismiss={dismissNotice} />

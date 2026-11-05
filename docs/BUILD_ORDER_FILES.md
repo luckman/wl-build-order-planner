@@ -7,8 +7,11 @@ browser and a secure context (HTTPS or localhost). Unsupported browsers use thei
 behavior and browser save-location preferences. No custom filename dialog is shown. Save failures
 produce a visible error.
 
-The top Import / Export menu offers Export JSON, Copy link, Import JSON, the Include calculated
-timings option, and faction-specific starting templates when available. The menu is also available
+The top Share / Import menu puts Copy link first, followed by faction-specific starting templates.
+The collapsed JSON files section at the bottom contains Export JSON and Import JSON. Include
+calculated timings appears directly beneath Export JSON and affects only file exports; copied
+links always omit calculated timings. Import guidance accompanies Import JSON. A divider and
+extra space separate file operations from templates. The menu is also available
 on narrow screens and closes with Escape or a click outside it. Files include the selected faction,
 the opening allocation and exact subsequent commands (including duplicates and blocked actions), and
 the complete game profile. Orders containing only the required opening allocation can share a
@@ -441,7 +444,7 @@ for that producer. Construction and upgrades are unaffected.
 
 ## Shareable links
 
-Copy link in the Import / Export menu copies a URL containing the current faction, exact action
+Copy link in the Share / Import menu copies a URL containing the current faction, exact action
 sequence, and complete profile. Calculated timings are always omitted, regardless of the JSON export
 checkbox; required scroll command timestamps remain. Successful copying closes the menu and shows a
 notice. If clipboard access fails, the menu stays open with the link selected for manual copying.
@@ -482,6 +485,26 @@ The command schema is
 must be finite and may be negative; command time must be within 0–1799 seconds. Negative adjustments
 cannot reduce either balance below zero. The UI uses whole-second timestamps, while imports/API
 commands may retain fractional seconds.
+
+## Mana spent commands
+
+`{ "type": "mana-spent", "commandTime": 30, "mana": 75 }` records immediate expenditure for
+an unmodeled spell. The amount must be finite, positive and a whole number. The command timestamp
+must be a whole second from 0 through 1799. Both factions use their prepared Mana spent artwork.
+The dialog defaults to 75 mana and one second after the latest active command, capped at 29:59.
+
+The event validates mana and shared scroll cooldown at command time, spends immediately and starts
+that cooldown. It has no own order delay or other spell effect. Scrolls following it retain their
+normal order delay and effects. Exact-balance spending is valid. Existing expenditures that become
+unaffordable or cooldown-blocked stay in the plan with a reason and contribute neither spending nor
+cooldown. New or edited expenditures must be valid to save.
+
+A Mana spent timestamp cannot equal another Mana spent or scroll timestamp, including blocked
+entries. Both editors and every import/draft/share ingestion path enforce the rule; an invalid
+file does not partially replace the current plan. Edits retain event identity and fixed positioning,
+and timeline edits follow the saved position. Deletion recalculates mana and cooldown. The existing
+version-2 format remains unchanged; older plans without this event remain supported. Game rules
+version `2026-11-05.1` records the new simulation behavior.
 
 ## Mana well commands
 

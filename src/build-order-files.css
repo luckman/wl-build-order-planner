@@ -3,13 +3,19 @@
 .file-menu > summary::-webkit-details-marker { display: none; }
 .file-menu[open] > summary { color: #fff; background: #263d55; }
 .file-menu > summary:focus-visible { outline: 2px solid #e3b75e; outline-offset: -3px; }
-.build-order-files { position: absolute; right: 0; top: 100%; z-index: 20; width: min(320px, calc(100vw - 1.5rem)); display: grid; gap: .6rem; padding: .75rem; border: 1px solid #34536e; background: #101d2c; box-shadow: 0 4px 12px #0008; }
-.file-buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
-.build-order-templates { display: grid; gap: .6rem; margin-top: .6rem; padding-top: 1rem; border-top: 1px solid #34536e; }
+.build-order-files { position: absolute; right: 0; top: 100%; z-index: 20; width: min(320px, calc(100vw - 1.5rem)); max-height: calc(100dvh - 120px); overflow-y: auto; display: grid; gap: .6rem; padding: .75rem; border: 1px solid #34536e; background: #101d2c; box-shadow: 0 4px 12px #0008; }
+.file-buttons { display: grid; gap: .5rem; }
+.build-order-templates { display: grid; gap: .6rem; margin-top: .6rem; }
 .build-order-templates strong { font-size: .95rem; color: #dce6f4; }
-.build-order-templates .file-buttons { display: grid; }
-.build-order-templates button { text-align: left; }
-.file-buttons button { padding: .4rem .6rem; border: 1px solid #3d6383; background: #132333; color: #dce6f4; }
+.build-order-files button { width: 100%; padding: .6rem .7rem; border: 1px solid #3d6383; background: #132333; color: #dce6f4; text-align: left; }
+.share-link-row { display: grid; gap: .35rem; padding: .7rem; border: 1px solid #65778b; border-left: 3px solid #e3b75e; background: #2a4059; }
+.share-link-row button { padding: 0; border: 0; background: transparent; color: #f3d394; font-weight: 700; font-size: .95rem; }
+.json-files { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #34536e; }
+.json-files > summary { cursor: pointer; color: #c4d5e5; font-size: .85rem; padding: .35rem 0; }
+.json-file-actions { display: grid; gap: 1rem; padding-top: .7rem; }
+.json-export, .json-import { display: grid; gap: .5rem; }
+.json-export > small { padding-left: 1.25rem; }
+.build-order-files :is(button, summary, input):focus-visible { outline: 2px solid #e3b75e; outline-offset: 2px; }
 .build-order-files label { display: flex; align-items: center; gap: .4rem; font-size: .76rem; }
 .build-order-files small { color: #a9c1d3; font-size: .72rem; line-height: 1.4; }
 .build-order-files p { margin: 0; font-size: .76rem; line-height: 1.4; overflow-wrap: anywhere; }

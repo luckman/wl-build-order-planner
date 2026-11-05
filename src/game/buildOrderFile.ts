@@ -1,3 +1,4 @@
+import { createManaSpentAction, manaSpentCommand, manaSpentCollision, type ManaSpentCommand } from "./manaSpent"
 import { validateActionCount, validateEconomyDurations } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, type UnitKilledCommand } from "./unitsKilled"
 import { createManaWellAction, manaWellCommand, type ManaWellCommand } from "./manaWells"
@@ -11,7 +12,7 @@ import { createScrollAction, isScrollAction, scrollCommand, type ScrollCommand }
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-10-19.4"
+export const GAME_RULES_VERSION = "2026-11-05.1"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -19,7 +20,7 @@ export type BuildOrderDocument = {
     gameRulesVersion: string
     faction: FactionId
     gameProfile: GameProfile
-    buildOrder: Array<OpeningAction | ((ScrollCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
+    buildOrder: Array<OpeningAction | ((ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
         itemId: string
     }) & {
         timings?: Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime">
@@ -33,7 +34,7 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
         buildOrder: [opening, ...actions.map(({ item, commandTime, startTime, finishTime, workerReturnTime }) => ({
-            ...(isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : { itemId: item.id }),
+            ...(item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : { itemId: item.id }),
             ...(includeTimings ? { timings: { commandTime, startTime, finishTime, workerReturnTime } } : {}),
         }))],
     }
@@ -122,6 +123,10 @@ export function parseBuildOrder(text: string): {
     const catalog = new Map(factions[faction].items.map(item => [item.id, item]))
     const buildOrder = doc.buildOrder.slice(1).map((entry: unknown, index: number) => {
         const action = object(entry, `Action ${index + 1}`)
+        if (action.type === "mana-spent") {
+            return createManaSpentAction({ type: "mana-spent", commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
+                mana: resourceAmount(action.mana, `Action ${index + 1}.mana`) }, faction)
+        }
         if (action.type === "unit-is-killed") {
             if (typeof action.unitId !== "string") throw new Error(`Action ${index + 1}.unitId must identify a unit.`)
             return createUnitKilledAction({ type: "unit-is-killed", unitId: action.unitId,
@@ -148,6 +153,8 @@ export function parseBuildOrder(text: string): {
         if (!item) throw new Error(`Action ${index + 1}: unknown item ID ${String(action.itemId)} for ${doc.faction}.`)
         return item
     })
+    const collision = manaSpentCollision(buildOrder)
+    if (collision) throw new Error(collision)
     return {
         faction: doc.faction, buildOrder, opening, gameProfile,
         warning: doc.gameRulesVersion === GAME_RULES_VERSION ? null :

@@ -25,7 +25,7 @@ export function earliestLegionsCallTime(settings: EconomySettings, plan: Schedul
 /** Resolve once when adding a command; later simulation never changes its timestamp. */
 export function earliestScrollTime(settings: EconomySettings, plan: ScheduledAction[], minimumTime: number, scrollId: ScrollId = "gold-rush"): number | null {
     const scroll = SCROLLS[scrollId]
-    const scrollTimes = plan.filter(action => action.item.kind === "scroll" && action.commandTime !== null)
+    const scrollTimes = plan.filter(action => (action.item.kind === "scroll" || (action.item.kind === "mana-spent" && !action.blocked)) && action.commandTime !== null)
         .map(action => action.commandTime!)
     if (scrollTimes.length) minimumTime = Math.max(minimumTime,
         Math.max(...scrollTimes) + scrollCooldown(settings) + settings.orderDelay)

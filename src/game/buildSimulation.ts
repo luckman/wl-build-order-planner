@@ -1,3 +1,4 @@
+import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, foodUsedAt } from "./unitsKilled"
 import { evaluateManaWells } from "./manaWells"
@@ -74,7 +75,13 @@ function simulateBuildOrderPass(
     const spending: Array<{ time: number; gold: number; wood: number }> = []
     const catalog = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!.items
     const faction = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!.id
-    const pendingScrolls = buildOrder.flatMap((item, index) => {
+    const collision = manaSpentCollision(buildOrder)
+    if (collision) throw new Error(collision)
+    const pendingScrolls = buildOrder.flatMap<{ item: Extract<PlannerItem, { kind: "scroll" | "mana-spent" }>; index: number }>((item, index) => {
+        if (item.kind === "mana-spent") {
+            createManaSpentAction(manaSpentCommand(item), faction)
+            return [{ item, index }]
+        }
         if (!isScrollAction(item)) return []
         createScrollAction(scrollCommand(item), faction)
         return [{ item, index }]
@@ -95,6 +102,7 @@ function simulateBuildOrderPass(
         simulation.workers.map(() => ({ item: workerItem, readyAt: 0, killed: false }))
     // Timed commands are processed independently of their position among catalog rows.
     until = Math.max(until, ...pendingUnitsKilled.map(({ item }) => item.commandTime), ...pendingResourcesCollected.map(({ item }) => item.commandTime), ...pendingScrolls.map(({ item }) => {
+        if (item.kind === "mana-spent") return item.commandTime
         const scroll = scrollEffect(item.scrollId, economy)
         return item.commandTime + scroll.startDelay + scroll.duration
     }))
@@ -166,6 +174,23 @@ function simulateBuildOrderPass(
             }
             while (pendingScrolls[0]?.item.commandTime === eventTime) {
                 const { item, index } = pendingScrolls.shift()!
+                if (item.kind === "mana-spent") {
+                    const availableMana = manaAt(economy, [...plan, ...scrollPlan, ...wellPlan], eventTime).mana
+                    const cooldownUntil = lastScrollCommand + scrollCooldown(economy)
+                    const cooldownBlocked = eventTime < cooldownUntil
+                    const manaBlocked = availableMana + 1e-9 < item.mana
+                    const blocked = cooldownBlocked || manaBlocked
+                    const action: ScheduledAction = { item, cost: { gold: 0, wood: 0 }, blocked,
+                        commandTime: eventTime, startTime: blocked ? null : eventTime, finishTime: blocked ? null : eventTime,
+                        workerReturnTime: null, workerId: null, manaCost: item.mana,
+                        ...(blocked ? { blockedReason: cooldownBlocked
+                            ? `Scroll cooldown: Mana spent can be used at ${cooldownUntil} seconds`
+                            : `Insufficient mana for Mana spent: requires ${item.mana}, available ${availableMana.toFixed(1)}` } : {}) }
+                    scrollPlan.push(action)
+                    timedEventsByIndex.set(index, action)
+                    if (!blocked) lastScrollCommand = eventTime
+                    continue
+                }
                 const scroll = scrollEffect(item.scrollId, economy)
                 const availableMana = manaAt(economy, [...plan, ...scrollPlan, ...wellPlan], eventTime).mana
                 const readyMana = manaAt(economy, [...plan, ...scrollPlan, ...wellPlan], Math.max(0, eventTime - economy.orderDelay)).mana

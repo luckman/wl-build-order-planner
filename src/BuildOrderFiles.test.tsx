@@ -10,6 +10,8 @@ import { simulateBuildOrder } from "./game/buildSimulation"
 import { economyFromProfile } from "./game/gameProfile"
 import { draftStorageKey } from "./game/draftStorage"
 import { profileStorageKey } from "./game/profileStorage"
+import "@testing-library/jest-dom"
+import { inflate } from "pako"
 
 jest.mock("./analytics", () => ({ trackEvent: jest.fn() }))
 beforeEach(() => jest.clearAllMocks())
@@ -18,13 +20,40 @@ afterEach(() => window.history.replaceState(null, "", window.location.pathname))
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
+function openJsonFiles() {
+    const disclosure = screen.getByText("JSON files")
+    if (!(disclosure.parentElement as HTMLDetailsElement).open) fireEvent.click(disclosure)
+}
+
+test("Share / Import puts sharing and templates before initially collapsed JSON actions", () => {
+    render(<App />)
+    fireEvent.click(screen.getByText("Share / Import"))
+    expect(screen.getByText("Share this build order")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Export JSON" })).not.toBeVisible()
+    expect(screen.getByRole("checkbox", { name: "Include calculated timings" })).not.toBeVisible()
+    const copy = screen.getByRole("button", { name: "Copy link" })
+    const templates = screen.getByRole("region", { name: "Start from template" })
+    const disclosure = screen.getByText("JSON files")
+    expect(copy.compareDocumentPosition(templates) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(templates.compareDocumentPosition(disclosure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(disclosure)
+    expect(screen.getByRole("button", { name: "Export JSON" })).toBeVisible()
+    expect(screen.getByRole("button", { name: "Import JSON" })).toBeVisible()
+    expect((screen.getByRole("checkbox", { name: "Include calculated timings" }) as HTMLInputElement).checked).toBe(false)
+    expect(screen.getByText("Export only")).toBeTruthy()
+    expect(screen.getByText(/Replaces build order and game profile/)).toBeVisible()
+    fireEvent.click(disclosure)
+    expect(screen.getByRole("button", { name: "Import JSON" })).not.toBeVisible()
+    expect(screen.getByRole("button", { name: "Copy link" })).toBeTruthy()
+})
+
 test("success notices stay for five seconds after the latest operation and support manual dismissal", () => {
     jest.useFakeTimers()
     const confirm = jest.spyOn(window, "confirm").mockReturnValue(true)
     try {
         render(<App />)
         const loadTemplate = () => {
-            fireEvent.click(screen.getByText("Import / Export"))
+            fireEvent.click(screen.getByText("Share / Import"))
             fireEvent.click(screen.getByRole("button", { name: "10 workers T2 on basic account", exact: true }))
         }
         loadTemplate()
@@ -76,7 +105,7 @@ test.each([
     try {
         const { unmount } = render(<App />)
         fireEvent.click(screen.getByRole("button", { name: faction === "light" ? "Light" : "Dark", exact: true }))
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByText("Share / Import"))
         fireEvent.click(screen.getByRole("button", { name, exact: true }))
         expect(confirm).not.toHaveBeenCalled()
         const goldWorkers = name === "11 slaves T2 on basic account" ? 4 : 3
@@ -84,7 +113,7 @@ test.each([
         expect(JSON.parse(window.localStorage.getItem(draftStorageKey(faction))!).buildOrder).toEqual(expected)
         expect(JSON.parse(window.localStorage.getItem(profileStorageKey(faction))!).gameProfile).toEqual(profile)
         expect((screen.getByRole("slider", { name: "Initial gold miners" }) as HTMLInputElement).value).toBe(String(goldWorkers))
-        expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
+        expect((screen.getByText("Share / Import").parentElement as HTMLDetailsElement).open).toBe(false)
         unmount()
         render(<App />)
         expect(screen.getAllByRole("button", { name: faction === "light" ? "Remove Worker" : "Remove Slave", exact: true })).toHaveLength(ids.filter(id => id === "worker" || id === "slave").length)
@@ -99,12 +128,12 @@ test("template orders warn before replacement and cancellation retains the draft
         render(<App />)
         fireEvent.click(screen.getByRole("button", { name: /^Sawmill \d+ gold/ }))
         const original = window.localStorage.getItem(draftStorageKey("light"))
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByText("Share / Import"))
         const template = screen.getByRole("button", { name: "10 workers T2 with swordsman", exact: true })
         fireEvent.click(template)
         expect(confirm).toHaveBeenCalledWith(expect.stringContaining("will replace your current build order"))
         expect(window.localStorage.getItem(draftStorageKey("light"))).toBe(original)
-        expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(true)
+        expect((screen.getByText("Share / Import").parentElement as HTMLDetailsElement).open).toBe(true)
         confirm.mockReturnValue(true)
         fireEvent.click(template)
         expect(screen.queryByRole("button", { name: "Remove Sawmill" })).toBeNull()
@@ -117,7 +146,7 @@ test("template suggestions follow the selected faction and leave the other facti
     fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
     fireEvent.click(screen.getByRole("button", { name: /^Slave \d+ gold/ }))
     const darkDraft = window.localStorage.getItem(draftStorageKey("dark"))
-    fireEvent.click(screen.getByText("Import / Export"))
+    fireEvent.click(screen.getByText("Share / Import"))
     const templates = screen.getByRole("region", { name: "Start from template" })
     expect(within(templates).getByRole("button", { name: "10 slaves T2 on basic account", exact: true })).toBeTruthy()
     expect(within(templates).getByRole("button", { name: "10 slaves T2 with goon", exact: true })).toBeTruthy()
@@ -126,7 +155,7 @@ test("template suggestions follow the selected faction and leave the other facti
         "10 slaves T2 with goon", "10 slaves T2 on basic account", "11 slaves T2 on basic account",
     ])
     fireEvent.click(screen.getByRole("button", { name: "Light", exact: true }))
-    fireEvent.click(screen.getByText("Import / Export"))
+    fireEvent.click(screen.getByText("Share / Import"))
     expect(within(screen.getByRole("region", { name: "Start from template" })).getAllByRole("button").map(button => button.textContent)).toEqual([
         "10 workers T2 with swordsman", "10 workers T2 on basic account",
     ])
@@ -207,33 +236,38 @@ test("Copy link copies the current profile without timings and closes the menu",
         render(<App />)
         fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "777" } })
         fireEvent.change(screen.getByRole("slider", { name: "Initial gold miners" }), { target: { value: "3" } })
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByRole("button", { name: /^Worker \d+ gold/ }))
+        fireEvent.click(screen.getByText("Share / Import"))
+        openJsonFiles()
         fireEvent.click(screen.getByLabelText("Include calculated timings"))
-        const menu = screen.getByText("Import / Export").parentElement as HTMLDetailsElement
+        const menu = screen.getByText("Share / Import").parentElement as HTMLDetailsElement
         expect(menu.open).toBe(true)
         const startingGold = screen.getByLabelText("Starting gold")
         startingGold.focus()
         fireEvent.click(startingGold)
         expect(menu.open).toBe(false)
         expect(document.activeElement).toBe(startingGold)
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByText("Share / Import"))
         fireEvent.click(screen.getByRole("button", { name: "Copy link" }))
         await waitFor(() => expect(screen.getByRole("status").textContent).toContain("copied"))
         expect(screen.getByRole("status").classList.contains("file-notice-success")).toBe(true)
         expect(trackEvent).toHaveBeenCalledTimes(1)
         expect(trackEvent).toHaveBeenLastCalledWith("copy-link")
-        expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false)
+        expect((screen.getByText("Share / Import").parentElement as HTMLDetailsElement).open).toBe(false)
         const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
+        const encoded = new URLSearchParams(new URL(writeText.mock.calls[0][0]).hash.slice(1)).get("build")!.slice(2)
+        const sharedDocument = JSON.parse(inflate(Uint8Array.from(atob(encoded.replace(/-/g, "+").replace(/_/g, "/")), char => char.charCodeAt(0)), { to: "string" }))
+        expect(sharedDocument.buildOrder).toEqual([{ type: "allocate-workers", goldWorkers: 3 }, { itemId: "worker" }])
         expect(result.gameProfile.player.startingGold).toBe(777)
         expect(result.opening.goldWorkers).toBe(3)
         expect(5 - result.opening.goldWorkers).toBe(2)
         writeText.mockRejectedValueOnce(new Error("Clipboard blocked"))
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByText("Share / Import"))
         fireEvent.click(screen.getByRole("button", { name: "Copy link" }))
         await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Copy the link below"))
         expect(trackEvent).toHaveBeenCalledTimes(1)
         expect((screen.getByLabelText("Shareable link") as HTMLInputElement).value).toBe(writeText.mock.calls[1][0])
-        expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(true)
+        expect((screen.getByText("Share / Import").parentElement as HTMLDetailsElement).open).toBe(true)
     } finally {
         if (original) Object.defineProperty(navigator, "clipboard", original)
         else delete (navigator as any).clipboard
@@ -257,6 +291,7 @@ function documentText() {
     }
 }
 function upload(text: string) {
+    openJsonFiles()
     const file = new File([text], "order.json", { type: "application/json" })
     // jsdom's File does not implement text().
     Object.defineProperty(file, "text", { value: async () => text })
@@ -275,7 +310,7 @@ test("Reset all restores every imported profile group while retaining faction, o
         doc.gameProfile.map.woodTravelTime = 7
         doc.gameProfile.map.sawmillWoodTravelTime = 2
         doc.gameProfile.delays.orderDelay = 3
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByText("Share / Import"))
         upload(JSON.stringify(doc))
         await waitFor(() => expect(screen.getByRole("button", { name: "Dark", exact: true }).classList.contains("selected")).toBe(true))
         fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
@@ -294,7 +329,7 @@ test("Reset all restores every imported profile group while retaining faction, o
         fireEvent.change(screen.getByLabelText("Order delay (seconds)"), { target: { value: "9" } })
         fireEvent.click(screen.getByRole("button", { name: "Reset all" }))
         expect((screen.getByLabelText("Order delay (seconds)") as HTMLInputElement).value).toBe("1")
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByText("Share / Import"))
         fireEvent.click(screen.getByRole("button", { name: "Copy link" }))
         await waitFor(() => expect(writeText).toHaveBeenCalled())
         const result = parseShareableLink(new URL(writeText.mock.calls[0][0]).hash)!
@@ -309,7 +344,7 @@ test("Reset all restores every imported profile group while retaining faction, o
 
 test("import replaces faction, profile and order, recalculates timings and preserves state after invalid imports", async () => {
     const { container } = render(<App />)
-    fireEvent.click(screen.getByText("Import / Export"))
+    fireEvent.click(screen.getByText("Share / Import"))
     const doc = documentText()
     doc.gameProfile.delays.orderDelay = 2.5
     doc.gameProfile.map.sawmillWoodTravelTime = 1.25
@@ -334,7 +369,7 @@ test("import replaces faction, profile and order, recalculates timings and prese
     expect(order.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
     expect(order.getByText("Command 0:02.5")).toBeTruthy()
     expect(screen.queryByText("Command 166:39")).toBeNull()
-    fireEvent.click(screen.getByText("Import / Export"))
+    fireEvent.click(screen.getByText("Share / Import"))
     upload("not json")
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("not valid JSON"))
     expect((container.querySelector(".file-menu") as HTMLDetailsElement).open).toBe(true)
@@ -360,7 +395,7 @@ test("export downloads JSON without timings by default and includes timings when
     const click = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {})
     try {
         render(<App />)
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByText("Share / Import"))
         const doc = documentText()
         doc.gameProfile.basic.initialGoldTravelReduction = 2.5
         upload(JSON.stringify(doc))
@@ -370,7 +405,8 @@ test("export downloads JSON without timings by default and includes timings when
         fireEvent.change(screen.getByLabelText("Sawmill wood travel time (seconds)"), { target: { value: "1.25" } })
         fireEvent.change(screen.getByLabelText("Gold travel time (seconds each way)"), { target: { value: "2.5" } })
         fireEvent.change(screen.getByLabelText("Map: Wood travel time (seconds each way)"), { target: { value: "1.5" } })
-        fireEvent.click(screen.getByText("Import / Export"))
+        fireEvent.click(screen.getByText("Share / Import"))
+        openJsonFiles()
         fireEvent.click(screen.getByRole("button", { name: "Export JSON" }))
         const readBlob = (blob: Blob) => new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
@@ -390,12 +426,13 @@ test("export downloads JSON without timings by default and includes timings when
         expect(plain.gameProfile.basic.initialGoldTravelReduction).toBe(2.5)
         expect(plain.buildOrder[0]).toEqual({ type: "allocate-workers", goldWorkers: 2 })
         expect(plain.buildOrder[1]).toEqual({ itemId: "barracks" })
-        await waitFor(() => expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false))
-        fireEvent.click(screen.getByText("Import / Export"))
+        await waitFor(() => expect((screen.getByText("Share / Import").parentElement as HTMLDetailsElement).open).toBe(false))
+        fireEvent.click(screen.getByText("Share / Import"))
+        openJsonFiles()
         fireEvent.click(screen.getByLabelText("Include calculated timings"))
         fireEvent.click(screen.getByRole("button", { name: "Export JSON" }))
         await waitFor(() => expect(blobs).toHaveLength(2))
-        await waitFor(() => expect((screen.getByText("Import / Export").parentElement as HTMLDetailsElement).open).toBe(false))
+        await waitFor(() => expect((screen.getByText("Share / Import").parentElement as HTMLDetailsElement).open).toBe(false))
         const timed = JSON.parse(await readBlob(blobs[1]))
         expect(timed.buildOrder[0]).toEqual({ type: "allocate-workers", goldWorkers: 2 })
         expect(timed.buildOrder[1].timings.commandTime).toBe(3.5)
