@@ -1,9 +1,9 @@
 # War Legends game model
 
 This guide describes the implemented simulator. Detailed catalog rules are in
-[CATALOG_DEPENDENCIES.md](CATALOG_DEPENDENCIES.md), builder behavior in
-[CONSTRUCTION.md](CONSTRUCTION.md), and persisted commands and profiles in
-[BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md).
+[CATALOG_DEPENDENCIES.md](CATALOG_DEPENDENCIES.md) , builder behavior in
+[CONSTRUCTION.md](CONSTRUCTION.md) , and persisted commands and profiles in
+[BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md) .
 
 ## Implementation and data ownership
 
@@ -31,11 +31,10 @@ definitions. There is no external game-data API or data-entry editor.
 
 ## Factions and initial state
 
-Exactly two factions are supported: Light and Dark. Light has the expanded building, unit, upgrade,
-and hero catalog. Dark currently has Citadel levels 1–4, Sawmill, Pigsty, Barracks, Tower of Mana,
-Slave, and Goon. Its action picker exposes only Citadel level 2; levels 3–4 remain available to
-catalog validation and simulation, including imports. Dark Whip is implemented as a timed scroll;
-its other illustrated buildings, units, heroes and Legion’s Call remain pending.
+Exactly two factions are supported: Light and Dark. Both have building, unit, upgrade, and hero
+catalogs, with Castle/Citadel levels 1–4 available in the action picker. Light scrolls are Gold Rush
+and Lumber Gathering; Dark scrolls are Whip and Legion's Call. See the catalog guide for each
+faction's units, producers, prerequisites, and building limits.
 
 Each game starts with one completed Castle/Citadel and five Workers/Slaves. The initial town hall
 costs nothing and can produce workers after the configured order delay. Worker count is a game-rule
@@ -63,7 +62,7 @@ gold miners' first outbound trip is shortened by `basic.initialGoldTravelReducti
 second), clamped at zero. Queue waits emerge from arrivals and mine availability.
 
 Wood workers gather independently, with no shared node capacity. Default gathering time is 12.1
-seconds and normal travel is 4 seconds each way. Initial gold miners and the first wood gatherer
+seconds and initial travel is 3.5 seconds each way. Initial gold miners and the first wood gatherer
 start at time zero; additional initial wood gatherers start at `delays.orderDelay` (default 1
 second).
 
@@ -89,7 +88,7 @@ last 30 seconds, values above 1 and up to 2 seconds last 60 seconds, values abov
 seconds last 90 seconds, and so on. Zero travel also lasts 30 seconds before its first increase.
 Zero increase disables growth; zero maximum makes new wood travel instantaneous.
 
-For initial travel `v0`, increment `b`, maximum `M`, and elapsed seconds since game start or the
+For initial travel `v0` , increment `b` , maximum `M` , and elapsed seconds since game start or the
 latest Sawmill completion:
 
 ```text
@@ -129,13 +128,13 @@ growth boundaries do not change travel already underway. Chopping durations and 
 unchanged. The rule applies to both factions.
 
 Newly recruited workers join gold until assigned gold workers reach
-`ceil((2 * goldTravelTime + effectiveGoldGatherTime) / effectiveGoldGatherTime)`, then join wood.
+`ceil((2 * goldTravelTime + effectiveGoldGatherTime) / effectiveGoldGatherTime)` , then join wood.
 Workers temporarily constructing count toward their previous assignment. Worker losses remove their
 future deliveries and assignment; recruitment uses the resulting current allocation.
 
 ## Player progression and in-match upgrades
 
-Eight player building levels are integers 1–24, defaulting to 1. These profile levels are distinct
+Ten player progression levels are integers 1–24, defaulting to 1. These profile levels are distinct
 from individual buildings' levels upgraded during a match. Player levels apply globally to the
 corresponding family; there are no separate account levels per building instance.
 
@@ -151,7 +150,7 @@ corresponding family; there are no separate account levels per building instance
 Recruitment bonuses use `townHallLevel` for Workers/Slaves, `barracksLevel` for Barracks,
 `industrialBuildingLevel` for Factory/Workshop, `arcaneBuildingLevel` for Sanctuary/Dark Gate,
 `shipyardLevel` for Shipyard, and `altarOfHeroesLevel` for Altar of Heroes. All mappings apply to
-both factions. Duration is `baseSeconds * (1 - reduction)`.
+both factions. Duration is `baseSeconds * (1 - reduction)` .
 
 In-match upgrades unlock catalog prerequisites, producer capabilities, and building limits. They do
 not change the profile's resource yields or account bonuses.
@@ -164,7 +163,7 @@ allow it. Later commands can overlap earlier construction or training after earl
 been accepted. Reordering or removing actions recalculates the entire plan.
 
 Production and Racial buildings double their base gold/wood cost for each successive copy of the
-same ID: 1×, 2×, 4×, 8×, or `2^(n - 1)` for copy `n`. Earlier catalog orders count for pricing,
+same ID: 1×, 2×, 4×, 8×, or `2^(n - 1)` for copy `n` . Earlier catalog orders count for pricing,
 including orders whose builders are travelling. Economic/Defensive buildings, units, heroes, and
 upgrades retain fixed costs. The hidden `massConstructionCostReduction` setting is persisted but
 currently has no cost effect.
@@ -235,13 +234,21 @@ completion, so a bonus load retains its bonus when delivered after expiry, inclu
 through construction. Overlapping windows of the same scroll do not stack. Worker loss discards
 cargo; construction discards only gold cargo.
 
-Dark Whip uses identical confirmed effects at levels 1–6: 50 mana, 30 seconds, wood harvesting −2
-seconds, gold mining −0.5 seconds and movement speed +15%. Its per-worker duration refreshes without
-stacking; construction clears it. See [WHIP.md](WHIP.md) for eligibility, progress and mine-entry
-rules. Dark Legion’s Call remains stored for future support. Scroll cooldown is shared between a
-faction’s scrolls: `basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, followed
-by `orderDelay`. Mana must also have been sufficient for `orderDelay` before the command. Blocked
-scrolls spend no mana and start no cooldown.
+Dark Whip costs 50 mana. At levels 1–6, it reduces wood harvesting by 2.0–2.5 seconds and gold
+mining by 0.5–0.8 seconds, increases movement speed by 15%, and lasts 30–33.5 seconds. Its
+per-worker duration refreshes without stacking; starting construction clears it. See
+[WHIP.md](WHIP.md) for level values, eligibility, progress, and mine-entry rules.
+
+Dark Legion's Call costs 25 mana and accelerates recruitment in one selected completed Production
+building or Citadel at an exact level. It starts one second after command time. Levels 1–6 reduce
+recruitment time by 20–25% for 25–26.5 seconds. Reapplication refreshes duration without stacking;
+construction and upgrades are unaffected. See [BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md) for
+target selection and command validation.
+
+Scroll cooldown is shared between a faction’s scrolls:
+`basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)` , followed by `orderDelay` .
+Mana must also have been sufficient for `orderDelay` before the command. Blocked scrolls spend no
+mana and start no cooldown.
 
 Automatic scroll insertion chooses an affordable timestamp once, respecting cooldown, mana, and
 order delay. Manual scroll insertion may retain a mana-blocked event. Invalid fixed-time events

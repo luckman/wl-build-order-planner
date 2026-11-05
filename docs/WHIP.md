@@ -13,10 +13,10 @@ default). `player.darkWhipLevel` accepts levels 1–6. Movement speed is ×1.15 
 | 5 | 0.7 seconds | 2.4 seconds | 32.4 seconds |
 | 6 | 0.8 seconds | 2.5 seconds | 33.5 seconds |
 
-The command is stored as `{ "type": "use-scroll", "scrollId": "whip", "commandTime": 91 }`. It
+The command is stored as `{ "type": "use-scroll", "scrollId": "whip", "commandTime": 91 }` . It
 survives JSON, links and Dark drafts. The card appears beside Dark heroes and uses the
-owner-provided `dark-whip.png` artwork. Its level is editable in Resources collection and resets
-with basic settings.
+`dark-whip.png` artwork. Its level is editable in Resources collection and resets with basic
+settings.
 
 ## Player preparation approximation
 
@@ -45,7 +45,7 @@ that journey. Starting construction removes the effect; it does not resume after
 if the original expiry is still in the future. Construction duration remains unchanged. Return
 travel uses normal speed unless a fresh Whip activates after construction has finished; a returning
 builder is moving and can receive that new effect. The worker remains unavailable for another
-command throughout travel, construction and return, as before.
+command throughout travel, construction and return.
 
 ## Gathering and movement
 

@@ -8,7 +8,7 @@ The first build-order command is available at `gameProfile.delays.orderDelay` (d
 Initial gold miners and the first initial wood gatherer receive their gathering orders at game
 start; any additional initial wood gatherers receive theirs at the configured initial order delay.
 
-The UI labels this setting **Order delay**, stored as `orderDelay`. Commands also wait this long
+The UI labels this setting **Order delay**, stored as `orderDelay` . Commands also wait this long
 after a recruitment building completes or their building prerequisites (including counted buildings,
 required levels, and capacity increases) become available. Enough gold, wood, and free food must
 also have been available for `orderDelay` before the command, accounting for costs and food reserved
@@ -30,17 +30,17 @@ If Citadel level 2 unlocks both Goblin Lab and Altar, the Lab can be ordered one
 upgrade completes and the Altar one second after the Lab order with the default Order delay,
 assuming resources and workers are ready.
 
-The editable game profile contains `delays.constructionStartDelay`, defaulting to 3 seconds. It
+The editable game profile contains `delays.constructionStartDelay` , defaulting to 3 seconds. It
 applies to every building and building upgrade, and both directions of builder travel. There are no
 per-building overrides or positioning modes.
 
-For a command accepted at time `t`:
+For a command accepted at time `t` :
 
-- Costs are paid and the selected worker stops gathering at `t`.
-- Construction starts at `t + constructionStartDelay`.
+- Costs are paid and the selected worker stops gathering at `t` .
+- Construction starts at `t + constructionStartDelay` .
 - The building or building upgrade completes after its `seconds` duration multiplied by
-  `1 - floor((workerLevel - 1) / 4) / 100`, using the base duration from `src/game/data.json`.
-- The worker returns to its resource after another `constructionStartDelay`.
+  `1 - floor((workerLevel - 1) / 4) / 100` , using the base duration from `src/game/data.json` .
+- The worker returns to its resource after another `constructionStartDelay` .
 
 At worker level 1–4, a 30-second Barracks ordered at 1s therefore starts at 4s, completes at 34s,
 and releases its worker back to gathering at 37s. The Barracks can train units at 35s with the
@@ -72,9 +72,9 @@ are unavailable. If no eligible worker exists, the command waits for a worker to
 The planner assigns all five starting workers to gold or wood; the UI permits 1–4 gold miners, while
 JSON/API opening allocations permit 0–5. The lower-level worker economy also supports idle workers
 when its worker count exceeds its assignments, but the persisted game profile has no idle-worker
-allocation field. Newly trained workers retain the existing allocation rule: gold up to mine
-saturation, then wood. Workers temporarily constructing still count toward their previous resource
-assignment for this allocation rule.
+allocation field. Newly trained workers use this allocation rule: gold up to mine saturation, then
+wood. Workers temporarily constructing still count toward their previous resource assignment for
+this allocation rule.
 
 ## Interrupted gathering
 
@@ -98,7 +98,7 @@ purchases. Building completion, food capacity, producer queues, and newly traine
 delayed completion times. Command scheduling uses a maximum 30:00 planning horizon. Commands whose
 completion or builder return would exceed 30:00 remain blocked without spending resources or
 reserving a builder. The graphs follow the plan within this maximum; they do not extend beyond it.
-See [BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md#supported-plan-limits).
+See [BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md#supported-plan-limits) .
 
 Building upgrades retain their producer-queue behavior while also reserving a worker for outbound
 travel, construction, and the return trip. They appear in the construction timeline lane, including
@@ -110,4 +110,4 @@ An affected Slave travels toward construction at ×1.15 movement speed while Whi
 Activation during travel and expiry preserve distance already traveled. Construction starts at the
 resulting arrival time and immediately removes Whip; construction duration stays unchanged. Return
 travel uses normal speed unless a fresh cast activates after construction finishes. A builder
-already constructing cannot receive the effect. See [WHIP.md](WHIP.md).
+already constructing cannot receive the effect. See [WHIP.md](WHIP.md) .
