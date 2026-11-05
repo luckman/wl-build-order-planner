@@ -8,8 +8,8 @@
 .build-order-templates { display: grid; gap: .6rem; margin-top: .6rem; }
 .build-order-templates strong { font-size: .95rem; color: #dce6f4; }
 .build-order-files button { width: 100%; padding: .6rem .7rem; border: 1px solid #3d6383; background: #132333; color: #dce6f4; text-align: left; }
-.share-link-row { display: grid; gap: .35rem; padding: .7rem; border: 1px solid #65778b; border-left: 3px solid #e3b75e; background: #2a4059; }
-.share-link-row button { padding: 0; border: 0; background: transparent; color: #f3d394; font-weight: 700; font-size: .95rem; }
+.build-order-files .share-link-row { display: grid; gap: .35rem; padding: .7rem; border: 1px solid #65778b; border-left: 3px solid #e3b75e; background: #2a4059; }
+.share-link-row > span { color: #f3d394; font-weight: 700; font-size: .95rem; }
 .json-files { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #34536e; }
 .json-files > summary { cursor: pointer; color: #c4d5e5; font-size: .85rem; padding: .35rem 0; }
 .json-file-actions { display: grid; gap: 1rem; padding-top: .7rem; }

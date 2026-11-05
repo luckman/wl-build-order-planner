@@ -228,6 +228,31 @@ test.each(["light", "dark"] as const)("opening a %s shared link, editing, and re
     expect(screen.queryByRole("status")).toBeNull()
 })
 
+test("Copy link subtitle copies once, blocks repeat activation while busy, and closes the menu", async () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, "clipboard")
+    let completeCopy!: () => void
+    const writeText = jest.fn(() => new Promise<void>(resolve => { completeCopy = resolve }))
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
+    try {
+        render(<App />)
+        fireEvent.click(screen.getByText("Share / Import"))
+        const copy = screen.getByRole("button", { name: "Copy link", exact: true })
+        fireEvent.click(screen.getByText("Share this build order"))
+        expect(writeText).toHaveBeenCalledTimes(1)
+        expect(copy).toBeDisabled()
+        fireEvent.click(screen.getByText("Share this build order"))
+        fireEvent.click(copy)
+        expect(writeText).toHaveBeenCalledTimes(1)
+        await act(async () => completeCopy())
+        expect(screen.getByRole("status")).toHaveTextContent("Shareable link copied to clipboard.")
+        expect(screen.getByText("Share / Import").parentElement).not.toHaveAttribute("open")
+        expect(screen.getByText("Share / Import")).toHaveFocus()
+    } finally {
+        if (original) Object.defineProperty(navigator, "clipboard", original)
+        else delete (navigator as any).clipboard
+    }
+})
+
 test("Copy link copies the current profile without timings and closes the menu", async () => {
     const original = Object.getOwnPropertyDescriptor(navigator, "clipboard")
     const writeText = jest.fn().mockResolvedValue(undefined)

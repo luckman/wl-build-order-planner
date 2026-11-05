@@ -112,10 +112,11 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     }}>
         <summary>Share / Import</summary>
         <div className="build-order-files">
-        <div className="share-link-row">
-            <button type="button" onClick={shareLink} disabled={busy}>Copy link</button>
-            <small>Share this build order</small>
-        </div>
+        <button type="button" className="share-link-row" onClick={shareLink} disabled={busy}
+            aria-labelledby="copy-link-title" aria-describedby="copy-link-description">
+            <span id="copy-link-title">Copy link</span>
+            <small id="copy-link-description">Share this build order</small>
+        </button>
         {buildOrderTemplates[faction].length > 0 && <section className="build-order-templates" aria-label="Start from template">
             <strong>Start from template</strong>
             <small>Keeps Resource collection settings.</small>

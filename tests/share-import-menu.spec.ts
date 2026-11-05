@@ -1,6 +1,58 @@
 import { expect, test } from "@playwright/test"
 
 for (const width of [1440, 390]) {
+    test(`Copy link uses its entire highlighted row and native keyboard activation at ${width}px`, async ({ page }) => {
+        const copiedLinks: string[] = []
+        await page.exposeFunction("recordCopiedLink", (link: string) => { copiedLinks.push(link) })
+        await page.addInitScript(() => {
+            Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+                writeText: (link: string) => (window as unknown as { recordCopiedLink: (link: string) => Promise<void> }).recordCopiedLink(link),
+            } })
+        })
+        await page.setViewportSize({ width, height: 780 })
+        await page.goto(process.env.PLANNER_TEST_URL ?? "http://localhost:2987")
+        const toggle = page.getByText("Share / Import", { exact: true })
+        const copy = page.getByRole("button", { name: "Copy link", exact: true })
+        for (const faction of ["Light", "Dark"]) {
+            await page.getByRole("button", { name: faction, exact: true }).click()
+            for (const target of ["title", "subtitle", "gap", "left padding", "right padding", "top padding", "bottom padding", "Enter", "Space"]) {
+                await toggle.click()
+                await expect(copy).toHaveAccessibleDescription("Share this build order")
+                const row = (await copy.boundingBox())!
+                const title = (await page.getByText("Copy link", { exact: true }).boundingBox())!
+                const subtitle = (await page.getByText("Share this build order", { exact: true }).boundingBox())!
+                const before = copiedLinks.length
+                if (target === "title" || target === "subtitle") {
+                    await page.getByText(target === "title" ? "Copy link" : "Share this build order", { exact: true }).click()
+                } else if (target === "Enter" || target === "Space") {
+                    await toggle.focus()
+                    await page.keyboard.press("Tab")
+                    await expect(copy).toBeFocused()
+                    await page.keyboard.press(target)
+                } else {
+                    let x = row.x + row.width / 2
+                    let y = title.y + title.height + (subtitle.y - title.y - title.height) / 2
+                    if (target === "left padding") x = row.x + 5
+                    if (target === "right padding") x = row.x + row.width - 5
+                    if (target === "top padding") y = row.y + 5
+                    if (target === "bottom padding") y = row.y + row.height - 5
+                    await page.mouse.click(x, y)
+                }
+                await expect(copy).toBeHidden()
+                await expect(page.getByRole("status")).toContainText("Shareable link copied to clipboard.")
+                await expect(toggle).toBeFocused()
+                expect(copiedLinks).toHaveLength(before + 1)
+                expect(copiedLinks[before]).toContain("#build=")
+                await page.getByRole("button", { name: "Dismiss message" }).click()
+            }
+        }
+        await toggle.click()
+        await toggle.focus()
+        await page.keyboard.press("Tab")
+        await expect(copy).toBeFocused()
+        await page.screenshot({ path: `test-results/copy-link-row-${width}.png`, fullPage: true })
+    })
+
     test(`Share / Import has distinct sharing, template and reachable JSON rows at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 780 })
         await page.goto(process.env.PLANNER_TEST_URL ?? "http://localhost:2987")
