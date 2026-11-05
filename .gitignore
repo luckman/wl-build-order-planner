@@ -28,3 +28,16 @@ temp.txt
 
 # Local agent instructions
 /AGENTS.md
+
+# Project-local agent workflow, configuration, and generated artifacts
+/.agents/
+/.scratch/
+/docs/agents/
+/docs/adr/
+/third-party/mattpocock-skills/
+/GLOSSARY.md
+/GLOSSARY-MAP.md
+/CONTEXT.md
+/CONTEXT-MAP.md
+__pycache__/
+*.pyc
