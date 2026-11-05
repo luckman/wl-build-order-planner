@@ -27,7 +27,7 @@
 .event.resources-collected { background: linear-gradient(#8b723a, #52421f); border-color: #e1b55f; }
 
 .action.resource-card { min-height: 64px; align-self: stretch; padding: 3px 2px; }
-.action.resource-card .action-name { text-align: center; overflow-wrap: normal; }
+.action.resource-card .action-name { min-height: 2.4em; text-align: center; overflow-wrap: normal; }
 .action.resource-card img { width: 28px; height: 28px; }
 
 .event.mana-well { background: linear-gradient(#3c688f, #25425f); border-color: #91bcdf; }
