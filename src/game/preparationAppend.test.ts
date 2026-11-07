@@ -77,3 +77,22 @@ test("an append that interrupts a previous builder's return agrees with a fresh 
     expect(result.plan[0].workerReturnEndTime).toBe(result.plan[1].commandTime)
     expect(result).toEqual(simulateBuildOrder(extended, ...args))
 })
+
+test("the full solver can move preparation to fund an append within the search horizon", () => {
+    const prepared = { ...barracks, construction: { preparationDuration: 17 } }
+    const sawmill = faction.items.find(item => item.id === "sawmill")!
+    const economy = { ...economyFromProfile(initialGameProfile), startingGold: 245, startingWood: 75,
+        goldWorkers: 3, woodWorkers: 2, goldPerTrip: 36, woodPerTrip: 18, goldGatherTime: 8, woodGatherTime: 2,
+        constructionStartDelay: 4, orderDelay: 2 }
+    const args = [economy, 10, 20, economy.foodPerFarm, faction.startingTownHall] as const
+    const until = 74
+    const prefix = [prepared]
+    const previous = simulateBuildOrder(prefix, ...args, until)
+    const extended = buildOrderWithDependencies(faction, prefix, sawmill)
+    const result = simulateBuildOrder(extended, ...args, { previous, until })
+
+    expect(previous.plan[0]).toMatchObject({ blocked: false, departureTime: 18, commandTime: 35 })
+    expect(result.plan[0]).toMatchObject({ blocked: false, departureTime: 23, commandTime: 40 })
+    expect(result.plan[1]).toMatchObject({ blocked: false, commandTime: 74 })
+    expect(result).toEqual(simulateBuildOrder(extended, ...args, until))
+})
