@@ -41,8 +41,8 @@ test.each(["light", "dark"] as const)("%s upgrade travel settings apply only to 
 })
 
 test("a shorter return override cannot erase remaining reactivation travel", () => {
-    const idle = createWorkerEvent({ type: "make-idle", commandTime: 0, count: 1 })
-    const active = createWorkerEvent({ type: "make-active", commandTime: 0, count: 1, travelDuration: 10 })
+    const idle = createWorkerEvent({ type: "make-idle", commandTime: 0, count: 1 }, "light")
+    const active = createWorkerEvent({ type: "make-active", commandTime: 0, count: 1, travelDuration: 10 }, "light")
     const farm = { ...factions.light.items.find(item => item.id === "farm")!, construction: { returnDuration: 4 } }
     const plan = simulateBuildOrder([idle, active, farm], { ...economy, workerCount: 1, goldWorkers: 0, woodWorkers: 1, orderDelay: 3 }, 2, 200, 20, "Castle").plan
     expect(plan[2].commandTime).toBe(3)
@@ -59,7 +59,7 @@ test("Whip applies to overridden outward travel and construction clears its old 
 
 test.each(["light", "dark"] as const)("%s explicitly uses an idle builder, returns it idle at completion, and never waits for future idle events", faction => {
     const farm = { ...factions[faction].items.find(item => item.id === (faction === "light" ? "farm" : "pigsty"))!, construction: { useIdleWorker: true, returnDuration: 40 } }
-    const idle = (commandTime: number) => createWorkerEvent({ type: "make-idle", commandTime, count: 1 })
+    const idle = (commandTime: number) => createWorkerEvent({ type: "make-idle", commandTime, count: 1 }, faction)
     const run = (items: PlannerItem[]) => simulateBuildOrder(items, economy, 10, 200, 20, factions[faction].startingTownHall)
     const plan = run([idle(1), farm]).plan
     expect(plan[1]).toMatchObject({ blocked: false, commandTime: 1 })
@@ -94,7 +94,7 @@ test("Whip progress survives chained returns, while Make idle and casualties sti
     const first = { ...barracks, construction: { outwardDuration: 0, returnDuration: 12 } }
     const funds = createResourcesCollectedAction({ type: "resources-collected", commandTime: 35, gold: 10000, wood: 10000 })
     const cast = createScrollAction({ type: "use-scroll", scrollId: "whip", commandTime: 31 }, "dark")
-    const idle = createWorkerEvent({ type: "make-idle", commandTime: 36, count: 1 })
+    const idle = createWorkerEvent({ type: "make-idle", commandTime: 36, count: 1 }, "dark")
     const loss = createUnitKilledAction({ type: "unit-is-killed", unitId: "slave", commandTime: 36 }, "dark")
     const run = (returnDuration: number) => simulateBuildOrder([first, { ...barracks, construction: { outwardDuration: 0, returnDuration } }, funds, cast, idle, loss], settings, 2, 200, 20, "Citadel").plan
     const plan = run(0)

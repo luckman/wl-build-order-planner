@@ -11,8 +11,8 @@ import { createUnitKilledAction } from "./unitsKilled"
 
 const settings = { ...economyFromProfile(initialGameProfile), startingGold: 10000, startingWood: 10000,
     workerCount: 1, goldWorkers: 0, woodWorkers: 1, orderDelay: 1, constructionStartDelay: 4 }
-const idle = (time: number, count = 1) => createWorkerEvent({ type: "make-idle", commandTime: time, count })
-const active = (time: number, travelDuration = 0) => createWorkerEvent({ type: "make-active", commandTime: time, count: 1, travelDuration })
+const idle = (time: number, count = 1) => createWorkerEvent({ type: "make-idle", commandTime: time, count }, "light")
+const active = (time: number, travelDuration = 0) => createWorkerEvent({ type: "make-active", commandTime: time, count: 1, travelDuration }, "light")
 
 test.each(["light", "dark"] as const)("%s worker batches are atomic, fixed-time and exclude idle workers from construction", faction => {
     const run = (items: PlannerItem[]) => simulateBuildOrder(items, settings, 2, 200, settings.foodPerFarm, factions[faction].startingTownHall, 120)

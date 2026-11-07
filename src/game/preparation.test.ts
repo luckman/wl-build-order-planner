@@ -46,7 +46,7 @@ test("a lone builder completes its earlier job before starting a later preparati
 
 test("idle preparation requires an idle worker at departure and ignores future idle events", () => {
     const farm = { ...factions.light.items.find(item => item.id === "farm")!, construction: { preparationDuration: 10, useIdleWorker: true } }
-    const idle = (time: number) => createWorkerEvent({ type: "make-idle", commandTime: time, count: 1 })
+    const idle = (time: number) => createWorkerEvent({ type: "make-idle", commandTime: time, count: 1 }, "light")
     expect(run([idle(0), farm]).plan[1]).toMatchObject({ blocked: false, departureTime: 0, commandTime: 10 })
     const rejected = run([idle(5), farm])
     expect(rejected.plan[1].blocked).toBe(true)
@@ -55,8 +55,8 @@ test("idle preparation requires an idle worker at departure and ignores future i
 })
 
 test("preparation captures the reactivation remainder at departure rather than purchase", () => {
-    const idle = createWorkerEvent({ type: "make-idle", commandTime: 0, count: 1 })
-    const active = createWorkerEvent({ type: "make-active", commandTime: 0, count: 1, travelDuration: 10 })
+    const idle = createWorkerEvent({ type: "make-idle", commandTime: 0, count: 1 }, "light")
+    const active = createWorkerEvent({ type: "make-active", commandTime: 0, count: 1, travelDuration: 10 }, "light")
     const farm = { ...factions.light.items.find(item => item.id === "farm")!, construction: { preparationDuration: 10, outwardDuration: 0, returnDuration: 4 } }
     const result = run([idle, active, farm], { ...economy, orderDelay: 13 })
     expect(result.plan[2]).toMatchObject({ departureTime: 3, commandTime: 13, finishTime: 38, workerReturnTime: 45 })
@@ -103,7 +103,7 @@ test("a long later preparation cannot starve an earlier valid command", () => {
 })
 
 test("rolling back an impossible idle reservation rechecks later idle departures", () => {
-    const idle = createWorkerEvent({ type: "make-idle", commandTime: 0, count: 1 })
+    const idle = createWorkerEvent({ type: "make-idle", commandTime: 0, count: 1 }, "light")
     const barracks = factions.light.items.find(item => item.id === "barracks")!
     const result = run([idle,
         { ...barracks, construction: { preparationDuration: 1799, useIdleWorker: true } },
@@ -125,7 +125,7 @@ test("multiple later preparations cannot invalidate an earlier prepared command"
 })
 
 test("fixed-time worker eligibility is independent of the event's source row position", () => {
-    const idle = createWorkerEvent({ type: "make-idle", commandTime: 5, count: 1 })
+    const idle = createWorkerEvent({ type: "make-idle", commandTime: 5, count: 1 }, "light")
     const barracks = { ...factions.light.items.find(item => item.id === "barracks")!, construction: { preparationDuration: 10 } }
     const before = run([idle, barracks])
     const after = run([barracks, idle])

@@ -25,7 +25,7 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
         return () => { if (previous?.isConnected) previous.focus() }
     }, [])
     const upgrade = item.kind === "upgrade"
-    const globalSeconds = `${globalDelay.toFixed(1)} s`
+    const globalSeconds = `${Number.isInteger(globalDelay) ? globalDelay.toFixed(1) : globalDelay} s`
     const resetLabel = `Use global (${globalSeconds})`
     return <div className="scroll-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
         <div ref={dialog} className="scroll-dialog construction-dialog panel" role="dialog" aria-modal="true" aria-labelledby="construction-dialog-title"

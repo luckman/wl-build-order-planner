@@ -130,10 +130,11 @@
 
 .event.construction-event { min-width: 0; padding: 0; gap: 0; }
 .construction-phase { position: absolute; top: 0; bottom: 0; pointer-events: none; }
-.construction-phase + .construction-phase { border-left: 1px solid #c8d9e680; }
+.construction-phase + .construction-phase { box-shadow: inset 1px 0 #c8d9e680; }
 .construction-caption { position: absolute; top: 0; left: var(--caption-left); width: var(--caption-width); height: 100%; display: flex; align-items: center; gap: 4px; padding: 3px; overflow: hidden; pointer-events: none; }
 .construction-caption > span { overflow: hidden; text-overflow: ellipsis; }
 .construction-caption img { flex-shrink: 0; }
 @media (max-width: 600px) {
-    .construction-caption { left: 0; width: 100%; justify-content: center; }
+    .construction-caption { left: 0; width: 100%; justify-content: center; gap: 2px; padding-inline: 2px; }
+    .construction-caption > span { max-height: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.1; }
 }

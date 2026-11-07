@@ -1,6 +1,6 @@
 import { schedulePreparation, type PreparationSchedule } from "./preparationScheduling"
 import { parseConstructionSettings } from "./constructionSettings"
-import { createWorkerEvent, workerEventCommand } from "./workerEvents"
+import { parseWorkerEvent, workerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, foodUsedAt } from "./unitsKilled"
@@ -101,7 +101,7 @@ function simulateBuildOrderPass(
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
     const pendingWorkerAndLossEvents = buildOrder.flatMap((item, index) => {
         if (item.kind !== "unit-is-killed" && item.kind !== "worker-event") return []
-        if (item.kind === "worker-event") createWorkerEvent(workerEventCommand(item))
+        if (item.kind === "worker-event") parseWorkerEvent(workerEventCommand(item))
         else createUnitKilledAction(unitKilledCommand(item), faction)
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)

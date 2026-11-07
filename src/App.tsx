@@ -634,19 +634,22 @@ export default function App() {
                                                         (action) => {
                                                             const { item, index } = action
                                                             const bounds = timelineBounds(action)
+                                                            const title = actionTimingTitle(action, economy.constructionStartDelay)
+                                                            const phaseDescriptionId = isConstruction(item) ? `construction-phases-${index}` : undefined
                                                             return <button
                                                                 className={`event ${item.kind}${isConstruction(item) ? " construction-event" : ""}${item.kind === "hero" ? " unit" : ""}${isTimedEvent(item) ? " timed-event" : ""}`}
                                                                 key={`${item.id}-${index}`}
                                                                 style={{ left: `${(bounds.start / endTime) * 100}%`, width: `${((bounds.end - bounds.start) / endTime) * 100}%` }}
-                                                                title={actionTimingTitle(action, economy.constructionStartDelay)}
+                                                                title={title}
                                                                 aria-label={isConstruction(item) ? item.name : undefined}
+                                                                aria-describedby={phaseDescriptionId}
                                                                 aria-haspopup="menu"
                                                                 data-order-id={(item as typeof buildOrder[number]).orderId}
                                                                 aria-expanded={timelineMenu?.item === item}
                                                                 aria-controls={timelineMenu?.item === item ? "timeline-action-menu" : undefined}
                                                                 onClick={event => setTimelineMenu(timelineMenu?.item === item ? null : { item, anchor: event.currentTarget })}
                                                             >
-                                                                {isConstruction(item) ? <ConstructionPhases action={action} icon={iconSources[item.icon]} /> : <><img src={iconSources[item.icon]} alt="" /><span>{item.name}</span></>}
+                                                                {phaseDescriptionId ? <ConstructionPhases action={action} icon={iconSources[item.icon]} descriptionId={phaseDescriptionId} timing={title} /> : <><img src={iconSources[item.icon]} alt="" /><span>{item.name}</span></>}
                                                             </button>
                                                         },
                                                     )}
