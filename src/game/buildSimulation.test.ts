@@ -475,7 +475,7 @@ test("a blocked Sawmill does not change wood travel", () => {
     expect(deliveries.map(({ time }) => time)).toEqual([20, 40, 60])
 })
 
-test.each(["light", "dark"] as const)("%s buildings finish before the builder becomes available again", (factionId) => {
+test.each(["light", "dark"] as const)("%s completed builders can accept another order before return arrival", (factionId) => {
     const faction = factions[factionId]
     const barracks = required(faction.items.find(({ id }) => id === "barracks"))
     const soldier = required(faction.items.find(({ producer, kind }) => producer === "Barracks" && kind === "unit"))
@@ -490,7 +490,7 @@ test.each(["light", "dark"] as const)("%s buildings finish before the builder be
     ).toEqual([
         [1, 5, 35, 39],
         [36, 36, 36 + soldier.seconds * 0.99, null],
-        [39, 43, 73, 77],
+        [37, 41, 71, 75],
     ])
     expect(plan[0].workerId).toBe(plan[2].workerId)
 })
@@ -558,10 +558,10 @@ test("a construction command waits for the only miner to exit the mine", () => {
         20,
         "Castle",
     )
-    expect(plan[1]).toMatchObject({ commandTime: 17, startTime: 21, finishTime: 51, workerReturnTime: 55 })
+    expect(plan[1]).toMatchObject({ commandTime: 11, startTime: 15, finishTime: 45, workerReturnTime: 49 })
 })
 
-test.each(["light", "dark"] as const)("%s building upgrades reserve a worker through its return trip", (factionId) => {
+test.each(["light", "dark"] as const)("%s building upgrades release the builder for construction at completion", (factionId) => {
     const faction = factions[factionId]
     const upgrade = required(faction.items.find(({ kind }) => kind === "upgrade"))
     const barracks = required(faction.items.find(({ id }) => id === "barracks"))
@@ -575,7 +575,7 @@ test.each(["light", "dark"] as const)("%s building upgrades reserve a worker thr
     )
 
     expect(plan[0]).toMatchObject({ commandTime: 1, startTime: 5, finishTime: 50, workerReturnTime: 54 })
-    expect(plan[1]).toMatchObject({ commandTime: 54, startTime: 58, finishTime: 88, workerReturnTime: 92 })
+    expect(plan[1]).toMatchObject({ commandTime: 50, startTime: 54, finishTime: 84, workerReturnTime: 88 })
     expect(plan[0].workerId).toBe(plan[1].workerId)
 })
 

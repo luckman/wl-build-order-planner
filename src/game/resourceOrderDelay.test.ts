@@ -34,9 +34,9 @@ test("food released by a kill waits for order delay", () => {
     expect(plan[0].commandTime).toBe(12.5)
 })
 
-test("worker return has no extra order delay when resources are already ready", () => {
+test("a completed builder can accept another construction without waiting for return", () => {
     const { plan } = simulateBuildOrder([farm, farm], { ...settings, workerCount: 1, woodWorkers: 1 }, 0, 100, 20, "Castle")
-    expect(plan[1].commandTime).toBe(plan[0].workerReturnTime)
+    expect(plan[1].commandTime).toBe(plan[0].finishTime)
 })
 
 test("natural gathering waits and resource waits overlap rather than stack", () => {

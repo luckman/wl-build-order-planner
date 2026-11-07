@@ -176,7 +176,8 @@ returns.
 
 Builders exclude deliberately idle workers and select wood gatherers with the least gathered/carried cargo,
 then gold workers carrying the least cargo outside the mine. Worker ID breaks ties. Builders are
-unavailable through both travel legs and construction. Wood workers preserve exact partial gathering
+exclusive through outward travel and construction; returning gatherers are immediately eligible
+for another construction, retaining unfinished return distance as a minimum for its next return. Wood workers preserve exact partial gathering
 progress or completed cargo through construction, including progress earned under Whip. On return,
 they finish the remaining gathering or travel to deposit a completed load. Interrupted gold cargo is
 discarded. Workers resume at their previous resource without another outbound trip. These rules also

@@ -411,10 +411,10 @@ export class WorkerEconomy {
     }
 
     selectBuilder(useIdleWorker = false) {
-        return useIdleWorker ? this.workers.find(worker => worker.assignment === "idle" && worker.state === "idle") : this.selectBuilderExcluding(new Set())
+        return useIdleWorker ? this.workers.find(worker => worker.assignment === "idle" && worker.state === "idle") : this.selectBuilderExcluding(new Set(), true)
     }
 
-    private selectBuilderExcluding(excluded: Set<number>) {
+    private selectBuilderExcluding(excluded: Set<number>, allowReturning = false) {
         const amount = (worker: GatheringWorker) => {
             if (worker.assignment === "wood") return this.gatheredWood(worker)
             if (worker.state === "deposit") {
@@ -427,13 +427,26 @@ export class WorkerEconomy {
         return this.workers
             .filter(
                 (worker) =>
-                    !excluded.has(worker.id) && worker.assignment !== "idle" && !isBuildingWorker(worker) && worker.state !== "killed" && !(worker.assignment === "gold" && worker.state === "gathering"),
+                    !excluded.has(worker.id) && worker.assignment !== "idle" && (!isBuildingWorker(worker) || (allowReturning && worker.state === "construction-return")) && worker.state !== "killed" && !(worker.assignment === "gold" && worker.state === "gathering"),
             )
             .sort((a, b) => priority(a) - priority(b) || amount(a) - amount(b) || a.id - b.id)[0]
     }
 
-    remainingReactivation(worker: GatheringWorker) {
-        return worker.state === "reactivation" ? Math.max(0, (worker.nextAt - this.time) * this.rate(worker)) : 0
+    remainingJourney(worker: GatheringWorker) {
+        if (worker.state === "reactivation") return Math.max(0, (worker.nextAt - this.time) * this.rate(worker))
+        if (worker.state !== "construction-return") return 0
+        // Return arrival already projects future Whip boundaries. Integrate the remaining
+        // projected journey back into normal-speed distance, rather than counting seconds.
+        const windows = [...this.constructionWhipWindows, ...this.whipStarts].filter(window => window.startTime >= worker.stateSince)
+        const boundaries = [this.time, worker.nextAt, ...windows.flatMap(window => [window.startTime, window.finishTime]), worker.whipUntil]
+            .filter(time => time >= this.time && time <= worker.nextAt).sort((a, b) => a - b)
+        let remaining = 0
+        for (let i = 1; i < boundaries.length; i++) {
+            const time = boundaries[i - 1]
+            const active = worker.whipUntil > time || windows.some(window => window.startTime <= time && window.finishTime > time)
+            remaining += (boundaries[i] - time) * (active ? this.whip.movementMultiplier : 1)
+        }
+        return remaining
     }
 
     applyWorkerEvent(item: WorkerEventAction) {

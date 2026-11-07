@@ -22,6 +22,7 @@ export type ScheduledAction = {
     startTime: number | null
     finishTime: number | null
     workerReturnTime: number | null
+    workerReturnEndTime?: number | null
     workerId: number | null
     foodReleased?: number
     manaCost?: number
@@ -383,11 +384,15 @@ function simulateBuildOrderPass(
                 const finishTime = isRecruitable(item) && producer
                     ? recruitmentFinish(startTime, duration, buildings.indexOf(producer), recruitmentWindows, recruitmentReduction)
                     : startTime + duration
-                const returnTravelTime = builder && !item.construction?.useIdleWorker ? simulation.constructionReturnTravelTime(finishTime, Math.max(item.construction?.returnDuration ?? economy.constructionStartDelay, simulation.remainingReactivation(builder))) : 0
+                const returnTravelTime = builder && !item.construction?.useIdleWorker ? simulation.constructionReturnTravelTime(finishTime, Math.max(item.construction?.returnDuration ?? economy.constructionStartDelay, simulation.remainingJourney(builder))) : 0
                 const workerReturnTime = builder ? finishTime + returnTravelTime : null
                 if ((workerReturnTime ?? finishTime) > MAX_PLAN_SECONDS) {
                     blockedReason = "Action would exceed the 30:00 plan limit"
                     break
+                }
+                if (builder) {
+                    const interrupted = plan.find(action => action.workerId === builder.id && action.finishTime! <= time && (action.workerReturnEndTime ?? action.workerReturnTime ?? 0) > time)
+                    if (interrupted) interrupted.workerReturnEndTime = time
                 }
                 plan.push({
                     item,
@@ -397,6 +402,7 @@ function simulateBuildOrderPass(
                     startTime,
                     finishTime,
                     workerReturnTime,
+                    workerReturnEndTime: workerReturnTime,
                     workerId: builder?.id ?? null,
                     buildingInstanceId: producer ? buildings.indexOf(producer) : item.kind === "building" ? buildings.length : undefined,
                 })

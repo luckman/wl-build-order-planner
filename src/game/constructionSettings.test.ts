@@ -1,3 +1,4 @@
+import { createUnitKilledAction } from "./unitsKilled"
 import { simulateBuildOrder } from "./buildSimulation"
 import { buildOrderWithDependencies, factions, type PlannerItem } from "./gameData"
 import { economyFromProfile, initialGameProfile } from "./gameProfile"
@@ -6,6 +7,7 @@ import { createWorkerEvent } from "./workerEvents"
 import { createScrollAction } from "./scrolls"
 import { createShareableLink, parseShareableLink } from "./shareableLink"
 import { workerAllocationAt } from "./resourceSimulation"
+import { createResourcesCollectedAction } from "./resourcesCollected"
 
 const economy = { ...economyFromProfile(initialGameProfile), startingGold: 10000, startingWood: 10000 }
 test.each(["light", "dark"] as const)("%s construction travel overrides are per occurrence and preserve explicit zero", faction => {
@@ -30,7 +32,8 @@ test.each(["light", "dark"] as const)("%s upgrade travel settings apply only to 
     const plan = simulateBuildOrder(order, economy, 10, 200, 20, factions[faction].startingTownHall).plan
     const action = plan[plan.length - 1]
     expect(action.startTime! - action.commandTime!).toBe(3)
-    expect(action.workerReturnTime).toBe(action.finishTime)
+    // The upgrade reuses a builder with two seconds of unfinished return.
+    expect(action.workerReturnTime! - action.finishTime!).toBe(2)
     const link = createShareableLink("https://example.com", faction, initialGameProfile, plan)
     const items = parseShareableLink(new URL(link).hash)!.buildOrder
     expect(items[items.length - 1].construction).toEqual({ outwardDuration: 3, returnDuration: 0 })
@@ -66,4 +69,39 @@ test.each(["light", "dark"] as const)("%s explicitly uses an idle builder, retur
     expect(rejected.plan[0].blocked).toBe(true)
     expect(rejected.plan[0].blockedReason).toContain("idle worker")
     expect(rejected.deliveries).toEqual(run([idle(20)]).deliveries)
+})
+
+test.each(["light", "dark"] as const)("%s chaining retains seven of twelve return seconds after five seconds of progress", faction => {
+    const barracks = factions[faction].items.find(item => item.id === "barracks")!
+    const farm = factions[faction].items.find(item => item.id === (faction === "light" ? "farm" : "pigsty"))!
+    const first = { ...barracks, construction: { outwardDuration: 0, returnDuration: 12 } }
+    const second = { ...barracks, construction: { outwardDuration: 0, returnDuration: 3 } }
+    const third = { ...farm, construction: { outwardDuration: 0, returnDuration: 0 } }
+    const economySettings = { ...economy, startingGold: barracks.gold, startingWood: barracks.wood,
+        workerCount: 1, goldWorkers: 0, woodWorkers: 1, woodPerTrip: 50 }
+    const funds = createResourcesCollectedAction({ type: "resources-collected", commandTime: 35, gold: 10000, wood: 10000 })
+    const result = simulateBuildOrder([first, second, third, funds], economySettings, 2, 200, 20, factions[faction].startingTownHall)
+    expect(result.plan[0]).toMatchObject({ finishTime: 31, workerReturnEndTime: 36 })
+    expect(result.plan[1]).toMatchObject({ commandTime: 36, finishTime: 66, workerReturnTime: 73, workerReturnEndTime: 66 })
+    expect(result.plan[2]).toMatchObject({ commandTime: 66, finishTime: 91, workerReturnTime: 98 })
+    expect(result.deliveries.some(delivery => delivery.worker >= 0 && delivery.time > 1 && delivery.time < 98 && delivery.wood > 0)).toBe(false)
+})
+
+test("Whip progress survives chained returns, while Make idle and casualties still exclude returning builders", () => {
+    const barracks = factions.dark.items.find(item => item.id === "barracks")!
+    const settings = { ...economy, startingGold: barracks.gold, startingWood: barracks.wood,
+        workerCount: 1, goldWorkers: 0, woodWorkers: 1, woodPerTrip: 50, startingMana: 500, baseManaLimit: 500 }
+    const first = { ...barracks, construction: { outwardDuration: 0, returnDuration: 12 } }
+    const funds = createResourcesCollectedAction({ type: "resources-collected", commandTime: 35, gold: 10000, wood: 10000 })
+    const cast = createScrollAction({ type: "use-scroll", scrollId: "whip", commandTime: 31 }, "dark")
+    const idle = createWorkerEvent({ type: "make-idle", commandTime: 36, count: 1 })
+    const loss = createUnitKilledAction({ type: "unit-is-killed", unitId: "slave", commandTime: 36 }, "dark")
+    const run = (returnDuration: number) => simulateBuildOrder([first, { ...barracks, construction: { outwardDuration: 0, returnDuration } }, funds, cast, idle, loss], settings, 2, 200, 20, "Citadel").plan
+    const plan = run(0)
+    expect(plan[1].commandTime).toBe(36)
+    expect(plan[1].workerReturnTime! - plan[1].finishTime!).toBeCloseTo(6.4)
+    expect(plan[4].blocked).toBe(true)
+    expect(plan[5]).toMatchObject({ blocked: true, foodReleased: 0 })
+    const longer = run(20)
+    expect(longer[1].workerReturnTime! - longer[1].finishTime!).toBe(20)
 })

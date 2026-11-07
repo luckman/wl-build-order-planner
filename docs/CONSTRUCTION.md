@@ -46,7 +46,7 @@ For a command accepted at time `t` :
 At worker level 1–4, a 30-second Barracks ordered at 1s therefore starts at 4s, completes at 34s,
 and releases its worker back to gathering at 37s. The Barracks can train units at 35s with the
 default one-second order delay, if resources and food permit. The builder cannot gather or accept
-another construction command before 37s. Multiple buildings can be constructed concurrently when
+another gathering cycle before 37s, but can accept another construction at completion (34s). Multiple buildings can be constructed concurrently when
 enough eligible workers and resources are available.
 
 Player `workerLevel` defaults to 1 and is an integer from 1 to 24. The six tiers (1–4, 5–8, 9–12,
@@ -67,7 +67,8 @@ Outbound workers and workers waiting outside the mine carry zero. Wood gathered 
 proportional to time spent chopping; workers returning to deposit carry a full trip. Worker ID
 breaks ties for reproducible results. Mine workers become eligible when they exit the mine; other
 queued miners can enter the freed slot. Workers travelling to a building, constructing, or returning
-are unavailable. If no eligible worker exists, the command waits for a worker to become eligible.
+remain excluded from Make idle and worker losses. Returning gatherers are eligible for
+construction and upgrades immediately at completion. If no eligible worker exists, the command waits for a worker to become eligible.
 
 The planner assigns all five starting workers to gold or wood; the UI permits 1–4 gold miners, while
 JSON/API opening allocations permit 0–5. The lower-level worker economy also supports idle workers
@@ -119,3 +120,12 @@ is ready. An empty idle pool blocks the order without costs or a reservation, in
 of waiting for a later idle event. An idle builder retains its prior gathering progress
 and becomes idle immediately at completion with no return journey. Its saved return
 override remains stored but inactive. Ordinary construction continues to exclude idle workers.
+
+## Chained construction
+
+When a returning gatherer is assigned again, retain its unfinished journey in normal-speed
+travel units. Its next return is max(configured return, retained remainder). Pause that
+journey through the next outward trip and construction; repeat the rule across further
+assignments. Whip preserves distance travelled. Twelve seconds interrupted after five
+leaves seven; a next return override of three or zero still requires seven. Plan results
+record interrupted return endpoints, separately from projected return arrival.
