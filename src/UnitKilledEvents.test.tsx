@@ -14,6 +14,7 @@ test("Unit is killed selects a timestamp and unit type, validates existence, rel
     expect(dialog.getByRole("option", { name: "Gilbert", exact: true })).toBeTruthy()
     fireEvent.change(dialog.getByLabelText("Unit type"), { target: { value: "swordsman" } })
     expect(dialog.getByRole("alert").textContent).toContain("living Swordsman")
+    expect(screen.getByRole("alert")).toBe(dialog.getByRole("alert"))
     expect((dialog.getByRole("button", { name: "Add event" }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.change(dialog.getByLabelText("Unit type"), { target: { value: "worker" } })
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0000" } })

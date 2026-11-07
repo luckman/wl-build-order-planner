@@ -23,6 +23,7 @@ test("mouse reordering recalculates dependency warnings, and keyboard reordering
     await expect(rows.first()).toHaveClass(/order-blocked/)
     await expect(rows.nth(1)).not.toHaveClass(/order-blocked/)
     await expect(page.getByRole("region", { name: "Blocked actions" })).toContainText("Requires")
+    await expect(page.getByRole("alert")).toHaveCount(0)
     await expect(page.locator(".event.unit")).toHaveCount(0)
 
     const restore = page.getByRole("button", { name: "Reorder Swordsman, action 1" })

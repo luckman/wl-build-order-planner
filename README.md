@@ -12,6 +12,7 @@ timeline.
 - Gold, wood, food, and mana simulation, including gathering, construction, and production queues.
 - Editable account and map settings, plus timed events for resources, mana spending, mana wells, unit losses, and worker idle/reactivation events.
 - Reorderable build orders, starter templates, and warnings for blocked actions.
+- Top-right notifications for rejected upgrades and newly added blocked actions, with blocked reasons also shown in the build order and below the timeline.
 - Planner controls pause while committed build-order changes recalculate. Updates still pending after 100 ms show a centered spinner.
 - Shareable links, JSON import/export, and separate browser-saved drafts for each faction.
 

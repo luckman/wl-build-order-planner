@@ -136,7 +136,7 @@ test("resource-blocked orders are highlighted in both panels and clear when reso
     expect(container.querySelector(".event.building")).toBeTruthy()
 })
 
-test("food shortages explain the required and available food in both warning locations", () => {
+test("a newly blocked Worker shows its food shortage in the notification and both panels", () => {
     const { container } = render(<App />)
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
     for (let i = 0; i < 6; i++) fireEvent.click(actions.getByRole("button", { name: /^Worker / }))
@@ -144,6 +144,7 @@ test("food shortages explain the required and available food in both warning loc
     const reason = "Insufficient supply: requires 2, available 0 (20/20 used)"
     expect(within(row).getByText(reason)).toBeTruthy()
     expect(within(screen.getByRole("region", { name: "Blocked actions" })).getByText(reason)).toBeTruthy()
+    expect(within(screen.getByRole("alert")).getByText(`Worker — ${reason}`)).toBeTruthy()
     fireEvent.change(screen.getByLabelText("Base food limit"), { target: { value: "22" } })
     expect(row.classList.contains("order-blocked")).toBe(false)
     expect(screen.queryByRole("region", { name: "Blocked actions" })).toBeNull()

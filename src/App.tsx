@@ -267,7 +267,7 @@ export default function App() {
     const gameProfile = gameProfiles[factionId]
     const { shell, pending, showSpinner, error: updateError, dismissError: dismissUpdateError, calculate } = useBuildOrderUpdate()
     const [calculated, setCalculated] = useState<{ draft: BuildDraft; profile: GameProfile; result: SimulationResult }>()
-    const updateDraft = useCallback((target: FactionId, draft: BuildDraft, profile: GameProfile, onSuccess?: () => void) => {
+    const updateDraft = useCallback((target: FactionId, draft: BuildDraft, profile: GameProfile, onSuccess?: (result: SimulationResult) => void) => {
         const economy = economyFromProfile(profile, draft.opening)
         const initialFood = (economy.goldWorkers + economy.woodWorkers) * 2
         const accepted = calculate([draft.items, economy, initialFood, profile.player.baseFoodLimit, economy.foodPerFarm, factions[target].startingTownHall], result => {
@@ -276,7 +276,7 @@ export default function App() {
             result.plan.forEach((action, index) => { action.item = draft.items[index] })
             setCalculated({ draft, profile, result })
             updateBuildOrders(current => ({ ...current, [target]: draft }))
-            onSuccess?.()
+            onSuccess?.(result)
         })
         if (accepted) closeTimelineMenu()
         return accepted
@@ -289,7 +289,18 @@ export default function App() {
             return
         }
         setActionNotice(null)
-        updateDraft(factionId, { opening, items: withOrderIds(items) }, gameProfile, onSuccess)
+        // Additions append the chosen action after any automatic prerequisites.
+        const addedIndex = items.length > buildOrder.length ? items.length - 1 : -1
+        updateDraft(factionId, { opening, items: withOrderIds(items) }, gameProfile, result => {
+            const added = result.plan[addedIndex]
+            if (added?.blocked && added.blockedReason) {
+                const name = added.item.name
+                const reason = added.blockedReason
+                const text = reason.startsWith(name) ? reason : `${name} — ${reason}`
+                setActionNotice({ text, kind: "error" })
+            }
+            onSuccess?.()
+        })
     }
     const [dependencyError, setDependencyError] = useState<string | null>(null)
     const setOpeningGoldWorkers = useCallback((goldWorkers: number) => {
