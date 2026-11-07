@@ -41,7 +41,9 @@ For a command accepted at time `t` :
   With preparation P, select and reserve the worker at `t - P` instead.
 - Construction starts at `t + constructionStartDelay` .
 - The building or building upgrade completes after its `seconds` duration multiplied by
-  `1 - floor((workerLevel - 1) / 4) / 100` , using the base duration from `src/game/data.json` .
+  `1 - floor((workerLevel - 1) / 4) / 100` and any
+  [per-order construction time factor](#construction-time-modifier), using the base duration
+  from `src/game/data.json`.
 - The worker returns to its resource after another `constructionStartDelay` .
 
 At worker level 1–4, a 30-second Barracks ordered at 1s therefore starts at 4s, completes at 34s,

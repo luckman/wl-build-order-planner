@@ -14,18 +14,21 @@ export function isConstruction(item: PlannerItem) { return item.kind === "buildi
 export function canModifyConstructionTime(item: PlannerItem) {
     return item.kind === "building" && item.id !== "castle" && item.id !== "citadel"
 }
+export function parseConstructionTimeModifier(value: unknown, eligible: boolean): ConstructionTimeModifier | undefined {
+    if (value === undefined) return undefined
+    const modifier = constructionTimeModifiers.find(percent => percent === value)
+    if (modifier === undefined) throw new Error("Construction time modifier must be 0, 50, or 100 percent.")
+    if (modifier !== 0 && !eligible) {
+        throw new Error("Construction time modifier is only available for buildings other than Castle and Citadel.")
+    }
+    return modifier
+}
 export function parseConstructionSettings(item: PlannerItem, value: unknown): ConstructionSettings {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Construction settings must be an object.")
     const raw = value as Record<string, unknown>
     const settings: ConstructionSettings = {}
-    if (raw.timeModifier !== undefined) {
-        const modifier = constructionTimeModifiers.find(percent => percent === raw.timeModifier)
-        if (modifier === undefined) throw new Error("Construction time modifier must be 0, 50, or 100 percent.")
-        if (modifier !== 0 && !canModifyConstructionTime(item)) {
-            throw new Error("Construction time modifier is only available for buildings other than Castle and Citadel.")
-        }
-        settings.timeModifier = modifier
-    }
+    const modifier = parseConstructionTimeModifier(raw.timeModifier, canModifyConstructionTime(item))
+    if (modifier !== undefined) settings.timeModifier = modifier
     for (const field of ["preparationDuration", "outwardDuration", "returnDuration"] as const) {
         if (raw[field] !== undefined) {
             if (typeof raw[field] !== "number") throw new Error(`${field} must be a finite nonnegative duration.`)

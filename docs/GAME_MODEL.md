@@ -170,9 +170,10 @@ currently has no cost effect.
 
 Construction and upgrades expose separate command, start, finish, and builder-return times. At
 command acceptance, costs are paid and a selected worker stops gathering. The worker travels for
-`constructionStartDelay` (default 3 seconds), builds for the worker-level-adjusted duration, then
-travels back for the same delay by default. Each occurrence can override either journey independently. The completed building becomes available before the builder
-returns.
+`constructionStartDelay` (default 3 seconds), builds for the worker-level-adjusted duration with
+any [per-order construction time modifier](CONSTRUCTION.md#construction-time-modifier), then
+travels back for the same delay by default. Each occurrence can override either journey
+independently. The completed building becomes available before the builder returns.
 
 Builders exclude deliberately idle workers and select wood gatherers with the least gathered/carried cargo,
 then gold workers carrying the least cargo outside the mine. Worker ID breaks ties. Builders are
