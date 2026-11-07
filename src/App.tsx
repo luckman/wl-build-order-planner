@@ -726,9 +726,9 @@ export default function App() {
                                         <span className="order-number">{index + 1}</span>
                                         <img src={iconSources[item.icon]} alt="" />
                                         <div>
-                                            <b>{item.name}</b>
+                                            <b>{item.name}{item.kind === "worker-event" && item.workerEvent === "make-idle" && item.count > 1 ? ` (${item.count})` : ""}</b>
                                             {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}
-                                            {item.kind === "worker-event" && <small>{item.count} workers{item.workerEvent === "make-active" ? ` · ${item.travelDuration}s travel` : ""}</small>}
+                                            {item.kind === "worker-event" && item.workerEvent === "make-active" && <small>{item.count} workers · {item.travelDuration}s travel</small>}
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}{item.workerGroup ? ` · ${item.workerGroup} worker` : ""}</small>}
                                             {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}

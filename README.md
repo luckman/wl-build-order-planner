@@ -49,7 +49,8 @@ builder travel, and when you need resources.
 from income and ordinary builder selection. **Make Worker active** and **Make Slave active**
 restore their previous assignments, optionally after travel. The two cards follow **Unit is killed**
 and use matching pause and resume icons in the build order and timeline. Both events use fixed times
-and apply the full count or report an error. Latest order state lists idle workers separately. Worker losses let you choose Gathering
+and apply the full count or report an error. The build-order idle event title includes a count only
+for two or more workers. Latest order state lists idle workers separately. Worker losses let you choose Gathering
 or Idle; an unavailable group reports an error without removing a worker from the other group.
 
 Plans support **100 actions** after the opening allocation and a **30-minute** simulation. The
