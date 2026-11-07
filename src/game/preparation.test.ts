@@ -55,24 +55,25 @@ test("the earliest prepared command after a fractional order delay preserves the
     expect(plan[1]).toMatchObject({ blocked: false, commandTime: 21.5, departureTime: 20.75, workerId: 1 })
 })
 
-test.each([0, 0.25])("a prepared command with order delay %s can use a second instance as soon as it is ready", orderDelay => {
+test.each([0, 0.25])("a prepared command with order delay %s can use any two ready instances", orderDelay => {
     const farm = { ...factions.light.items.find(item => item.id === "farm")!, limit: undefined }
     const sawmill = factions.light.items.find(item => item.id === "sawmill")!
     const construction = { outwardDuration: 0, returnDuration: 0 }
     const target = { ...sawmill, requirements: [{ item: "farm", count: 2 }],
         construction: { preparationDuration: 2, outwardDuration: 3 } }
+    const slowest = { ...farm, seconds: 12, construction }
     const slower = { ...farm, seconds: 3, construction }
     const faster = { ...farm, seconds: 1, construction }
     const worker = factions.light.items.find(item => item.id === "worker")!
-    const settings = { ...economy, orderDelay, workerCount: 3, woodWorkers: 3 }
-    const args = [settings, 6, 200, 20, "Castle"] as const
-    const previous = simulateBuildOrder([slower, faster, target, worker], ...args, 200)
+    const settings = { ...economy, orderDelay, workerCount: 4, woodWorkers: 4 }
+    const args = [settings, 8, 200, 20, "Castle"] as const
+    const previous = simulateBuildOrder([slowest, slower, faster, target, worker], ...args, 200)
 
-    expect(previous.plan[2]).toMatchObject({ blocked: false, departureTime: 1 + 2 * orderDelay,
-        commandTime: 3 + 2 * orderDelay, startTime: 6 + 2 * orderDelay })
-    const changed = [{ ...slower, seconds: 2 }, faster, target, worker]
+    expect(previous.plan[3]).toMatchObject({ blocked: false, departureTime: 1 + 3 * orderDelay,
+        commandTime: 3 + 3 * orderDelay, startTime: 6 + 3 * orderDelay })
+    const changed = [slowest, { ...slower, seconds: 2 }, faster, target, worker]
     const result = simulateBuildOrder(changed, ...args, { until: 200, previous })
-    expect(result.plan[2]).toMatchObject({ blocked: false, commandTime: 2 + 2 * orderDelay })
+    expect(result.plan[3]).toMatchObject({ blocked: false, commandTime: 2 + 3 * orderDelay })
     expect(result).toEqual(simulateBuildOrder(changed, ...args, 200))
 })
 
@@ -85,6 +86,27 @@ test("the starting Castle counts alongside an earlier Castle construction", () =
         { ...economy, workerCount: 2, woodWorkers: 2 })
 
     expect(plan[1]).toMatchObject({ blocked: false, departureTime: 3, commandTime: 5 })
+})
+
+test("moving a fixed delivery earlier advances the prerequisite and prepared command", () => {
+    const farm = { ...factions.light.items.find(item => item.id === "farm")!, seconds: 12,
+        construction: { outwardDuration: 0, returnDuration: 0 } }
+    const sawmill = factions.light.items.find(item => item.id === "sawmill")!
+    const worker = factions.light.items.find(item => item.id === "worker")!
+    const target = { ...sawmill, prerequisites: [farm.name], requirements: [{ item: farm.id, count: 1 }],
+        construction: { preparationDuration: 2 } }
+    const settings = { ...economy, startingWood: 0, woodPerTrip: 0, workerCount: 2, woodWorkers: 2 }
+    const args = [settings, 4, 200, 20, "Castle"] as const
+    const funding = (commandTime: number) => createResourcesCollectedAction({ type: "resources-collected", commandTime,
+        gold: 0, wood: farm.wood + sawmill.wood })
+    const prefix = [farm, target, worker, worker]
+    const previous = simulateBuildOrder([...prefix, funding(20)], ...args, 200)
+    const changed = [...prefix, funding(10)]
+    const result = simulateBuildOrder(changed, ...args, { until: 200, previous })
+
+    expect(previous.plan[1]).toMatchObject({ blocked: false, departureTime: 32, commandTime: 34 })
+    expect(result.plan[1]).toMatchObject({ blocked: false, departureTime: 22, commandTime: 24 })
+    expect(result).toEqual(simulateBuildOrder(changed, ...args, 200))
 })
 
 test("a lone builder completes its earlier job before starting a later preparation", () => {
@@ -119,6 +141,28 @@ test("Whip speeds outward travel but leaves the preparation offset exact", () =>
     const result = run([farm, cast], { ...economy, startingMana: 500, baseManaLimit: 500 }, "dark")
     expect(result.plan[0]).toMatchObject({ departureTime: 0, commandTime: 10 })
     expect(result.plan[0].startTime! - result.plan[0].commandTime!).toBeCloseTo(10 / 1.15)
+})
+
+test("preparation at the same time as a prerequisite command can change its builder and finish", () => {
+    const idle = createWorkerEvent({ type: "make-idle", commandTime: 0, count: 1 }, "dark")
+    const cast = createScrollAction({ type: "use-scroll", scrollId: "whip", commandTime: 1 }, "dark")
+    const active = createWorkerEvent({ type: "make-active", commandTime: 12, count: 1, travelDuration: 5 }, "dark")
+    const pigsty = { ...factions.dark.items.find(item => item.id === "pigsty")!, seconds: 3,
+        construction: { outwardDuration: 20, returnDuration: 0 } }
+    const sawmill = factions.dark.items.find(item => item.id === "sawmill")!
+    const funding = createResourcesCollectedAction({ type: "resources-collected", commandTime: 11,
+        gold: 0, wood: pigsty.wood + sawmill.wood })
+    const target = { ...sawmill, prerequisites: [pigsty.name], requirements: [{ item: pigsty.id, count: 1 }],
+        construction: { preparationDuration: 22 } }
+    const settings = { ...economy, workerCount: 2, woodWorkers: 2, startingWood: 0, woodPerTrip: 0,
+        startingMana: 500, baseManaLimit: 500 }
+    const previous = run([pigsty, sawmill, idle, cast, active, funding], settings, "dark")
+    const result = run([pigsty, target, idle, cast, active, funding], settings, "dark")
+
+    expect(previous.plan[0]).toMatchObject({ commandTime: 12, workerId: 0, finishTime: 35 })
+    expect(result.plan[0]).toMatchObject({ commandTime: 12, workerId: 1 })
+    expect(result.plan[0].finishTime!).toBeLessThan(previous.plan[0].finishTime!)
+    expect(result.plan[1]).toMatchObject({ blocked: false, departureTime: 12, commandTime: 34, workerId: 0 })
 })
 
 test.each(["light", "dark"] as const)("%s upgrade preparation can precede purchase prerequisites and survives file round-trip", faction => {

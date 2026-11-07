@@ -117,17 +117,22 @@ export function schedulePreparation(items: PlannerItem[], economy: EconomySettin
     throw new Error("Construction preparation scheduling did not converge.")
 }
 
-type ConstructionPrerequisite = { count: number; sources: ScheduledAction[] }
+type ConstructionPrerequisite = { count: number; sources: Array<{ action: ScheduledAction; duration: number }> }
 
-function constructionPrerequisites(plan: ScheduledAction[], index: number, startingBuilding: PlannerItem) {
+function constructionPrerequisites(plan: ScheduledAction[], index: number, startingBuilding: PlannerItem, economy: EconomySettings) {
     const { item } = plan[index]
     const prerequisites: ConstructionPrerequisite[] = []
     if (!isConstruction(item) || (!item.prerequisites.length && !item.requirements?.length)) return prerequisites
     const earlier = plan.slice(0, index).filter(action => !isTimedEvent(action.item))
+    const addPrerequisite = (count: number, actions: ScheduledAction[]) => {
+        if (actions.length >= count) {
+            prerequisites.push({ count, sources: actions.map(action => ({ action, duration: actionDuration(action.item, economy) })) })
+        }
+    }
     for (const name of item.prerequisites) {
         if (name === startingBuilding.name) continue
         const sources = earlier.filter(action => action.item.name === name)
-        if (sources.length && sources.every(action => isConstruction(action.item))) prerequisites.push({ count: 1, sources })
+        if (sources.every(action => isConstruction(action.item))) addPrerequisite(1, sources)
     }
     for (const requirement of item.requirements ?? []) {
         const level = requirement.minLevel ?? 1
@@ -138,18 +143,36 @@ function constructionPrerequisites(plan: ScheduledAction[], index: number, start
         // count every possible upgrade and let even repeat upgrades qualify separately.
         const sources = earlier.filter(({ item }) => item.kind === "building" ? qualifies(item) :
             item.kind === "upgrade" && (item.level ?? Infinity) >= level)
-        if (sources.length >= count) prerequisites.push({ count, sources })
+        addPrerequisite(count, sources)
     }
     return prerequisites
 }
 
-function prerequisiteReadinessLowerBound(prerequisites: ConstructionPrerequisite[], economy: EconomySettings) {
+function prerequisiteReadinessLowerBound(prerequisites: ConstructionPrerequisite[], orderDelay: number) {
     return Math.max(-Infinity, ...prerequisites.map(({ count, sources }) => {
-        const durations = sources.map(({ item }) => actionDuration(item, economy)).sort((a, b) => a - b)
+        const durations = sources.map(({ duration }) => duration).sort((a, b) => a - b)
         // The clock starts at the order delay. Ignore travel, resources and
         // competition for builders to allow the earliest possible completion.
-        return economy.orderDelay + durations[count - 1] + economy.orderDelay
+        return orderDelay + durations[count - 1] + orderDelay
     }))
+}
+
+function cannotMeetPrerequisites(prerequisites: ConstructionPrerequisite[], time: number, departure: number, orderDelay: number) {
+    // In this replay only the new departure differs. It runs before catalog
+    // commands at the same time. Earlier commands keep their builder and finish
+    // (including travel under this pass's forecasts). Any command that can change
+    // must start at or after the departure, even with instant access to resources.
+    const earliestChangedCommand = Math.max(orderDelay, departure)
+    return prerequisites.some(({ count, sources }) => {
+        let possible = 0
+        for (const { action, duration } of sources) {
+            const finish = action.commandTime !== null && action.commandTime < departure && action.finishTime !== null
+                ? action.finishTime : earliestChangedCommand + duration
+            if (time < finish + orderDelay) continue
+            if (++possible >= count) return false
+        }
+        return true
+    })
 }
 
 /** A later departure can restore an earlier delivery. Refine against observable
@@ -188,8 +211,8 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, start
                 }
             }
         }
-        const prerequisites = constructionPrerequisites(probe.plan, index, startingBuilding)
-        const earliestPrerequisiteTime = prerequisiteReadinessLowerBound(prerequisites, economy)
+        const prerequisites = constructionPrerequisites(probe.plan, index, startingBuilding, economy)
+        const earliestPrerequisiteTime = prerequisiteReadinessLowerBound(prerequisites, economy.orderDelay)
         const wasSuccessful = result.plan.map(action => !action.blocked)
         const evaluate = (time: number) => {
             const candidate = new Map(schedule.commands)
@@ -214,7 +237,9 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, start
         }
         for (const time of candidates) {
             if (time < earliestCommandTime) continue
-            if (time < earliestPrerequisiteTime) {
+            if (time < earliestPrerequisiteTime ||
+                (prerequisites.length && cannotMeetPrerequisites(prerequisites, time, time - preparation, economy.orderDelay))) {
+                // Reuse also requires unchanged fixed events and forecasts.
                 reuse.minimumPrefixLength = Math.max(reuse.minimumPrefixLength, index + 1)
                 continue
             }
