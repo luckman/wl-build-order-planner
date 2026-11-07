@@ -39,9 +39,10 @@ Hover for command, start and finish times and additional details on customized o
 **Use idle worker** selects only an available idle builder; it becomes idle at completion
 without return travel. A returning gatherer can start another construction at completion; its
 unfinished return journey is retained as a minimum after the next job. The construction and
-upgrade dialogs use 0.1-second steps and mark each travel setting as **Global** or **Custom**.
-**Use global (3.0 s)** shows the current profile delay and restores live inheritance.
-Idle mode disables return travel and keeps its saved duration.
+upgrade dialogs show seconds in the field labels and step by 0.1 seconds. Each travel
+setting is marked **Global** or **Custom**. The reset link beside **Custom** shows the
+current profile delay and restores live inheritance. Idle mode dims the return settings
+and keeps the saved duration.
 
 **Make Worker idle** (Light) and **Make Slave idle** (Dark) remove a chosen count of gatherers
 from income and ordinary builder selection. **Make Worker active** and **Make Slave active**

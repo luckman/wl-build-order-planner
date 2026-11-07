@@ -44,14 +44,11 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
             <form noValidate onSubmit={event => { event.preventDefault(); if (!error) onSave(settings) }}>
                 <div className="construction-duration-row">
                     <div>
-                        <label htmlFor="construction-preparation">Preparation<span className="construction-unit-label"> (seconds)</span></label>
+                        <label htmlFor="construction-preparation">Preparation (s)</label>
                         <p id="construction-preparation-help">Time before the construction command.</p>
                     </div>
-                    <div className="construction-seconds">
-                        <input id="construction-preparation" type="number" min="0" step="0.1" value={preparation}
-                            aria-describedby="construction-preparation-help" onChange={event => setPreparation(event.target.value)} />
-                        <span aria-hidden="true">s</span>
-                    </div>
+                    <input id="construction-preparation" type="number" min="0" step="0.1" inputMode="decimal" value={preparation}
+                        aria-describedby="construction-preparation-help" onChange={event => setPreparation(event.target.value)} />
                 </div>
                 <label className="construction-idle"><input type="checkbox" checked={useIdleWorker}
                     onChange={event => setUseIdleWorker(event.target.checked)} />Use idle worker</label>
@@ -59,24 +56,23 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
                     { id: "construction-outward", label: "Outward travel", value: outward, set: setOutward, disabled: false },
                     { id: "construction-return", label: "Return travel", value: back, set: setBack, disabled: useIdleWorker },
                 ]).map(field => <div key={field.id} className="construction-duration-row">
-                    <div>
-                        <label htmlFor={field.id}>{field.label}<span className="construction-unit-label"> (seconds)</span></label>
-                        <p id={`${field.id}-source`}>{field.value === undefined ? `Global: ${globalSeconds}` : "Custom"}</p>
+                    <div className={field.disabled ? "construction-inactive" : undefined}>
+                        <label htmlFor={field.id}>{field.label} (s)</label>
+                        <div className="construction-source">
+                            <span id={`${field.id}-source`}>{field.value === undefined ? `Global: ${globalSeconds}` : "Custom"}</span>
+                            {field.value !== undefined && <button type="button" className="construction-reset" disabled={field.disabled}
+                                onClick={event => {
+                                    const input = event.currentTarget.form?.elements.namedItem(field.id)
+                                    if (input instanceof HTMLInputElement) input.focus()
+                                    field.set(undefined)
+                                }} aria-label={`${resetLabel} for ${field.label.toLowerCase()}`}>{resetLabel}</button>}
+                        </div>
                     </div>
-                    <div className="construction-seconds">
-                        <input id={field.id} type="number" min="0" step="0.1" disabled={field.disabled} value={field.value ?? globalDelay}
-                            aria-describedby={`${field.id}-source${field.disabled ? " construction-return-help" : ""}`}
-                            onChange={event => field.set(event.target.value)} />
-                        <span aria-hidden="true">s</span>
-                    </div>
-                    {field.value !== undefined && <button type="button" className="construction-reset" disabled={field.disabled}
-                        onClick={event => {
-                            const input = event.currentTarget.form?.elements.namedItem(field.id)
-                            if (input instanceof HTMLInputElement) input.focus()
-                            field.set(undefined)
-                        }} aria-label={`${resetLabel} for ${field.label.toLowerCase()}`}>{resetLabel}</button>}
+                    <input id={field.id} type="number" min="0" step="0.1" inputMode="decimal" disabled={field.disabled} value={field.value ?? globalDelay}
+                        aria-describedby={`${field.id}-source${field.disabled ? " construction-return-help" : ""}`}
+                        onChange={event => field.set(event.target.value)} />
                     {field.disabled && <p id="construction-return-help" className="construction-return-help">
-                        Idle builders skip return travel. Your saved duration is kept.
+                        Idle builders skip return travel and remain idle
                     </p>}
                 </div>)}
                 {error && <p role="alert">{error}</p>}

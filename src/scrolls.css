@@ -24,7 +24,6 @@
 
 .scroll-dialog.construction-dialog {
     --construction-inset: 24px;
-    width: min(520px, 100%);
     min-width: 0;
     padding: var(--construction-inset) var(--construction-inset) 0;
     background: #102230;
@@ -35,30 +34,23 @@
 .construction-dialog form { gap: 16px; }
 .construction-duration-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 88px 108px;
+    grid-template-columns: minmax(0, 1fr) 88px;
     align-items: center;
     gap: 4px 12px;
 }
 .construction-duration-row p { margin: 4px 0 0; }
 .construction-duration-row label { display: block; }
-.construction-unit-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-}
-.construction-seconds {
+.construction-source {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    min-width: 0;
-    border: 1px solid #49667e;
-    border-radius: 4px;
-    background: #091520;
+    gap: 2px 8px;
+    margin-top: 4px;
+    color: #a9c5df;
+    font-size: .8rem;
 }
-.construction-seconds input[type="number"] { min-width: 0; border: 0; background: transparent; }
-.construction-seconds span { padding-right: 8px; color: #a9c5df; font-size: .8rem; }
+.construction-inactive label, .construction-inactive .construction-source > span { opacity: .6; }
+.construction-dialog input[type="number"] { min-width: 0; border-radius: 4px; }
 .construction-dialog .construction-idle {
     display: flex;
     align-items: center;
@@ -68,12 +60,13 @@
 }
 .construction-idle input { margin: 0; accent-color: #e1b55f; }
 .construction-reset {
-    justify-self: end;
-    padding: 4px 0;
+    min-width: 0;
+    padding: 2px 0;
     border: 0;
     background: transparent;
     color: #b4d6f1;
-    text-align: right;
+    text-align: left;
+    overflow-wrap: anywhere;
     text-decoration: underline;
     font-size: .75rem;
 }
@@ -89,8 +82,6 @@
 
 @media (max-width: 440px) {
     .scroll-dialog.construction-dialog { --construction-inset: 14px; }
-    .construction-duration-row { grid-template-columns: minmax(0, 1fr) 88px; }
-    .construction-reset { grid-column: 1 / -1; }
 }
 
 .dark-events-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 10px repeat(5, var(--action-card-width)); }
