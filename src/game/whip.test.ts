@@ -289,7 +289,7 @@ test("successful commands model player preparation in scheduling and replay; blo
     reference.advanceTo(12)
     reference.prepareGoldWorkerForWhip()
     reference.scheduleScroll("whip", 13, 43)
-    reference.advanceTo(50)
+    reference.advanceTo(343) // The selected scroll finishes at 43; project five more minutes.
     expect(actual.deliveries).toEqual(reference.deliveries)
     // First worker was due at 13, is delayed to 14 by the command at 12,
     // then travels its remaining normal second at boosted speed from 13.

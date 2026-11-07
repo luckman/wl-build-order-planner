@@ -1,4 +1,5 @@
-import ConstructionPhases, { timelineBounds } from "./ConstructionPhases"
+import ConstructionPhases from "./ConstructionPhases"
+import { TIMELINE_WINDOW_SECONDS, timelineBounds, timelineEnd } from "./game/timelineBounds"
 import ConstructionDialog from "./ConstructionDialog"
 import { isConstruction, hasCustomConstruction, constructionDescription } from "./game/constructionSettings"
 import WorkerEventDialog from "./WorkerEventDialog"
@@ -6,7 +7,7 @@ import { createWorkerEvent, workerEventIdentity, type WorkerEventCommand } from 
 import ManaSpentDialog from "./ManaSpentDialog"
 import { createManaSpentAction, manaSpentCollision } from "./game/manaSpent"
 import Notification, { type NotificationMessage } from "./Notification"
-import { ACTION_LIMIT_MESSAGE, MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, MAX_COMMAND_SECONDS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
+import { ACTION_LIMIT_MESSAGE, MAX_PLAN_ACTIONS, MAX_COMMAND_SECONDS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
 import UnitKilledDialog from "./UnitKilledDialog"
 import { createUnitKilledAction, foodUsedAt } from "./game/unitsKilled"
 import { createManaWellAction, evaluateManaWells, MANA_WELL_EVENTS, type ManaWellEventType } from "./game/manaWells"
@@ -133,7 +134,6 @@ const iconSources: Record<string, string> = {
     darkJax: require("./icons/heroes/dark-jax.png"),
     darkEater: require("./icons/heroes/dark-eater.png"),
 }
-const TIMELINE_WINDOW_SECONDS = 120
 
 const formatTime = (seconds: number) => {
     const tenths = Math.round(seconds * 10)
@@ -372,8 +372,7 @@ export default function App() {
     const spending = plan.flatMap(({ cost, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
     )
-    const lastCompletionTime = Math.max(0, ...plan.map(action => action.blocked ? action.commandTime ?? 0 : timelineBounds(action).end))
-    const endTime = Math.min(MAX_PLAN_SECONDS, Math.max(TIMELINE_WINDOW_SECONDS, lastCompletionTime + 30))
+    const endTime = timelineEnd(plan)
     const samples = useMemo(
         () =>
             Array.from({ length: Math.min(MAX_TIMELINE_SAMPLES, Math.ceil(endTime / 5) + 1) }, (_, index) =>

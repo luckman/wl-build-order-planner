@@ -1,13 +1,7 @@
 import type { CSSProperties } from "react"
 import type { ScheduledAction } from "./game/buildSimulation"
-import { isConstruction } from "./game/constructionSettings"
+import { timelineBounds } from "./game/timelineBounds"
 import { formatDuration } from "./durationTime"
-
-export function timelineBounds(action: ScheduledAction) {
-    return isConstruction(action.item)
-        ? { start: action.departureTime ?? action.commandTime!, end: action.workerReturnEndTime ?? action.workerReturnTime ?? action.finishTime! }
-        : { start: action.commandTime!, end: action.finishTime! }
-}
 
 /** All phases belong to one editable occurrence; zero-length journeys have no segment. */
 export default function ConstructionPhases({ action, icon, descriptionId, timing }: {

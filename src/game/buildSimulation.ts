@@ -12,6 +12,9 @@ import { type EconomySettings, type WhipWindow, manaAt, resourceAt, WorkerEconom
 import { createScrollAction, scrollEffect, legionsCallEffect, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
 import { actionDuration } from "./playerLevels"
 import { productionBuildingsAt, recruitmentFinish, recruitmentWork, type RecruitmentWindow } from "./recruitment"
+import { timelineEnd } from "./timelineBounds"
+
+const RESOURCE_PROJECTION_SECONDS = 5 * 60
 
 export type ScheduledAction = {
     item: PlannerItem
@@ -57,7 +60,9 @@ export function simulateBuildOrder(
         const nextRecruitment = result.orderedPlan.filter(action => action.item.id === "legions-call" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime!, buildingInstanceId: action.buildingInstanceId! }))
         if (JSON.stringify(next) === JSON.stringify(windows) && JSON.stringify(nextRecruitment) === JSON.stringify(recruitmentWindows)) {
-            return { plan: result.plan, orderedPlan: result.orderedPlan, deliveries: result.projectDeliveries() }
+            const buildEnd = Math.max(0, ...result.orderedPlan.map(action => action.blocked ? 0 : action.finishTime!))
+            const horizon = Math.min(MAX_PLAN_SECONDS, Math.max(buildEnd + RESOURCE_PROJECTION_SECONDS, timelineEnd(result.plan)))
+            return { plan: result.plan, orderedPlan: result.orderedPlan, deliveries: result.projectDeliveries(horizon) }
         }
         windows = next
         recruitmentWindows = nextRecruitment
@@ -525,8 +530,10 @@ function simulateBuildOrderPass(
     const orderedPlan = inputPlan.map((action, index) => ({ action, index }))
         .sort((a, b) => (a.action.commandTime ?? Infinity) - (b.action.commandTime ?? Infinity) || a.index - b.index)
         .map(({ action }) => action)
-    const projectDeliveries = () => {
-        advanceTo(replayEnd)
+    const projectDeliveries = (horizon: number) => {
+        // Scheduling may have searched beyond the output horizon for a blocked action.
+        if (simulation.time > horizon) return simulation.deliveries.filter(({ time }) => time <= horizon)
+        if (simulation.time < horizon) advanceTo(horizon)
         return simulation.deliveries
     }
     const candidateEventTimes = collectCandidatesThrough === undefined ? []
