@@ -83,7 +83,21 @@ for (const faction of ["light", "dark"] as const) for (const width of [1440, 320
         await page.getByRole("menuitem", { name: "Edit", exact: true }).click()
         const editDialog = page.getByRole("dialog", { name: "Edit Barracks Construction" })
         await expect(editDialog.getByLabel("Preparation (s)")).toBeFocused()
+        const help = editDialog.getByRole("button", { name: "Construction timing help" })
+        const tooltip = editDialog.getByRole("tooltip")
+        if (width === 1440) {
+            await help.hover()
+            await expect(tooltip).toContainText("You need the resources at that moment.")
+            await editDialog.getByRole("heading").hover({ position: { x: 5, y: 5 } })
+            await expect(tooltip).toBeHidden()
+        }
         await editDialog.getByLabel("Preparation (s)").press("Shift+Tab")
+        await expect(help).toBeFocused()
+        await expect(tooltip).toBeVisible()
+        await help.press("Escape")
+        await expect(tooltip).toBeHidden()
+        await expect(editDialog).toBeVisible()
+        await help.press("Shift+Tab")
         await expect(editDialog.getByRole("button", { name: "Save order" })).toBeFocused()
         await editDialog.press("Escape")
         await expect(event).toBeFocused()
@@ -97,6 +111,22 @@ for (const faction of ["light", "dark"] as const) for (const width of [1440, 320
         await page.screenshot({ path: `test-results/${faction}-${width}-worker-phases.png`, fullPage: true })
     })
 }
+
+test.describe("touch timing help", () => {
+    test.use({ hasTouch: true, viewport: { width: 320, height: 760 } })
+
+    test("tapping upgrade timing help shows all three phases within the dialog", async ({ page }) => {
+        await page.goto("http://localhost:2987")
+        await page.getByRole("button", { name: "Castle upgrade", exact: true }).tap()
+        await page.getByRole("menuitem", { name: /Castle lvl 2/ }).click({ button: "right" })
+        const dialog = page.getByRole("dialog", { name: "Configure Castle Upgrade" })
+        await dialog.getByRole("button", { name: "Construction timing help" }).tap()
+        const tooltip = dialog.getByRole("tooltip")
+        await expect(tooltip).toContainText("Idle builders skip this trip.")
+        await expect(tooltip).toBeInViewport({ ratio: 1 })
+        await dialog.screenshot({ path: "test-results/worker-ui-followup-touch-help.png" })
+    })
+})
 
 test("a long construction title and a sub-tenth duration fit and save at 320px", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 760 })

@@ -86,6 +86,18 @@ test.each([["Light", "Castle"], ["Dark", "Citadel"]])("%s upgrades use shared ad
     expect((dialog.getByLabelText("Outward travel (s)") as HTMLInputElement).value).toBe("2")
 })
 
+test("construction timing help explains preparation, resource timing and return travel", () => {
+    render(<App />)
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^Barracks \d/ }))
+    const dialog = within(screen.getByRole("dialog", { name: "Configure Barracks Construction" }))
+    expect(dialog.queryByText("Time before the construction command.")).toBeNull()
+    fireEvent.focus(dialog.getByRole("button", { name: "Construction timing help" }))
+    const help = dialog.getByRole("tooltip")
+    expect(help.textContent).toContain("A gathering worker stops gathering at that point.")
+    expect(help.textContent).toContain("You need the resources at that moment.")
+    expect(help.textContent).toContain("Idle builders skip this trip.")
+})
+
 test("idle-builder mode disables return controls without losing its override through drafts", () => {
     const view = render(<App />)
     fireEvent.contextMenu(screen.getByRole("button", { name: /^Barracks \d/ }))

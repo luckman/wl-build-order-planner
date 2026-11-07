@@ -29,7 +29,13 @@
     background: #102230;
     border-radius: 7px;
 }
-.construction-dialog h2 { margin-bottom: 18px; overflow-wrap: anywhere; }
+.construction-dialog-heading { position: relative; display: flex; align-items: flex-start; gap: 8px; margin-bottom: 18px; }
+.construction-dialog-heading h2 { margin: 0; overflow-wrap: anywhere; }
+.construction-dialog-heading > div { align-self: stretch; }
+.construction-dialog-heading .timeline-help-button { width: 24px; height: 24px; }
+.construction-dialog-heading .construction-timing-help { left: 0; width: 100%; }
+.construction-dialog-heading .construction-timing-help p { margin: 0; }
+.construction-dialog-heading .construction-timing-help p + p { margin-top: 8px; }
 .construction-dialog .construction-target-level { margin: -12px 0 14px; }
 .construction-dialog form { gap: 16px; }
 .construction-duration-row {

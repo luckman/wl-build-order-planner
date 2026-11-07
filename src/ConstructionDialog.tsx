@@ -11,6 +11,9 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
     const [back, setBack] = useState<string | undefined>(item.construction?.returnDuration?.toString())
     const [preparation, setPreparation] = useState(String(item.construction?.preparationDuration ?? 0))
     const [useIdleWorker, setUseIdleWorker] = useState(item.construction?.useIdleWorker ?? false)
+    const [helpHovered, setHelpHovered] = useState(false)
+    const [helpFocused, setHelpFocused] = useState(false)
+    const helpOpen = helpHovered || helpFocused
     const settings: ConstructionSettings = { useIdleWorker, preparationDuration: Number(preparation), ...(outward !== undefined ? { outwardDuration: Number(outward) } : {}),
         ...(back !== undefined ? { returnDuration: Number(back) } : {}) }
     let error = validationError
@@ -30,7 +33,13 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
     return <div className="scroll-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
         <div ref={dialog} className="scroll-dialog construction-dialog panel" role="dialog" aria-modal="true" aria-labelledby="construction-dialog-title"
             onKeyDown={event => {
-                if (event.key === "Escape") { event.stopPropagation(); onClose() }
+                if (event.key === "Escape") {
+                    event.stopPropagation()
+                    if (helpOpen) {
+                        setHelpHovered(false)
+                        setHelpFocused(false)
+                    } else onClose()
+                }
                 if (event.key === "Tab") {
                     const controls = Array.from(dialog.current!.querySelectorAll<HTMLElement>("input:not(:disabled), button:not(:disabled)"))
                     const first = controls[0], last = controls[controls.length - 1]
@@ -38,17 +47,28 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
                     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
                 }
             }}>
-            <h2 id="construction-dialog-title">{editing ? "Edit" : "Configure"} {buildingName} {upgrade ? "Upgrade" : "Construction"}</h2>
+            <div className="construction-dialog-heading">
+                <h2 id="construction-dialog-title">{editing ? "Edit" : "Configure"} {buildingName} {upgrade ? "Upgrade" : "Construction"}</h2>
+                <div onPointerEnter={event => { if (event.pointerType === "mouse") setHelpHovered(true) }}
+                    onPointerLeave={() => setHelpHovered(false)}>
+                    <button type="button" className="timeline-help-button" aria-label="Construction timing help"
+                        aria-describedby="construction-timing-help"
+                        onFocus={() => setHelpFocused(true)} onBlur={() => setHelpFocused(false)}
+                        onClick={event => { event.currentTarget.focus(); setHelpFocused(true) }}>?</button>
+                    <div id="construction-timing-help" className="timeline-help-tooltip construction-timing-help" role="tooltip" hidden={!helpOpen}>
+                        <p><strong>Preparation</strong> reserves the worker before the command. A gathering worker stops gathering at that point.</p>
+                        <p><strong>Outward travel</strong> starts when you issue the command. You need the resources at that moment. Work starts when the worker arrives.</p>
+                        <p><strong>Return travel</strong> starts when work finishes. Idle builders skip this trip.</p>
+                    </div>
+                </div>
+            </div>
             {upgrade && item.level !== undefined && <p className="construction-target-level">Target level {item.level}</p>}
             {/* Keep accepting valid imported durations that are finer than the input's step. */}
             <form noValidate onSubmit={event => { event.preventDefault(); if (!error) onSave(settings) }}>
                 <div className="construction-duration-row">
-                    <div>
-                        <label htmlFor="construction-preparation">Preparation (s)</label>
-                        <p id="construction-preparation-help">Time before the construction command.</p>
-                    </div>
+                    <label htmlFor="construction-preparation">Preparation (s)</label>
                     <input id="construction-preparation" type="number" min="0" step="0.1" inputMode="decimal" value={preparation}
-                        aria-describedby="construction-preparation-help" onChange={event => setPreparation(event.target.value)} />
+                        onChange={event => setPreparation(event.target.value)} />
                 </div>
                 <label className="construction-idle"><input type="checkbox" checked={useIdleWorker}
                     onChange={event => setUseIdleWorker(event.target.checked)} />Use idle worker</label>

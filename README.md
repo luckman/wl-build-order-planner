@@ -42,7 +42,8 @@ unfinished return journey is retained as a minimum after the next job. The const
 upgrade dialogs show seconds in the field labels and step by 0.1 seconds. Each travel
 setting is marked **Global** or **Custom**. The reset link beside **Custom** shows the
 current profile delay and restores live inheritance. Idle mode dims the return settings
-and keeps the saved duration.
+and keeps the saved duration. The **(?)** beside the dialog title explains preparation,
+builder travel, and when you need resources.
 
 **Make Worker idle** (Light) and **Make Slave idle** (Dark) remove a chosen count of gatherers
 from income and ordinary builder selection. **Make Worker active** and **Make Slave active**
