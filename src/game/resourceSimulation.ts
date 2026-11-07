@@ -78,7 +78,8 @@ export type GatheringWorker = {
     id: number
     assignment: "gold" | "wood" | "idle"
     previousAssignment?: "gold" | "wood"
-    state: "reactivation" | "idle" | "outbound" | "waiting" | "gathering" | "deposit" | "construction-outbound" | "construction" | "construction-return" | "killed"
+    retainedJourneyDuration?: number
+    state: "preparation" | "reactivation" | "idle" | "outbound" | "waiting" | "gathering" | "deposit" | "construction-outbound" | "construction" | "construction-return" | "killed"
     stateSince: number
     nextAt: number
     cargoGold: number
@@ -89,7 +90,7 @@ export type GatheringWorker = {
 }
 
 export type WhipWindow = { startTime: number; finishTime: number }
-const isBuildingWorker = (worker: GatheringWorker) => worker.state === "construction" ||
+const isBuildingWorker = (worker: GatheringWorker) => worker.state === "preparation" || worker.state === "construction" ||
     worker.state === "construction-outbound" || worker.state === "construction-return"
 
 export type WorkerAllocation = {
@@ -107,6 +108,7 @@ type WorkerStateAction = {
     workerReturnTime: number | null
     workerId: number | null
     startTime?: number | null
+    departureTime?: number | null
     blocked?: boolean
 }
 
@@ -114,6 +116,7 @@ type WorkerStateAction = {
 export class WorkerEconomy {
     workers: GatheringWorker[] = []
     deliveries: ResourceDelivery[] = []
+    readonly eventBoundaries = new Set<number>()
     time = 0
     private steps = 0
     private mineWorker: number | null = null
@@ -124,7 +127,7 @@ export class WorkerEconomy {
     private whipStarts: WhipWindow[] = []
     private readonly whip: ReturnType<typeof whipEffect>
 
-    constructor(private settings: EconomySettings, private constructionWhipWindows: WhipWindow[] = []) {
+    constructor(private settings: EconomySettings, private constructionWhipWindows: WhipWindow[] = [], private recordBoundaries = false) {
         this.whip = whipEffect(settings)
         validateEconomyDurations(settings, Math.max(settings.workerCount, settings.goldWorkers + settings.woodWorkers))
         for (const count of [settings.workerCount, settings.goldWorkers, settings.woodWorkers]) {
@@ -330,6 +333,7 @@ export class WorkerEconomy {
         while (this.nextEventTime <= time) {
             if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
             this.time = this.nextEventTime
+            if (this.recordBoundaries) this.eventBoundaries.add(this.time)
             // A construction finishing exactly at activation is already returning
             // and can receive a fresh effect. The previous effect was cleared at start.
             for (const worker of this.workers.filter(worker => worker.state === "construction" && worker.nextAt === this.time)) {
@@ -433,6 +437,7 @@ export class WorkerEconomy {
     }
 
     remainingJourney(worker: GatheringWorker) {
+        if (worker.state === "preparation") return worker.retainedJourneyDuration ?? 0
         if (worker.state === "reactivation") return Math.max(0, (worker.nextAt - this.time) * this.rate(worker))
         if (worker.state !== "construction-return") return 0
         // Return arrival already projects future Whip boundaries. Integrate the remaining
@@ -481,12 +486,21 @@ export class WorkerEconomy {
         return true
     }
 
-    construct(worker: GatheringWorker, buildTime: number, travelTime = this.constructionTravelTime(worker),
-        returnTravelTime = this.constructionReturnTravelTime(this.time + travelTime + buildTime)) {
+    private interruptGathering(worker: GatheringWorker) {
         this.delayedInitialWoodWorkerIds = this.delayedInitialWoodWorkerIds.filter(id => id !== worker.id)
-        // Pause wood gathering through construction; gold cargo is still discarded.
         worker.cargoGold = 0
         worker.cargoWood = worker.assignment === "idle" ? worker.cargoWood : this.gatheredWood(worker)
+    }
+
+    prepareConstruction(worker: GatheringWorker) {
+        worker.retainedJourneyDuration = this.remainingJourney(worker)
+        this.interruptGathering(worker)
+        this.transition(worker, "preparation", Infinity)
+    }
+
+    construct(worker: GatheringWorker, buildTime: number, travelTime = this.constructionTravelTime(worker),
+        returnTravelTime = this.constructionReturnTravelTime(this.time + travelTime + buildTime)) {
+        this.interruptGathering(worker)
         worker.constructionDuration = buildTime
         worker.constructionReturnDuration = returnTravelTime
         // Travel is projected separately so future casts can also affect a builder en route.
@@ -557,7 +571,7 @@ export function workerAllocationAt(
         .flatMap((action) => {
             const events: Array<{
                 time: number
-                type: "worker" | "construction" | "kill" | "worker-event" | "player-whip-preparation"
+                type: "prepare" | "worker" | "construction" | "kill" | "worker-event" | "player-whip-preparation"
                 action?: WorkerEventAction
                 workerId?: number
                 duration?: number
@@ -583,6 +597,9 @@ export function workerAllocationAt(
                 action.workerReturnTime !== null &&
                 action.workerId !== null
             ) {
+                if (action.departureTime != null && action.departureTime < action.commandTime) {
+                    events.push({ time: action.departureTime, type: "prepare", workerId: action.workerId })
+                }
                 events.push({
                     time: action.commandTime,
                     type: "construction",
@@ -596,14 +613,16 @@ export function workerAllocationAt(
         })
         .filter((event) => event.time <= time)
         .sort((left, right) => left.time - right.time ||
-            ({ worker: 0, "worker-event": 1, kill: 1, "player-whip-preparation": 2, construction: 3 }[left.type] -
-                { worker: 0, "worker-event": 1, kill: 1, "player-whip-preparation": 2, construction: 3 }[right.type]))
+            ({ worker: 0, "worker-event": 1, kill: 1, prepare: 2, "player-whip-preparation": 2, construction: 3 }[left.type] -
+                { worker: 0, "worker-event": 1, kill: 1, prepare: 2, "player-whip-preparation": 2, construction: 3 }[right.type]))
 
     for (const event of events) {
         simulation.advanceTo(event.time)
         if (event.type === "worker") {
             const goldWorkers = simulation.workers.filter(({ assignment }) => assignment === "gold").length
             simulation.addWorker(goldWorkers < saturation ? "gold" : "wood")
+        } else if (event.type === "prepare") {
+            simulation.prepareConstruction(simulation.workers[event.workerId!])
         } else if (event.type === "worker-event") {
             simulation.applyWorkerEvent(event.action!)
         } else if (event.type === "kill") {

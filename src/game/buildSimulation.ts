@@ -1,3 +1,4 @@
+import { schedulePreparation, type PreparationSchedule } from "./preparationScheduling"
 import { parseConstructionSettings } from "./constructionSettings"
 import { createWorkerEvent, workerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
@@ -21,6 +22,7 @@ export type ScheduledAction = {
     commandTime: number | null
     startTime: number | null
     finishTime: number | null
+    departureTime?: number | null
     workerReturnTime: number | null
     workerReturnEndTime?: number | null
     workerId: number | null
@@ -46,13 +48,15 @@ export function simulateBuildOrder(
     // Casts can change work already scheduled into the future. Replay with accepted
     // travel/recruitment forecasts, keeping target and mana validation chronological.
     for (let pass = 0; pass <= MAX_PLAN_ACTIONS + 1; pass++) {
-        const result = simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit,
-            foodPerFarm, initialTownHall, until, windows, recruitmentWindows)
+        const run = (preparation?: PreparationSchedule) => simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit,
+            foodPerFarm, initialTownHall, until, windows, recruitmentWindows, preparation)
+        const result = buildOrder.some(item => (item.construction?.preparationDuration ?? 0) > 0)
+            ? schedulePreparation(buildOrder, economy, run) : run()
         const next = result.orderedPlan.filter(action => action.item.id === "whip" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime! }))
         const nextRecruitment = result.orderedPlan.filter(action => action.item.id === "legions-call" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime!, buildingInstanceId: action.buildingInstanceId! }))
-        if (JSON.stringify(next) === JSON.stringify(windows) && JSON.stringify(nextRecruitment) === JSON.stringify(recruitmentWindows)) return result
+        if (JSON.stringify(next) === JSON.stringify(windows) && JSON.stringify(nextRecruitment) === JSON.stringify(recruitmentWindows)) return { plan: result.plan, orderedPlan: result.orderedPlan, deliveries: result.deliveries }
         windows = next
         recruitmentWindows = nextRecruitment
     }
@@ -69,10 +73,11 @@ function simulateBuildOrderPass(
     until = MAX_PLAN_SECONDS,
     constructionWhipWindows: WhipWindow[] = [],
     recruitmentWindows: RecruitmentWindow[] = [],
+    preparation?: PreparationSchedule,
 ) {
     validateActionCount(buildOrder.length)
     validatePlanTime(until, "Simulation horizon")
-    const simulation = new WorkerEconomy(economy, constructionWhipWindows)
+    const simulation = new WorkerEconomy(economy, constructionWhipWindows, !!preparation)
     const recruitmentReduction = legionsCallEffect(economy).recruitmentTimeReduction
     const plan: ScheduledAction[] = []
     const spending: Array<{ time: number; gold: number; wood: number }> = []
@@ -127,6 +132,15 @@ function simulateBuildOrderPass(
     const namesById = new Map([...catalog, ...buildOrder].map(item => [item.id, item.name]))
     const buildings = [newBuilding(initial)]
     const workerCompletions: number[] = []
+    const preparationFailures = new Map<number, string>()
+    const preparedWorkers = new Map<number, { workerId: number; departureTime: number }>()
+    const pendingDepartures = [...(preparation?.commands ?? [])].filter(([index]) => !preparation?.blocked.has(index))
+        .map(([index, command]) => ({ index, time: command - buildOrder[index].construction!.preparationDuration! }))
+        .sort((a, b) => a.time - b.time || a.index - b.index)
+    const interruptReturn = (workerId: number, time: number) => {
+        const interrupted = plan.find(action => action.workerId === workerId && action.finishTime! <= time && (action.workerReturnEndTime ?? action.workerReturnTime ?? 0) > time)
+        if (interrupted) interrupted.workerReturnEndTime = time
+    }
     const saturation = Math.max(
         1,
         Math.ceil(
@@ -137,8 +151,8 @@ function simulateBuildOrderPass(
 
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
-        while (Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity) <= time) {
-            const eventTime = Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity)
+        while (Math.min(pendingDepartures[0]?.time ?? Infinity, workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity) <= time) {
+            const eventTime = Math.min(pendingDepartures[0]?.time ?? Infinity, workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity)
             simulation.advanceTo(eventTime)
             while (workerCompletions[0] === eventTime) {
                 workerCompletions.shift()
@@ -248,6 +262,18 @@ function simulateBuildOrderPass(
                     simulation.scheduleScroll(item.scrollId, startTime, finishTime)
                 }
             }
+            while (pendingDepartures[0]?.time === eventTime) {
+                const { index } = pendingDepartures.shift()!
+                const item = buildOrder[index]
+                const worker = simulation.selectBuilder(item.construction?.useIdleWorker)
+                if (!worker) preparationFailures.set(index, item.construction?.useIdleWorker
+                    ? "No available idle worker at preparation departure." : "No eligible gathering worker at preparation departure.")
+                else {
+                    interruptReturn(worker.id, eventTime)
+                    preparedWorkers.set(index, { workerId: worker.id, departureTime: eventTime })
+                    simulation.prepareConstruction(worker)
+                }
+            }
         }
         simulation.advanceTo(time)
         completeUpgrades(buildings, time)
@@ -271,7 +297,7 @@ function simulateBuildOrderPass(
         return unlocked
     }
 
-    for (const item of buildOrder) {
+    for (const [itemIndex, item] of buildOrder.entries()) {
         if (isTimedEvent(item)) continue
         if (item.construction) parseConstructionSettings(item.construction)
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)
@@ -292,13 +318,13 @@ function simulateBuildOrderPass(
         const pendingHeroLoss = pendingWorkerAndLossEvents.some(({ item: event }) => event.kind === "unit-is-killed" && catalog.some(unit => unit.id === event.unitId && unit.kind === "hero"))
         const missingHeroTier = item.kind === "hero" && !pendingHeroLoss && !unitInstances.some(unit => unit.item.id === item.id && !unit.killed) && requirementCount(eventualBuildings,
             { item: item.producerBuildingId!, count: 1, minLevel: eventualHeroTier }, Infinity) < 1
-        const dependencyProblem = missingHeroTier ? `Requires at least one ${item.producer} at level ${eventualHeroTier} or higher for hero ${eventualHeroTier}` : missingEarlierRequirement
+        const dependencyProblem = preparation?.blocked.get(itemIndex) ?? (missingHeroTier ? `Requires at least one ${item.producer} at level ${eventualHeroTier} or higher for hero ${eventualHeroTier}` : missingEarlierRequirement
             ? `Requires ${missingEarlierRequirement.count} × ${namesById.get(missingEarlierRequirement.item) ?? missingEarlierRequirement.item}${missingEarlierRequirement.minLevel ? ` at level ${missingEarlierRequirement.minLevel} or higher` : ""}`
             : item.kind === "upgrade" && !eventualProducer
                 ? `Requires an available ${item.producer} to upgrade`
                 : needsProducer && !eventualProducer
                     ? `Requires ${item.producer} earlier in the build order`
-                    : missingEarlierName ? `Requires ${missingEarlierName} earlier in the build order` : null
+                    : missingEarlierName ? `Requires ${missingEarlierName} earlier in the build order` : null)
         if (dependencyProblem) blockedReason = dependencyProblem
         // Earlier orders already reserve their costs, even when checking readiness
         // before their command time. The same resources cannot unlock two orders.
@@ -307,6 +333,8 @@ function simulateBuildOrderPass(
         while (!dependencyProblem && simulation.time <= until) {
             advanceTo(simulation.time)
             const time = simulation.time
+            if (preparationFailures.has(itemIndex)) { blockedReason = preparationFailures.get(itemIndex)!; break }
+            const preparationCommand = preparation?.commands.get(itemIndex) ?? item.construction?.preparationDuration ?? 0
             // Only construction commands need spacing; recruitment retains its normal queue.
             const commandReadyAt = requiresConstructionWorker(item)
                 ? Math.max(lastCatalogCommand, lastScrollCommand) + economy.orderDelay : -Infinity
@@ -334,7 +362,10 @@ function simulateBuildOrderPass(
                 : readyProducers.find(building => building.availableAt <= time)
             const heroTierUnlocked = item.kind !== "hero" || requirementCount(unlockedBuildings,
                 { item: item.producerBuildingId!, count: 1, minLevel: requiredAltarLevel }, time) >= 1
-            const builder = requiresConstructionWorker(item) ? simulation.selectBuilder(item.construction?.useIdleWorker) : undefined
+            const prepared = preparedWorkers.get(itemIndex)
+            const builder = requiresConstructionWorker(item) ? preparation?.commands.has(itemIndex)
+                ? prepared ? simulation.workers[prepared.workerId] : undefined
+                : simulation.selectBuilder(item.construction?.useIdleWorker) : undefined
             const state = resourceAt(economy, simulation.deliveries, spending, time)
             // Avoid missing a delivery at the exact boundary through subtraction rounding.
             const readinessTime = Math.max(0, Math.min(time, time - economy.orderDelay + 1e-9))
@@ -363,7 +394,7 @@ function simulateBuildOrderPass(
                         ? `Insufficient supply: requires ${item.food}, available ${Math.max(0, foodLimit - foodUsed)} (${foodUsed}/${foodLimit} used)`
                     : "Waiting for resources, food, producer, or worker"
             const purchaseReady = (
-                time >= commandReadyAt &&
+                time >= commandReadyAt && time >= preparationCommand &&
                 (!needsProducer || producer) &&
                 item.prerequisites.every((name) => completedNames.has(name)) &&
                 !missingRequirement && withinLimit && heroTierUnlocked && !maxCountReached &&
@@ -390,15 +421,13 @@ function simulateBuildOrderPass(
                     blockedReason = "Action would exceed the 30:00 plan limit"
                     break
                 }
-                if (builder) {
-                    const interrupted = plan.find(action => action.workerId === builder.id && action.finishTime! <= time && (action.workerReturnEndTime ?? action.workerReturnTime ?? 0) > time)
-                    if (interrupted) interrupted.workerReturnEndTime = time
-                }
+                if (builder && !prepared) interruptReturn(builder.id, time)
                 plan.push({
                     item,
                     cost,
                     blocked: false,
                     commandTime: time,
+                    departureTime: builder ? prepared?.departureTime ?? time : null,
                     startTime,
                     finishTime,
                     workerReturnTime,
@@ -429,6 +458,8 @@ function simulateBuildOrderPass(
             const nextTime = Math.min(
                 ...[
                     simulation.nextEventTime,
+                    pendingDepartures[0]?.time ?? Infinity,
+                    preparationCommand,
                     commandReadyAt,
                     pendingScrolls[0]?.item.commandTime ?? Infinity,
                     pendingResourcesCollected[0]?.item.commandTime ?? Infinity,
@@ -480,5 +511,5 @@ function simulateBuildOrderPass(
     const orderedPlan = inputPlan.map((action, index) => ({ action, index }))
         .sort((a, b) => (a.action.commandTime ?? Infinity) - (b.action.commandTime ?? Infinity) || a.index - b.index)
         .map(({ action }) => action)
-    return { plan: inputPlan, orderedPlan, deliveries: simulation.deliveries }
+    return { plan: inputPlan, orderedPlan, deliveries: simulation.deliveries, preparationFailures, eventBoundaries: [...simulation.eventBoundaries] }
 }

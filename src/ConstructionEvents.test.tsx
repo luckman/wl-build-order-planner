@@ -71,3 +71,22 @@ test("idle-builder mode disables return controls without losing its override thr
     expect((dialog.getByLabelText("Return travel (seconds)") as HTMLInputElement).disabled).toBe(false)
     fireEvent.click(dialog.getByRole("button", { name: "Save order" }))
 })
+
+test("preparation validates, persists and exposes computed departure through the shared editor", () => {
+    const view = render(<App />)
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^Barracks \d/ }))
+    let dialog = within(screen.getByRole("dialog"))
+    fireEvent.change(dialog.getByLabelText("Preparation (seconds)"), { target: { value: "" } })
+    expect((dialog.getByRole("button", { name: "Add order" }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(dialog.getByLabelText("Preparation (seconds)"), { target: { value: "10" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Add order" }))
+    const row = view.container.querySelector(".order-custom-construction")!
+    expect(row.getAttribute("title")).toContain("Preparation: 10s")
+    expect(row.getAttribute("title")).toContain("Departure ")
+    view.unmount()
+    const restored = render(<App />)
+    fireEvent.click(restored.container.querySelector(".order-custom-construction")!)
+    dialog = within(screen.getByRole("dialog"))
+    expect((dialog.getByLabelText("Preparation (seconds)") as HTMLInputElement).value).toBe("10")
+    fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
+})

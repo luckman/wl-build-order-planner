@@ -37,7 +37,8 @@ its override; explicit values equal to the global value remain fixed after profi
 
 For a command accepted at time `t` :
 
-- Costs are paid and the selected worker stops gathering at `t` .
+- Costs are paid at `t`; by default the selected worker stops gathering then.
+  With preparation P, select and reserve the worker at `t - P` instead.
 - Construction starts at `t + constructionStartDelay` .
 - The building or building upgrade completes after its `seconds` duration multiplied by
   `1 - floor((workerLevel - 1) / 4) / 100` , using the base duration from `src/game/data.json` .
@@ -129,3 +130,18 @@ journey through the next outward trip and construction; repeat the rule across f
 assignments. Whip preserves distance travelled. Twelve seconds interrupted after five
 leaves seven; a next return override of three or zero still requires seven. Plan results
 record interrupted return endpoints, separately from projected return arrival.
+
+## Command-relative preparation
+
+Per-order preparation defaults to zero. The full interval fits after time zero; an
+early command moves later rather than truncating preparation. Worker selection and
+gathering interruption occur at departure, before purchase readiness is checked.
+Resources, food, prerequisites, queues and command spacing retain their existing rules.
+
+Departures are processed chronologically across all rows, before construction commands
+and after same-time worker/loss events. The scheduler replays fresh economies while
+commands move, removes rejected reservations, and checks observable event boundaries
+when restoring earlier deliveries can permit an earlier departure. Later reservations
+cannot starve earlier catalog commands. An idle-only order requires an idle worker at
+its departure; a future Make idle event cannot satisfy it. Preparation is unaffected
+by Whip; outward/return travel retains movement effects and unfinished journey minima.

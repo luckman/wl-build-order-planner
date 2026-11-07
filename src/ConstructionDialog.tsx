@@ -9,11 +9,13 @@ export default function ConstructionDialog({ item, globalDelay, editing, onSave,
     const dialog = useRef<HTMLDivElement>(null)
     const [outward, setOutward] = useState<string | undefined>(item.construction?.outwardDuration?.toString())
     const [back, setBack] = useState<string | undefined>(item.construction?.returnDuration?.toString())
+    const [preparation, setPreparation] = useState(String(item.construction?.preparationDuration ?? 0))
     const [useIdleWorker, setUseIdleWorker] = useState(item.construction?.useIdleWorker ?? false)
-    const settings: ConstructionSettings = { useIdleWorker, ...(outward !== undefined ? { outwardDuration: Number(outward) } : {}),
+    const settings: ConstructionSettings = { useIdleWorker, preparationDuration: Number(preparation), ...(outward !== undefined ? { outwardDuration: Number(outward) } : {}),
         ...(back !== undefined ? { returnDuration: Number(back) } : {}) }
     let error = validationError
     try {
+        if (!preparation.trim()) throw new Error("Enter a preparation duration.")
         if (outward?.trim() === "" || back?.trim() === "") throw new Error("Enter a travel duration or use global.")
         parseConstructionSettings(settings)
     } catch (failure) { error = (failure as Error).message }
@@ -35,6 +37,8 @@ export default function ConstructionDialog({ item, globalDelay, editing, onSave,
             }}>
             <h2 id="construction-dialog-title">{editing ? "Edit" : "Configure"} {item.name}</h2>
             <form onSubmit={event => { event.preventDefault(); if (!error) onSave(settings) }}>
+                <label>Preparation (seconds)<input type="number" min="0" step="any" value={preparation} onChange={event => setPreparation(event.target.value)} /></label>
+                <p>Preparation reserves the worker this many seconds before the scheduled command.</p>
                 <label><input type="checkbox" checked={useIdleWorker} onChange={event => setUseIdleWorker(event.target.checked)} />Use idle worker</label>
                 {([{ label: "Outward travel (seconds)", value: outward, set: setOutward, disabled: false },
                     { label: "Return travel (seconds)", value: back, set: setBack, disabled: useIdleWorker }]).map(field => <div key={field.label}>

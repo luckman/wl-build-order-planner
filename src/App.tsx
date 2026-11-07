@@ -141,10 +141,10 @@ const formatTimeWithTenths = (seconds: number) => {
 type TimelineEvent = ScheduledAction & { index: number }
 type TimelineLane = { label: string; events: TimelineEvent[] }
 
-function actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason }:
-    Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime" | "blockedReason">) {
+function actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason }:
+    Pick<ScheduledAction, "departureTime" | "commandTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime" | "blockedReason">) {
     if (commandTime === null || startTime === null || finishTime === null) return blockedReason
-    return `Command ${formatTime(commandTime)} · start ${formatTime(startTime)} · finish ${formatTime(finishTime)}${workerReturnTime === null ? "" : ` · eligible for construction ${formatTime(finishTime)} · ${workerReturnEndTime != null && workerReturnEndTime < workerReturnTime ? `return interrupted ${formatTime(workerReturnEndTime)} (projected arrival ${formatTime(workerReturnTime)})` : `worker returns ${formatTime(workerReturnTime)}`}`}`
+    return `${departureTime != null ? `Departure ${formatTime(departureTime)} · ` : ""}Command ${formatTime(commandTime)} · start ${formatTime(startTime)} · finish ${formatTime(finishTime)}${workerReturnTime === null ? "" : ` · eligible for construction ${formatTime(finishTime)} · ${workerReturnEndTime != null && workerReturnEndTime < workerReturnTime ? `return interrupted ${formatTime(workerReturnEndTime)} (projected arrival ${formatTime(workerReturnTime)})` : `worker returns ${formatTime(workerReturnTime)}`}`}`
 }
 
 function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
@@ -610,6 +610,7 @@ export default function App() {
                                                         ({
                                                             item,
                                                             commandTime,
+                                                            departureTime,
                                                             startTime,
                                                             finishTime,
                                                             workerReturnTime,
@@ -623,7 +624,7 @@ export default function App() {
                                                                     left: `${(commandTime! / endTime) * 100}%`,
                                                                     width: `${((finishTime! - commandTime!) / endTime) * 100}%`,
                                                                 }}
-                                                                title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime })].filter(Boolean).join("\n")}
+                                                                title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime })].filter(Boolean).join("\n")}
                                                                 aria-haspopup="menu"
                                                                 data-order-id={(item as typeof buildOrder[number]).orderId}
                                                                 aria-expanded={timelineMenu?.item === item}
@@ -696,9 +697,9 @@ export default function App() {
                             <DragDropContext onDragEnd={reorderActions}>
                             <Droppable droppableId="build-order">
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
-                                {displayPlan.map(({ item, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blocked, blockedReason }, index) => (
+                                {displayPlan.map(({ item, departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blocked, blockedReason }, index) => (
                                     <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
-                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason })].filter(Boolean).join("\n")}
+                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason })].filter(Boolean).join("\n")}
                                         tabIndex={isConstruction(item) ? 0 : undefined}
                                         onKeyDown={event => { if (isConstruction(item) && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setEditingEventId((item as typeof buildOrder[number]).orderId) } }}
                                         onClick={isTimedEvent(item) || isConstruction(item) ? () => { setDependencyError(null); setEditingEventId((item as typeof buildOrder[number]).orderId) } : undefined}>

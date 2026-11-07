@@ -557,3 +557,7 @@ are per occurrence; derived timings and worker identities remain non-authoritati
 
 `construction.useIdleWorker` is optional boolean, default false. Its return override
 is retained in persistence but inactive while the order explicitly uses an idle worker.
+
+`construction.preparationDuration` is optional, finite and nonnegative, default zero.
+It is a command-relative interval in seconds, not an absolute departure timestamp.
+Save/load, drafts and sharing preserve the interval and recalculate all phase timings.

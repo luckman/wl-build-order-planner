@@ -364,7 +364,7 @@ test("adding a second Farm inserts the needed upgrade and removal explains block
     fireEvent.click(screen.getByRole("button", { name: "Remove Castle lvl 2" }))
     expect(within(order).getByText("Farm limit reached at the current town-hall level")).toBeTruthy()
     const blockedFarm = Array.from(order.querySelectorAll("li")).find(row => row.textContent?.includes("Farm limit reached"))!
-    expect(blockedFarm.title).toBe("Farm limit reached at the current town-hall level")
+    expect(blockedFarm.title).toContain("Farm limit reached at the current town-hall level")
     expect(blockedFarm.classList.contains("order-blocked")).toBe(true)
     expect(within(blockedFarm).queryByText("Blocked")).toBeNull()
     expect(within(screen.getByRole("region", { name: "Blocked actions" })).getByText("Farm limit reached at the current town-hall level")).toBeTruthy()
@@ -522,9 +522,9 @@ test("the editable construction delay changes building and worker return times",
     fireEvent.click(
         within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ }),
     )
-    expect(screen.getAllByTitle("Command 0:01 · start 0:04 · finish 0:34 · worker returns 0:37")).toHaveLength(2)
+    expect(screen.getAllByTitle(/Command 0:01 · start 0:04 · finish 0:34 · eligible for construction 0:34 · worker returns 0:37/)).toHaveLength(2)
     fireEvent.change(delay, { target: { value: "2.5" } })
-    expect(screen.getAllByTitle("Command 0:01 · start 0:03.5 · finish 0:33.5 · worker returns 0:36")).toHaveLength(2)
+    expect(screen.getAllByTitle(/Command 0:01 · start 0:03.5 · finish 0:33.5 · eligible for construction 0:33.5 · worker returns 0:36/)).toHaveLength(2)
 })
 
 test("town hall upgrades show builder travel and return time in the construction timeline", () => {
@@ -533,8 +533,8 @@ test("town hall upgrades show builder travel and return time in the construction
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
     chooseUpgrade("Castle lvl 2")
 
-    expect(container.querySelector(".event.upgrade")?.getAttribute("title")).toBe(
-        "Command 0:35 · start 0:38 · finish 1:23 · worker returns 1:26",
+    expect(container.querySelector(".event.upgrade")?.getAttribute("title")).toContain(
+        "Command 0:35 · start 0:38 · finish 1:23 · eligible for construction 1:23 · worker returns 1:26",
     )
     const upgradeRow = screen.getByRole("button", { name: "Remove Castle lvl 2" }).closest("li")!
     expect(upgradeRow.title).toBe(container.querySelector(".event.upgrade")?.getAttribute("title"))

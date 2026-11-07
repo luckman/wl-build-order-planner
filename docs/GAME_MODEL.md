@@ -297,3 +297,9 @@ at the scheduled event time. Gathering casualties include travel and in-mine wor
 idle casualties require a deliberately idle, available worker. Both exclude builders
 and construction return travel. Empty groups produce a correctable error with no
 death or food release. Worker events and losses share displayed order for ties.
+
+Construction preparation is per occurrence, measured backward from the scheduled
+purchase command. Departure reserves the worker and stops income. Fresh chronological
+replays recalculate departures, readiness and availability across rows when commands
+move, without committing rejected costs or reservations. Preparation must fit after
+time zero and is not shortened by Whip. See CONSTRUCTION.md for scheduling details.
