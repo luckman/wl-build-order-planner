@@ -36,6 +36,24 @@ test("a later row can depart before an earlier command without taking the same w
     expect(result.plan[1]).toMatchObject({ commandTime: 20, departureTime: 0, workerId: 0 })
 })
 
+test("prepared commands can share a command time with zero order delay", () => {
+    const barracks = { ...factions.light.items.find(item => item.id === "barracks")!, construction: { preparationDuration: 10 } }
+    const farm = { ...factions.light.items.find(item => item.id === "farm")!, construction: { preparationDuration: 8 } }
+    const { plan } = run([barracks, farm], { ...economy, workerCount: 2, woodWorkers: 2, orderDelay: 0 })
+    expect(plan[0]).toMatchObject({ blocked: false, commandTime: 10, departureTime: 0, workerId: 0 })
+    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 10, departureTime: 2, workerId: 1 })
+})
+
+test("the earliest prepared command after a fractional order delay preserves the funding delivery", () => {
+    const farm = { ...factions.light.items.find(item => item.id === "farm")!, construction: { preparationDuration: 20 } }
+    const sawmill = { ...factions.light.items.find(item => item.id === "sawmill")!, construction: { preparationDuration: 0.75 } }
+    const settings = { ...economy, workerCount: 2, woodWorkers: 2, orderDelay: 0.5, startingWood: 150, woodPerTrip: 150 }
+    const { plan, deliveries } = run([farm, sawmill], settings)
+    expect(deliveries[0]).toMatchObject({ time: 20.5, wood: 150, worker: 1 })
+    expect(plan[0]).toMatchObject({ blocked: false, commandTime: 21, departureTime: 1, workerId: 0 })
+    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 21.5, departureTime: 20.75, workerId: 1 })
+})
+
 test("a lone builder completes its earlier job before starting a later preparation", () => {
     const farm = factions.light.items.find(item => item.id === "farm")!
     const barracks = { ...factions.light.items.find(item => item.id === "barracks")!, construction: { preparationDuration: 20 } }

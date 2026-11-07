@@ -1,6 +1,7 @@
 import type { ScheduledAction } from "./buildSimulation"
 import type { PlannerItem } from "./gameData"
 import type { EconomySettings, ResourceDelivery } from "./resourceSimulation"
+import { isConstruction } from "./constructionSettings"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS } from "./plannerLimits"
 import { isTimedEvent } from "./resourcesCollected"
 
@@ -88,6 +89,15 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, sched
         const candidates = Array.from(new Set([command, probe.plan[index].commandTime ?? command, preparation,
             ...times.flatMap(time => [time + preparation, time + economy.orderDelay])]))
             .filter(time => time >= preparation && time <= command).sort((a, b) => a - b)
+        let earliestCommandTime = -Infinity
+        if (isConstruction(items[index])) {
+            // Accepted trials keep earlier active reservations at their fixed command times.
+            for (const [earlierIndex, fixedCommand] of commands) {
+                if (earlierIndex < index && !schedule.blocked.has(earlierIndex) && isConstruction(items[earlierIndex])) {
+                    earliestCommandTime = Math.max(earliestCommandTime, fixedCommand + economy.orderDelay)
+                }
+            }
+        }
         const wasSuccessful = result.plan.map(action => !action.blocked)
         const evaluate = (time: number) => {
             const candidate = new Map(schedule.commands)
@@ -98,6 +108,7 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, sched
             return valid ? trial : null
         }
         for (const time of candidates) {
+            if (time < earliestCommandTime) continue
             const refined = evaluate(time)
             if (refined) { schedule.commands.set(index, time); result = refined; break }
         }
