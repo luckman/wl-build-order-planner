@@ -290,3 +290,9 @@ retained; interrupted gold cargo is discarded. Whip affects reactivation movemen
 Construction can interrupt reactivation; its eventual return is at least the unfinished
 normal-speed journey. Delayed initial gatherers remain gatherers, distinct from deliberate
 idle assignment. Latest order state reports idle separately from building/travelling.
+
+Worker losses select Gathering (default, including old records) or Idle, strictly
+at the scheduled event time. Gathering casualties include travel and in-mine workers;
+idle casualties require a deliberately idle, available worker. Both exclude builders
+and construction return travel. Empty groups produce a correctable error with no
+death or food release. Worker events and losses share displayed order for ties.

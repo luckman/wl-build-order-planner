@@ -545,3 +545,7 @@ restores assignments with normal-speed travel in seconds (omitted travel default
 Counts are positive integers within the supported worker limit; times and durations use
 planner limits. Drafts, JSON files and share links use these same records. Worker identity,
 resource assignments and travel progress are derived by simulation, never stored.
+
+Worker casualty records optionally carry `workerGroup: "gathering" | "idle"`.
+Omitted groups default to gathering. New and imported events share the same strict
+choices; no legacy automatic mode or cross-group fallback exists.

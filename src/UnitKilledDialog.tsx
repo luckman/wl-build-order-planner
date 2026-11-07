@@ -1,3 +1,4 @@
+import type { WorkerCasualtyGroup } from "./game/gameData"
 import { useEffect, useRef, useState } from "react"
 import DurationInput from "./DurationInput"
 import { formatDuration, parseDuration } from "./durationTime"
@@ -12,16 +13,17 @@ export default function UnitKilledDialog({ faction, defaultTime, action, validat
     const dialog = useRef<HTMLDivElement>(null)
     const [time, setTime] = useState(() => formatDuration(Math.ceil(action?.commandTime ?? defaultTime)))
     const [unitId, setUnitId] = useState(action?.unitId ?? (faction === "light" ? "worker" : "slave"))
+    const [workerGroup, setWorkerGroup] = useState<WorkerCasualtyGroup>(action?.workerGroup ?? "gathering")
     const commandTime = parseDuration(time)
     const timeValid = commandTime !== null && Number.isInteger(commandTime)
-    const command: UnitKilledCommand = { type: "unit-is-killed", commandTime: commandTime ?? 0, unitId }
+    const workerId = faction === "light" ? "worker" : "slave"
+    const command: UnitKilledCommand = { type: "unit-is-killed", commandTime: commandTime ?? 0, unitId, ...(unitId === workerId ? { workerGroup } : {}) }
     const error = timeValid ? validate(command) : "Enter a valid whole-second time from 00:00 to 29:59."
     useEffect(() => {
         const previousFocus = document.activeElement as HTMLElement | null
         dialog.current?.querySelector<HTMLInputElement>("input")?.focus()
         return () => { if (previousFocus?.isConnected) previousFocus.focus() }
     }, [])
-    const workerId = faction === "light" ? "worker" : "slave"
     const units = factions[faction].items.filter(isRecruitable)
     return <div className="scroll-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
         <div ref={dialog} className="scroll-dialog panel" role="dialog" aria-modal="true" aria-labelledby="unit-is-killed-dialog-title"
@@ -42,6 +44,10 @@ export default function UnitKilledDialog({ faction, defaultTime, action, validat
                     <optgroup label="Units">{units.filter(unit => unit.kind === "unit" && unit.id !== workerId).map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</optgroup>
                     <optgroup label="Heroes">{units.filter(unit => unit.kind === "hero").map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</optgroup>
                 </select></label>
+                {unitId === workerId && <label>Worker group<select value={workerGroup} onChange={event => setWorkerGroup(event.target.value as WorkerCasualtyGroup)}>
+                    <option value="gathering">Gathering worker</option>
+                    <option value="idle" disabled={workerGroup !== "idle" && !!validate({ ...command, workerGroup: "idle" })}>Idle worker</option>
+                </select></label>}
                 <p className="scroll-time-hint">The unit must be alive and fully recruited. Workers assigned to construction cannot be killed. Wood gatherers are killed before gold miners.</p>
                 {error && <p role="alert">{error}</p>}
                 <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!timeValid || !!error}>{action ? "Save event" : "Add event"}</button></div>

@@ -1,3 +1,4 @@
+import type { WorkerCasualtyGroup } from "./gameData"
 import { createWorkerEvent, workerEventCommand, type WorkerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision, type ManaSpentCommand } from "./manaSpent"
 import { validateActionCount, validateEconomyDurations } from "./plannerLimits"
@@ -135,7 +136,9 @@ export function parseBuildOrder(text: string): {
         }
         if (action.type === "unit-is-killed") {
             if (typeof action.unitId !== "string") throw new Error(`Action ${index + 1}.unitId must identify a unit.`)
-            return createUnitKilledAction({ type: "unit-is-killed", unitId: action.unitId,
+            if (action.workerGroup !== undefined && action.workerGroup !== "gathering" && action.workerGroup !== "idle")
+                throw new Error(`Action ${index + 1}.workerGroup must be gathering or idle.`)
+            return createUnitKilledAction({ workerGroup: action.workerGroup as WorkerCasualtyGroup | undefined, type: "unit-is-killed", unitId: action.unitId,
                 commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`) }, faction)
         }
         if (action.type === "mana-well-is-captured" || action.type === "mana-well-is-lost") {

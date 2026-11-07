@@ -32,7 +32,8 @@ an order delay or spell effect; edit or delete it like other timed events.
 
 **Make idle** removes a chosen count of gatherers from income and ordinary builder selection.
 **Make active** restores their previous assignments, optionally after travel. Both use fixed times
-and apply the full count or report an error. Latest order state lists idle workers separately.
+and apply the full count or report an error. Latest order state lists idle workers separately. Worker losses let you choose Gathering
+or Idle; an unavailable group reports an error without removing a worker from the other group.
 
 Plans support **100 actions** after the opening allocation and a **30-minute** simulation. The
 catalog is still expanding, and timings are estimates to check in-game. See the

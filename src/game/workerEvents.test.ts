@@ -89,3 +89,15 @@ test("reactivation retains a completed wood load instead of gathering another", 
     const result = simulateBuildOrder([idle(17), active(30)], economy, 2, 200, economy.foodPerFarm, "Castle", 40)
     expect(result.deliveries[0]).toMatchObject({ time: 34, wood: economy.woodPerTrip })
 })
+
+test.each(["light", "dark"] as const)("%s worker losses strictly select their group in displayed event order", faction => {
+    const unitId = faction === "light" ? "worker" : "slave"
+    const loss = (workerGroup?: "gathering" | "idle") => createUnitKilledAction({ type: "unit-is-killed", commandTime: 5, unitId, workerGroup }, faction)
+    const run = (items: PlannerItem[]) => simulateBuildOrder(items, settings, 2, 200, settings.foodPerFarm, factions[faction].startingTownHall, 40)
+    expect(run([idle(5), loss("idle")]).plan[1]).toMatchObject({ blocked: false, foodReleased: 2 })
+    expect(run([loss("idle"), idle(5)]).plan[0]).toMatchObject({ blocked: true, foodReleased: 0 })
+    expect(run([idle(5), loss()]).plan[1]).toMatchObject({ blocked: true, foodReleased: 0 })
+    expect(run([idle(5), active(5), loss("gathering")]).plan[2].blocked).toBe(false)
+    const plan = run([idle(5), loss("idle")]).plan
+    expect(parseBuildOrder(serializeBuildOrder(faction, initialGameProfile, plan)).buildOrder[1]).toMatchObject({ workerGroup: "idle" })
+})

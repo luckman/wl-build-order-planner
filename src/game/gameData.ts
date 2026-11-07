@@ -1,6 +1,7 @@
 import rawData from "./data.json"
 import { buildingLimit, newBuilding, plannedBuildings, requirementCount } from "./buildingRules"
 
+export type WorkerCasualtyGroup = "gathering" | "idle"
 export type FactionId = "light" | "dark"
 export type ItemKind = "building" | "unit" | "hero" | "upgrade"
 export function isRecruitable(item: { kind: ItemKind | "worker-event" | "mana-spent" | "scroll" | "resources-collected" | "mana-well" | "unit-is-killed" }) {
@@ -132,7 +133,7 @@ export type PlannerItem = {
     level?: number
     upgradeFrom?: string
     producerBuildingId?: string
-} & ({ kind: ItemKind } | { kind: "worker-event"; workerEvent: "make-idle" | "make-active"; commandTime: number; count: number; travelDuration: number } | { kind: "mana-spent"; commandTime: number; mana: number } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering" | "whip" | "legions-call"; commandTime: number; targetItemId?: string } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string })
+} & ({ kind: ItemKind } | { kind: "worker-event"; workerEvent: "make-idle" | "make-active"; commandTime: number; count: number; travelDuration: number } | { kind: "mana-spent"; commandTime: number; mana: number } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering" | "whip" | "legions-call"; commandTime: number; targetItemId?: string } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string; workerGroup?: WorkerCasualtyGroup })
 
 export type Faction = {
     id: FactionId

@@ -1,3 +1,4 @@
+import type { WorkerCasualtyGroup } from "./gameData"
 import type { WorkerEventAction } from "./workerEvents"
 import { growingWoodTravelTime } from "./gatheringRules"
 import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
@@ -168,10 +169,11 @@ export class WorkerEconomy {
     }
 
     /** Construction workers cannot be selected; wood gatherers are killed before gold miners. */
-    selectWorkerToKill() {
+    selectWorkerToKill(group: WorkerCasualtyGroup = "gathering") {
         const priority = (worker: GatheringWorker) => worker.assignment === "wood" || this.delayedInitialWoodWorkerIds.includes(worker.id)
             ? 0 : worker.assignment === "gold" ? 1 : 2
-        return this.workers.filter(worker => !isBuildingWorker(worker) && worker.state !== "killed")
+        return this.workers.filter(worker => !isBuildingWorker(worker) && worker.state !== "killed" &&
+            (group === "idle" ? worker.assignment === "idle" && worker.state === "idle" : worker.assignment !== "idle"))
             .sort((a, b) => priority(a) - priority(b) || a.id - b.id)[0]
     }
 

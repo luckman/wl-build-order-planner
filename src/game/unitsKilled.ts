@@ -1,20 +1,24 @@
+import type { WorkerCasualtyGroup } from "./gameData"
 import { validateCommandTime } from "./plannerLimits"
 import { factions, isRecruitable, type FactionId, type PlannerItem } from "./gameData"
 
-export type UnitKilledCommand = { type: "unit-is-killed"; commandTime: number; unitId: string }
-export type UnitKilledAction = PlannerItem & { kind: "unit-is-killed"; commandTime: number; unitId: string }
+export type UnitKilledCommand = { type: "unit-is-killed"; commandTime: number; unitId: string; workerGroup?: WorkerCasualtyGroup }
+export type UnitKilledAction = PlannerItem & { kind: "unit-is-killed"; commandTime: number; unitId: string; workerGroup?: WorkerCasualtyGroup }
 export function createUnitKilledAction(command: UnitKilledCommand, faction: FactionId): UnitKilledAction {
     if (command.type !== "unit-is-killed" || !Number.isFinite(command.commandTime) || command.commandTime < 0)
         throw new Error("Unit is killed commandTime must be a finite non-negative number.")
     validateCommandTime(command.commandTime)
     const unit = factions[faction].items.find(item => item.id === command.unitId && isRecruitable(item))
     if (!unit) throw new Error(`Unknown unit ID ${String(command.unitId)} for ${faction}.`)
-    return { id: "unit-is-killed", name: "Unit is killed", kind: "unit-is-killed", unitId: unit.id,
+    if (command.workerGroup !== undefined && command.workerGroup !== "gathering" && command.workerGroup !== "idle")
+        throw new Error("Worker group must be gathering or idle.")
+    const isWorker = unit.id === (faction === "light" ? "worker" : "slave")
+    return { ...(isWorker ? { workerGroup: command.workerGroup ?? "gathering" } : {}), id: "unit-is-killed", name: "Unit is killed", kind: "unit-is-killed", unitId: unit.id,
         icon: faction === "light" ? "lightUnitIsKilled" : "darkUnitIsKilled", commandTime: command.commandTime,
         gold: 0, wood: 0, food: 0, seconds: 0, producer: "", prerequisites: [] }
 }
 export function unitKilledCommand(item: UnitKilledAction): UnitKilledCommand {
-    return { type: "unit-is-killed", unitId: item.unitId, commandTime: item.commandTime }
+    return { type: "unit-is-killed", unitId: item.unitId, commandTime: item.commandTime, ...(item.workerGroup ? { workerGroup: item.workerGroup } : {}) }
 }
 
 type FoodAction = { item: PlannerItem; blocked: boolean; commandTime: number | null; foodReleased?: number }

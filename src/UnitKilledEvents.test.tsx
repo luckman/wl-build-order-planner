@@ -27,7 +27,7 @@ test("Unit is killed selects a timestamp and unit type, validates existence, rel
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0020.5" } })
     expect((dialog.getByLabelText("Command time (mm:ss)") as HTMLInputElement).value).toBe("00:20")
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
-    expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder[1]).toEqual({ type: "unit-is-killed", unitId: "worker", commandTime: 20 })
+    expect(JSON.parse(window.localStorage.getItem("wl-build-draft-v2-light")!).buildOrder[1]).toEqual({ type: "unit-is-killed", unitId: "worker", commandTime: 20, workerGroup: "gathering" })
     view.unmount()
     render(<App />)
     expect(screen.getByRole("button", { name: "Remove Unit is killed" })).toBeTruthy()

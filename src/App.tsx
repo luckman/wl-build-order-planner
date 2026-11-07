@@ -701,7 +701,7 @@ export default function App() {
                                             <b>{item.name}</b>
                                             {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}
                                             {item.kind === "worker-event" && <small>{item.count} workers{item.workerEvent === "make-active" ? ` · ${item.travelDuration}s travel` : ""}</small>}
-                                            {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}</small>}
+                                            {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}{item.workerGroup ? ` · ${item.workerGroup} worker` : ""}</small>}
                                             {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
                                             <small>

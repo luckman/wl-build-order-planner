@@ -155,7 +155,7 @@ function simulateBuildOrderPass(
                 const target = catalog.find(unit => unit.id === item.unitId)!
                 const isWorker = target.id === workerItem.id
                 const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.killed && unit.readyAt <= eventTime)
-                const worker = isWorker ? simulation.selectWorkerToKill() : undefined
+                const worker = isWorker ? simulation.selectWorkerToKill(item.workerGroup) : undefined
                 const blocked = !instance || (isWorker && !worker)
                 if (!blocked) {
                     instance!.killed = true
@@ -166,7 +166,7 @@ function simulateBuildOrderPass(
                     workerReturnTime: null, workerId: blocked ? null : worker?.id ?? null,
                     foodReleased: blocked ? 0 : target.food,
                     ...(blocked ? { blockedReason: isWorker && instance
-                        ? `Unit is killed: no available ${target.name}; workers assigned to construction cannot be killed.`
+                        ? `Unit is killed: no available ${item.workerGroup === "idle" ? "idle" : "gathering"} ${target.name}; workers assigned to construction cannot be killed.`
                         : `Unit is killed requires a living ${target.name} at this timestamp (recruitment must be complete).` } : {}) }
                 unitKilledPlan.push(action)
                 timedEventsByIndex.set(index, action)
