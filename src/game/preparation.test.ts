@@ -5,6 +5,7 @@ import { createWorkerEvent } from "./workerEvents"
 import { workerAllocationAt } from "./resourceSimulation"
 import { createScrollAction } from "./scrolls"
 import { parseBuildOrder, serializeBuildOrder } from "./buildOrderFile"
+import { createResourcesCollectedAction } from "./resourcesCollected"
 
 const economy = { ...economyFromProfile(initialGameProfile), startingGold: 10000, startingWood: 10000,
     workerCount: 1, goldWorkers: 0, woodWorkers: 1, woodTravelTime: 4, woodGatherTime: 12, woodTravelTimeIncreaseBase: 0 }
@@ -151,6 +152,21 @@ test("fixed-time worker eligibility is independent of the event's source row pos
     expect(before.plan[1]).toMatchObject({ blocked: false, departureTime: 0, commandTime: 10 })
     expect(after.plan[0]).toEqual(before.plan[1])
     expect(after.plan[1]).toEqual(before.plan[0])
+})
+
+test("a prepared build waits for late resources and resolves a worker event after the final command", () => {
+    const barracks = factions.light.items.find(item => item.id === "barracks")!
+    const farm = factions.light.items.find(item => item.id === "farm")!
+    const funds = createResourcesCollectedAction({ type: "resources-collected", commandTime: 1400, gold: 0, wood: farm.wood })
+    const active = createWorkerEvent({ type: "make-active", commandTime: 1700, count: 1 }, "light")
+    const { plan, orderedPlan } = simulateBuildOrder([
+        { ...barracks, construction: { preparationDuration: 10 } }, farm, funds, active,
+    ], { ...economy, startingWood: barracks.wood, woodPerTrip: 0 }, 2, 200, 20, "Castle")
+
+    expect(plan[0]).toMatchObject({ blocked: false, departureTime: 0, commandTime: 10 })
+    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 1401 })
+    expect(plan[3]).toMatchObject({ blocked: true, commandTime: 1700, blockedReason: "Make Worker active: not enough eligible workers for count 1." })
+    expect(orderedPlan).toEqual([plan[0], plan[2], plan[1], plan[3]])
 })
 
 test.each([[1, 35, 168], [20, 54, 187]])("the earliest later departure moves when preparations are [0,%s,100]", (middle, secondCommand, thirdCommand) => {

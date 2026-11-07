@@ -6,11 +6,18 @@ import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS } from "./plannerLimits"
 import { isTimedEvent } from "./resourcesCollected"
 
 export type PreparationSchedule = { commands: Map<number, number>; blocked: Map<number, string> }
-type Result = { plan: ScheduledAction[]; orderedPlan: ScheduledAction[]; deliveries: ResourceDelivery[]; preparationFailures: Map<number, string>; eventBoundaries: number[] }
+type Result = {
+    plan: ScheduledAction[]
+    orderedPlan: ScheduledAction[]
+    preparationFailures: Map<number, string>
+    candidateEventTimes: number[]
+    projectDeliveries: () => ResourceDelivery[]
+}
+type Replay = (schedule: PreparationSchedule, collectCandidatesThrough?: number) => Result
 
 /** Replays discard obsolete reservations. The engine remains responsible for all
  * purchase readiness, worker selection, fixed events and movement rules. */
-export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, run: (schedule: PreparationSchedule) => Result): Result {
+export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, run: Replay): Result {
     const prepared = items.flatMap((item, index) => (item.construction?.preparationDuration ?? 0) > 0 ? [index] : [])
     const schedule: PreparationSchedule = { commands: new Map(), blocked: new Map() }
     let result = run(schedule)
@@ -77,14 +84,13 @@ export function schedulePreparation(items: PlannerItem[], economy: EconomySettin
 
 /** A later departure can restore an earlier delivery. Refine against observable
  * event boundaries so a conservative replay does not impose an unnecessary wait. */
-function refinePreparation(items: PlannerItem[], economy: EconomySettings, schedule: PreparationSchedule, result: Result,
-    run: (schedule: PreparationSchedule) => Result) {
+function refinePreparation(items: PlannerItem[], economy: EconomySettings, schedule: PreparationSchedule, result: Result, run: Replay) {
     for (const [index, command] of schedule.commands) {
         const preparation = items[index].construction!.preparationDuration!
         const commands = new Map(schedule.commands)
         commands.delete(index)
-        const probe = run({ commands, blocked: schedule.blocked })
-        const times = [0, ...probe.eventBoundaries, ...probe.deliveries.map(event => event.time), ...probe.plan.flatMap(action =>
+        const probe = run({ commands, blocked: schedule.blocked }, command)
+        const times = [0, ...probe.candidateEventTimes, ...probe.plan.flatMap(action =>
             [action.commandTime, action.startTime, action.finishTime, action.workerReturnTime].filter((time): time is number => time !== null))]
         const candidates = Array.from(new Set([command, probe.plan[index].commandTime ?? command, preparation,
             ...times.flatMap(time => [time + preparation, time + economy.orderDelay])]))
