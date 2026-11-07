@@ -240,8 +240,8 @@ export class WorkerEconomy {
     }
 
     /** Project travel across activation/expiry boundaries; construction itself is never sped up. */
-    constructionTravelTime(worker: GatheringWorker) {
-        return this.projectConstructionTravel(this.time, worker.whipUntil)
+    constructionTravelTime(worker: GatheringWorker, duration = this.settings.constructionStartDelay) {
+        return this.projectConstructionTravel(this.time, worker.whipUntil, false, duration)
     }
 
     constructionReturnTravelTime(finishTime: number, duration = this.settings.constructionStartDelay) {

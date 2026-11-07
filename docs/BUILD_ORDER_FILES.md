@@ -549,3 +549,8 @@ resource assignments and travel progress are derived by simulation, never stored
 Worker casualty records optionally carry `workerGroup: "gathering" | "idle"`.
 Omitted groups default to gathering. New and imported events share the same strict
 choices; no legacy automatic mode or cross-group fallback exists.
+
+Construction/upgrade item records may include `construction: { outwardDuration: 0,
+returnDuration: 7 }`. Each omitted field inherits the current global construction delay.
+Explicit zero or an override equal to the current global value stays explicit. Settings
+are per occurrence; derived timings and worker identities remain non-authoritative.

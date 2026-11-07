@@ -1,3 +1,4 @@
+import { constructionCommand, parseConstructionSettings, type ConstructionSettings } from "./constructionSettings"
 import type { WorkerCasualtyGroup } from "./gameData"
 import { createWorkerEvent, workerEventCommand, type WorkerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision, type ManaSpentCommand } from "./manaSpent"
@@ -23,7 +24,7 @@ export type BuildOrderDocument = {
     faction: FactionId
     gameProfile: GameProfile
     buildOrder: Array<OpeningAction | ((WorkerEventCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
-        itemId: string
+        itemId: string; construction?: ConstructionSettings
     }) & {
         timings?: Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime">
     })>
@@ -36,7 +37,7 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
         buildOrder: [opening, ...actions.map(({ item, commandTime, startTime, finishTime, workerReturnTime }) => ({
-            ...(item.kind === "worker-event" ? workerEventCommand(item) : item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : { itemId: item.id }),
+            ...(item.kind === "worker-event" ? workerEventCommand(item) : item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : constructionCommand(item)),
             ...(includeTimings ? { timings: { commandTime, startTime, finishTime, workerReturnTime } } : {}),
         }))],
     }
@@ -160,6 +161,10 @@ export function parseBuildOrder(text: string): {
         if ("type" in action) throw new Error("Worker allocation is only allowed as the opening action.")
         const item = typeof action.itemId === "string" ? catalog.get(action.itemId) : undefined
         if (!item) throw new Error(`Action ${index + 1}: unknown item ID ${String(action.itemId)} for ${doc.faction}.`)
+        if (action.construction !== undefined) {
+            if (item.kind !== "building" && item.kind !== "upgrade") throw new Error("Construction settings require a building or upgrade.")
+            return { ...item, construction: parseConstructionSettings(action.construction) }
+        }
         return item
     })
     const collision = manaSpentCollision(buildOrder)

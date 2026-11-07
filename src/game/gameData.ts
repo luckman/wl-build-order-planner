@@ -1,3 +1,4 @@
+import type { ConstructionSettings } from "./constructionSettings"
 import rawData from "./data.json"
 import { buildingLimit, newBuilding, plannedBuildings, requirementCount } from "./buildingRules"
 
@@ -116,6 +117,7 @@ type RawFaction = {
 }
 
 export type PlannerItem = {
+    construction?: ConstructionSettings
     id: string
     name: string
     type?: BuildingType

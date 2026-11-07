@@ -30,6 +30,10 @@ stores personal resource settings separately from your build.
 number (default 75) and fixed command time. It respects and starts shared scroll cooldown without
 an order delay or spell effect; edit or delete it like other timed events.
 
+Right-click a building or an upgrade target level to configure its outward and return travel
+before adding. Click construction rows, or choose **Edit** on their timeline items, to change
+settings. Each travel field inherits the live global delay until overridden; **Use global** resets it.
+
 **Make idle** removes a chosen count of gatherers from income and ordinary builder selection.
 **Make active** restores their previous assignments, optionally after travel. Both use fixed times
 and apply the full count or report an error. Latest order state lists idle workers separately. Worker losses let you choose Gathering

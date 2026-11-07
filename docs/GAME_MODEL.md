@@ -171,7 +171,7 @@ currently has no cost effect.
 Construction and upgrades expose separate command, start, finish, and builder-return times. At
 command acceptance, costs are paid and a selected worker stops gathering. The worker travels for
 `constructionStartDelay` (default 3 seconds), builds for the worker-level-adjusted duration, then
-travels back for the same delay. The completed building becomes available before the builder
+travels back for the same delay by default. Each occurrence can override either journey independently. The completed building becomes available before the builder
 returns.
 
 Builders exclude deliberately idle workers and select wood gatherers with the least gathered/carried cargo,
@@ -196,7 +196,7 @@ recruitment adds no repeated wait when its resources are already ready. Building
 require `orderDelay` after the previous successful player command (building, upgrade, recruitment,
 or scroll); this wait overlaps with other readiness waits. Unit and hero production have no
 additional command-spacing wait. Blocked commands, resource adjustments, unit losses, and mana-well
-events do not reset spacing. There are no per-action construction-delay overrides or
+events do not reset spacing. Per-action outward/return overrides are supported; there are no
 theoretical/practical mode controls.
 
 Food is reserved at an accepted recruitment command, including for queued heroes. Completed

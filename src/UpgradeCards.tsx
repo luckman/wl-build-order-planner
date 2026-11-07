@@ -5,10 +5,11 @@ type Props = {
     faction: Faction
     buildOrder: PlannerItem[]
     iconSources: Record<string, string>
+    onConfigure: (item: PlannerItem) => void
     onAdd: (item: PlannerItem) => void
 }
 
-export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd }: Props) {
+export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd, onConfigure }: Props) {
     const [open, setOpen] = useState<{ building: PlannerItem; anchor: HTMLButtonElement; last: boolean } | null>(null)
     const menu = useRef<HTMLDivElement>(null)
     const upgrades = open ? faction.items.filter(item => item.kind === "upgrade" && item.buildingId === open.building.id)
@@ -89,7 +90,7 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd }
         }}>
         {upgrades.map(item => {
             const cost = itemCost(item, buildOrder, faction.startingTownHall)
-            return <button type="button" role="menuitem" tabIndex={-1} key={item.id} onClick={() => { onAdd(item); close() }}>
+            return <button type="button" role="menuitem" tabIndex={-1} key={item.id} onContextMenu={event => { event.preventDefault(); close(); onConfigure(item) }} onClick={() => { onAdd(item); close() }}>
                 <img className="upgrade-option-icon" src={iconSources[item.icon]} alt="" />
                 <span className="upgrade-option-name">{item.name}</span>
                 <span className="upgrade-option-cost">{cost.gold} gold · {cost.wood} wood</span>

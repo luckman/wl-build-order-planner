@@ -31,8 +31,9 @@ upgrade completes and the Altar one second after the Lab order with the default 
 assuming resources and workers are ready.
 
 The editable game profile contains `delays.constructionStartDelay` , defaulting to 3 seconds. It
-applies to every building and building upgrade, and both directions of builder travel. There are no
-per-building overrides or positioning modes.
+supplies the default for both directions of builder travel. Each building or upgrade occurrence
+can independently override outward and return travel, including zero. Resetting a field removes
+its override; explicit values equal to the global value remain fixed after profile changes.
 
 For a command accepted at time `t` :
 

@@ -1,3 +1,4 @@
+import { parseConstructionSettings } from "./constructionSettings"
 import { createWorkerEvent, workerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
@@ -271,6 +272,7 @@ function simulateBuildOrderPass(
 
     for (const item of buildOrder) {
         if (isTimedEvent(item)) continue
+        if (item.construction) parseConstructionSettings(item.construction)
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)
         const needsProducer = item.kind !== "building"
         let scheduled = false
@@ -371,13 +373,13 @@ function simulateBuildOrderPass(
                 (cost.wood === 0 || readyResources.wood >= cost.wood) &&
                 (!isRecruitable(item) || (foodUsed + item.food <= foodLimit && readyFoodUsed + item.food <= readyFoodLimit))
             ) {
-                const travelTime = builder ? simulation.constructionTravelTime(builder) : 0
+                const travelTime = builder ? simulation.constructionTravelTime(builder, item.construction?.outwardDuration) : 0
                 const startTime = time + travelTime
                 const duration = actionDuration(item, economy)
                 const finishTime = isRecruitable(item) && producer
                     ? recruitmentFinish(startTime, duration, buildings.indexOf(producer), recruitmentWindows, recruitmentReduction)
                     : startTime + duration
-                const returnTravelTime = builder ? simulation.constructionReturnTravelTime(finishTime, Math.max(economy.constructionStartDelay, simulation.remainingReactivation(builder))) : 0
+                const returnTravelTime = builder ? simulation.constructionReturnTravelTime(finishTime, Math.max(item.construction?.returnDuration ?? economy.constructionStartDelay, simulation.remainingReactivation(builder))) : 0
                 const workerReturnTime = builder ? finishTime + returnTravelTime : null
                 if ((workerReturnTime ?? finishTime) > MAX_PLAN_SECONDS) {
                     blockedReason = "Action would exceed the 30:00 plan limit"

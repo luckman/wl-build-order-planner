@@ -1,3 +1,5 @@
+import ConstructionDialog from "./ConstructionDialog"
+import { isConstruction, hasCustomConstruction, constructionDescription } from "./game/constructionSettings"
 import WorkerEventDialog from "./WorkerEventDialog"
 import { createWorkerEvent, type WorkerEventCommand } from "./game/workerEvents"
 import ManaSpentDialog from "./ManaSpentDialog"
@@ -176,6 +178,7 @@ export default function App() {
     const [factionId, setFactionId] = useState<FactionId>(loadActiveFaction)
     useEffect(() => saveActiveFaction(factionId), [factionId])
     const [scrollDialogOpen, setScrollDialogOpen] = useState<ScrollId | null>(null)
+    const [configuringConstruction, setConfiguringConstruction] = useState<PlannerItem | null>(null)
     const [workerEventDialogOpen, setWorkerEventDialogOpen] = useState<WorkerEventCommand["type"] | null>(null)
     const [unitKilledDialogOpen, setUnitKilledDialogOpen] = useState(false)
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
@@ -471,7 +474,7 @@ export default function App() {
                                 {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
                                     <section key={kind} aria-label={kind === "hero" ? "heroes" : `${kind}s`}>
                                         {kind === "upgrade" ? <UpgradeCards key={faction.id} faction={faction} buildOrder={buildOrder} iconSources={iconSources}
-                                            onAdd={addCatalogItem} /> : <div className={`action-grid${kind === "hero" ? ` hero-scroll-grid${factionId === "dark" ? " dark-events-grid" : ""}` : ""}`}>
+                                            onAdd={addCatalogItem} onConfigure={item => { setDependencyError(null); setConfiguringConstruction(item) }} /> : <div className={`action-grid${kind === "hero" ? ` hero-scroll-grid${factionId === "dark" ? " dark-events-grid" : ""}` : ""}`}>
                                             {(kind === "building" ? orderedBuildings(faction) : faction.items.filter(item => item.kind === kind))
                                                 .map((item) => {
                                                     const cost = itemCost(item, buildOrder, faction.startingTownHall)
@@ -483,6 +486,9 @@ export default function App() {
                                                             key={item.id}
                                                             aria-label={`${item.name} ${cost.gold} gold · ${cost.wood} wood${showFood ? ` · ${item.food} food` : ""} · ${duration}s`}
                                                             title={`${item.name}\nGold: ${cost.gold}\nWood: ${cost.wood}${showFood ? `\nFood: ${item.food}` : ""}\nTime: ${duration}s`}
+                                                            onContextMenu={item.kind === "building" ? event => {
+                                                                event.preventDefault(); setDependencyError(null); setConfiguringConstruction(item)
+                                                            } : undefined}
                                                             onClick={() => addCatalogItem(item)}
                                                         >
                                                             <img src={iconSources[item.icon]} alt="" />
@@ -616,7 +622,7 @@ export default function App() {
                                                                     left: `${(commandTime! / endTime) * 100}%`,
                                                                     width: `${((finishTime! - commandTime!) / endTime) * 100}%`,
                                                                 }}
-                                                                title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime })}
+                                                                title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime })].filter(Boolean).join("\n")}
                                                                 aria-haspopup="menu"
                                                                 data-order-id={(item as typeof buildOrder[number]).orderId}
                                                                 aria-expanded={timelineMenu?.item === item}
@@ -691,10 +697,12 @@ export default function App() {
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
                                 {displayPlan.map(({ item, commandTime, startTime, finishTime, workerReturnTime, blocked, blockedReason }, index) => (
                                     <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
-                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })}
-                                        onClick={isTimedEvent(item) ? () => setEditingEventId((item as typeof buildOrder[number]).orderId) : undefined}>
+                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ commandTime, startTime, finishTime, workerReturnTime, blockedReason })].filter(Boolean).join("\n")}
+                                        tabIndex={isConstruction(item) ? 0 : undefined}
+                                        onKeyDown={event => { if (isConstruction(item) && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setEditingEventId((item as typeof buildOrder[number]).orderId) } }}
+                                        onClick={isTimedEvent(item) || isConstruction(item) ? () => { setDependencyError(null); setEditingEventId((item as typeof buildOrder[number]).orderId) } : undefined}>
                                         {isTimedEvent(item) ? <button className="scroll-order-marker" aria-label={`Change ${item.name} timestamp, action ${index + 1}`} title="Click to change timestamp">◷</button>
-                                            : <button className="order-drag-handle" {...drag.dragHandleProps} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>}
+                                            : <button className="order-drag-handle" {...drag.dragHandleProps} onClick={event => event.stopPropagation()} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>}
                                         <span className="order-number">{index + 1}</span>
                                         <img src={iconSources[item.icon]} alt="" />
                                         <div>
@@ -753,12 +761,25 @@ export default function App() {
                 </div>
                 {timelineMenu && buildOrder.some(item => item === timelineMenu.item) && <TimelineActionMenu
                     anchor={timelineMenu.anchor} actionName={timelineMenu.item.name} onClose={closeTimelineMenu}
-                    onEdit={isTimedEvent(timelineMenu.item) ? () => {
+                    onEdit={isTimedEvent(timelineMenu.item) || isConstruction(timelineMenu.item) ? () => {
                         const item = timelineMenu.item as typeof buildOrder[number]
                         timelineEdit.current = { item, anchor: timelineMenu.anchor }
                         setEditingEventId(item.orderId)
                     } : undefined}
                     onDelete={() => setBuildOrder(current => current.filter(item => item !== timelineMenu.item))} />}
+                {(configuringConstruction || (editingEvent && isConstruction(editingEvent))) && <ConstructionDialog
+                    key={editingEvent?.orderId ?? configuringConstruction!.id} item={editingEvent && isConstruction(editingEvent) ? editingEvent : configuringConstruction!}
+                    globalDelay={economy.constructionStartDelay} editing={!!editingEvent} validationError={dependencyError ?? (editingEvent ? null : additionError)}
+                    onClose={() => { setConfiguringConstruction(null); setEditingEventId(null); setDependencyError(null) }}
+                    onSave={construction => {
+                        if (editingEvent && isConstruction(editingEvent)) {
+                            setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, construction } : item))
+                        } else {
+                            try { if (!setBuildOrder(buildOrderWithDependencies(faction, buildOrder, { ...configuringConstruction!, construction }))) return }
+                            catch (error) { setDependencyError((error as Error).message); return }
+                        }
+                        setConfiguringConstruction(null); setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                    }} />}
                 {(manaSpentDialogOpen || editingEvent?.kind === "mana-spent") && <ManaSpentDialog
                     key={editingEvent?.orderId ?? "new-mana-spent"} defaultTime={defaultEventTime}
                     action={editingEvent?.kind === "mana-spent" ? editingEvent : undefined}

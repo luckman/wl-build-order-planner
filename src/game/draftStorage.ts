@@ -1,3 +1,4 @@
+import { constructionCommand } from "./constructionSettings"
 import { workerEventCommand } from "./workerEvents"
 import { manaSpentCommand } from "./manaSpent"
 import { validateActionCount, validateCommandTime } from "./plannerLimits"
@@ -47,7 +48,7 @@ export function saveFactionDrafts(drafts: FactionDrafts, profiles: FactionProfil
                 if ("commandTime" in item) validateCommandTime(item.commandTime)
             }
             const buildOrder = [
-                draft.opening, ...draft.items.map(item => item.kind === "worker-event" ? workerEventCommand(item) : item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : ({ itemId: item.id })),
+                draft.opening, ...draft.items.map(item => item.kind === "worker-event" ? workerEventCommand(item) : item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : (constructionCommand(item))),
             ]
             const document = {
                 format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,

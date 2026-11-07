@@ -172,3 +172,5 @@
     .resource-profile-grid > .profile-field:nth-child(3) .profile-help-tooltip { left: 0; right: auto; }
     .panel-title { gap: .5rem; flex-wrap: wrap; }
 }
+
+.sortable-order .order-custom-construction { box-shadow: inset 3px 0 #c6a65d; background-color: #302b23; }
