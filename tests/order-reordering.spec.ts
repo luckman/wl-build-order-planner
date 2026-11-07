@@ -43,6 +43,7 @@ test("repeated actions keep their identity and cancelled drags preserve order", 
     await page.locator(".action-panel").getByRole("button", { name: /^Worker \d/ }).click()
     await page.locator(".action-panel").getByRole("button", { name: /^Worker \d/ }).click()
     const rows = page.locator(".sortable-order > li")
+    await expect(rows).toHaveCount(2)
     const ids = await rows.evaluateAll(elements => elements.map(element => element.getAttribute("data-rfd-draggable-id")))
     const handle = page.getByRole("button", { name: "Reorder Worker, action 2" })
     await handle.focus()

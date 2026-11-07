@@ -15,13 +15,15 @@ extra space separate file operations from templates. The menu is also available
 on narrow screens and closes with Escape or a click outside it. Files include the selected faction,
 the opening allocation and exact subsequent commands (including duplicates and blocked actions), and
 the complete game profile. Orders containing only the required opening allocation can share a
-profile alone. Import selects the imported faction and replaces its order and profile after
-validating the entire document, preserving the other faction's draft and settings.
+profile alone. After validating the entire document, import locks the planner while it recalculates.
+The current plan remains visible during the update. On success, the planner selects the imported
+faction and shows the replacement order, profile, and completion notice together. A failed
+calculation leaves the current draft available and displays an error.
 
 Start from template replaces the selected faction's build and opening allocation while retaining its
-active Resource collection settings. It asks before replacing a build with subsequent actions,
-recalculates timings, and saves the resulting working draft without replacing the personal saved
-profile. Templates are declared in `src/game/buildOrderTemplates.ts` .
+active Resource collection settings. It asks before replacing a build with subsequent actions.
+Once confirmed, the template uses the same recalculation and saves the resulting working draft
+when it succeeds. Templates are declared in `src/game/buildOrderTemplates.ts` .
 
 Personal profiles and working drafts are stored separately per faction in browser local storage
 (`wl-resource-profile-v2-*` and `wl-build-draft-v2-*` ). Save profile and Load saved profile appear
@@ -40,10 +42,10 @@ keys are validated and migrated to the envelope for that faction; if migration w
 profile remains usable.
 
 Direct visits restore the faction's draft profile and build first, then its saved personal profile
-if no valid draft exists, then defaults. JSON imports and `build=` links always apply their own
-profile and build after full validation, replacing only that faction's working draft without
-changing either personal profile. Drafts contain a complete build-order document: the active
-profile, opening allocation, and exact action commands. They are saved together after an import or
+if no valid draft exists, then defaults. JSON imports and `build=` links apply their own profile
+and build after full validation and successful recalculation, replacing only that faction's working
+draft. Personal profiles and the other faction's working draft are stored separately. Drafts contain
+the active profile, opening allocation, and exact action commands. They are saved together after an import or
 working change, including profile edits, Load, Reset, template selection, and build-order changes;
 merely opening the planner does not create a draft. The selected faction is retained under
 `wl-active-faction` , so refresh restores the same faction, build, and active profile. Array-only

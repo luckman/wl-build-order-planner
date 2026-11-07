@@ -1,5 +1,5 @@
 import type { WorkerCasualtyGroup } from "./game/gameData"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import DurationInput from "./DurationInput"
 import { formatDuration, parseDuration } from "./durationTime"
 import { factions, isRecruitable, type FactionId } from "./game/gameData"
@@ -17,8 +17,12 @@ export default function UnitKilledDialog({ faction, defaultTime, action, validat
     const commandTime = parseDuration(time)
     const timeValid = commandTime !== null && Number.isInteger(commandTime)
     const workerId = faction === "light" ? "worker" : "slave"
-    const command: UnitKilledCommand = { type: "unit-is-killed", commandTime: commandTime ?? 0, unitId, ...(unitId === workerId ? { workerGroup } : {}) }
-    const error = timeValid ? validate(command) : "Enter a valid whole-second time from 00:00 to 29:59."
+    const command = useMemo<UnitKilledCommand>(() => ({ type: "unit-is-killed", commandTime: commandTime ?? 0, unitId,
+        ...(unitId === workerId ? { workerGroup } : {}) }), [commandTime, unitId, workerGroup, workerId])
+    const error = useMemo(() => timeValid ? validate(command) : "Enter a valid whole-second time from 00:00 to 29:59.",
+        [command, timeValid, validate])
+    const idleUnavailable = useMemo(() => unitId === workerId && workerGroup !== "idle" && !!validate({ ...command, workerGroup: "idle" }),
+        [command, unitId, validate, workerGroup, workerId])
     useEffect(() => {
         const previousFocus = document.activeElement as HTMLElement | null
         dialog.current?.querySelector<HTMLInputElement>("input")?.focus()
@@ -46,7 +50,7 @@ export default function UnitKilledDialog({ faction, defaultTime, action, validat
                 </select></label>
                 {unitId === workerId && <label>Worker group<select value={workerGroup} onChange={event => setWorkerGroup(event.target.value as WorkerCasualtyGroup)}>
                     <option value="gathering">Gathering worker</option>
-                    <option value="idle" disabled={workerGroup !== "idle" && !!validate({ ...command, workerGroup: "idle" })}>Idle worker</option>
+                    <option value="idle" disabled={idleUnavailable}>Idle worker</option>
                 </select></label>}
                 <p className="scroll-time-hint">The unit must be alive and fully recruited. Workers assigned to construction cannot be killed. Wood gatherers are killed before gold miners.</p>
                 {error && <p role="alert">{error}</p>}

@@ -5,15 +5,15 @@ import { isConstruction, hasCustomConstruction, constructionDescription } from "
 import WorkerEventDialog from "./WorkerEventDialog"
 import { createWorkerEvent, workerEventIdentity, type WorkerEventCommand } from "./game/workerEvents"
 import ManaSpentDialog from "./ManaSpentDialog"
-import { createManaSpentAction, manaSpentCollision } from "./game/manaSpent"
+import { createManaSpentAction, manaSpentCollision, type ManaSpentCommand } from "./game/manaSpent"
 import Notification, { type NotificationMessage } from "./Notification"
 import { ACTION_LIMIT_MESSAGE, MAX_PLAN_ACTIONS, MAX_COMMAND_SECONDS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
 import UnitKilledDialog from "./UnitKilledDialog"
-import { createUnitKilledAction, foodUsedAt } from "./game/unitsKilled"
+import { createUnitKilledAction, foodUsedAt, type UnitKilledCommand } from "./game/unitsKilled"
 import { createManaWellAction, evaluateManaWells, MANA_WELL_EVENTS, type ManaWellEventType } from "./game/manaWells"
 import ResourcesCollectedDialog from "./ResourcesCollectedDialog"
 import { createResourcesCollectedAction, isTimedEvent } from "./game/resourcesCollected"
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react"
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd"
 import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
@@ -44,12 +44,15 @@ import { loadFactionProfiles, loadSavedProfile, saveProfile } from "./game/profi
 import { discardFactionDraft, loadActiveFaction, saveActiveFaction, loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
 import type { BuildDraft } from "./game/draftStorage"
 import { actionDuration } from "./game/playerLevels"
+import useBuildOrderUpdate from "./useBuildOrderUpdate"
+import type { SimulationResult } from "./game/buildOrderSimulation.worker"
 import "./index.css"
 import "./timeline.css"
 import "./parallel-timeline.css"
 import "./layout-overrides.css"
 import "./build-order-files.css"
 import "./scrolls.css"
+import "./build-order-busy.css"
 
 const iconSources: Record<string, string> = {
     lightUnitIsKilled: require("./icons/events/light-unit-is-killed.png"),
@@ -230,7 +233,8 @@ export default function App() {
         const drafts = initialDrafts
         return { light: { ...drafts.light, items: withOrderIds(drafts.light.items) }, dark: { ...drafts.dark, items: withOrderIds(drafts.dark.items) } }
     })
-    const buildOrder = buildOrders[factionId].items
+    const activeDraft = buildOrders[factionId]
+    const buildOrder = activeDraft.items
     useEffect(() => {
         if (timelineMenu && !buildOrder.some(item => item === timelineMenu.item)) closeTimelineMenu()
     }, [buildOrder, timelineMenu, closeTimelineMenu])
@@ -251,11 +255,7 @@ export default function App() {
         const frame = requestAnimationFrame(() => focusTarget?.focus({ preventScroll: true }))
         return () => cancelAnimationFrame(frame)
     }, [buildOrder, editingEventId])
-    const opening = buildOrders[factionId].opening
-    const setOpeningGoldWorkers = (goldWorkers: number) => {
-        updateBuildOrders(current => ({ ...current, [factionId]: { ...current[factionId], opening: { type: "allocate-workers", goldWorkers } } }))
-        setHoverTime(null)
-    }
+    const opening = activeDraft.opening
     const initialOrders = useRef(buildOrders)
     useEffect(() => {
         const changed = (["light", "dark"] as const).filter(faction =>
@@ -264,18 +264,38 @@ export default function App() {
     }, [buildOrders, gameProfiles, initialDrafts])
     const [limitError, setLimitError] = useState<NotificationMessage | null>(null)
     const dismissLimitError = useCallback(() => setLimitError(null), [])
-    const setBuildOrder = useCallback((update: SetStateAction<PlannerItem[]>) => {
+    const gameProfile = gameProfiles[factionId]
+    const { shell, pending, showSpinner, error: updateError, dismissError: dismissUpdateError, calculate } = useBuildOrderUpdate()
+    const [calculated, setCalculated] = useState<{ draft: BuildDraft; profile: GameProfile; result: SimulationResult }>()
+    const updateDraft = useCallback((target: FactionId, draft: BuildDraft, profile: GameProfile, onSuccess?: () => void) => {
+        const economy = economyFromProfile(profile, draft.opening)
+        const initialFood = (economy.goldWorkers + economy.woodWorkers) * 2
+        const accepted = calculate([draft.items, economy, initialFood, profile.player.baseFoodLimit, economy.foodPerFarm, factions[target].startingTownHall], result => {
+            // Both views share action objects. Restore the original item for
+            // each input row so editing and reordering retain row identity.
+            result.plan.forEach((action, index) => { action.item = draft.items[index] })
+            setCalculated({ draft, profile, result })
+            updateBuildOrders(current => ({ ...current, [target]: draft }))
+            onSuccess?.()
+        })
+        if (accepted) closeTimelineMenu()
+        return accepted
+    }, [calculate, closeTimelineMenu])
+    const setBuildOrder = (update: SetStateAction<PlannerItem[]>, onSuccess?: () => void) => {
         const items = typeof update === "function" ? update(buildOrder) : update
+        if (items === buildOrder) return
         if (items.length > MAX_PLAN_ACTIONS) {
             setLimitError({ text: ACTION_LIMIT_MESSAGE, kind: "error" })
-            return false
+            return
         }
         setLimitError(null)
-        updateBuildOrders(current => ({ ...current, [factionId]: { ...current[factionId], items: withOrderIds(items) } }))
-        return true
-    }, [buildOrder, factionId, withOrderIds])
+        updateDraft(factionId, { opening, items: withOrderIds(items) }, gameProfile, onSuccess)
+    }
     const [dependencyError, setDependencyError] = useState<string | null>(null)
-    const gameProfile = gameProfiles[factionId]
+    const setOpeningGoldWorkers = useCallback((goldWorkers: number) => {
+        if (opening.goldWorkers === goldWorkers) return
+        updateDraft(factionId, { opening: { type: "allocate-workers", goldWorkers }, items: buildOrder }, gameProfile, () => setHoverTime(null))
+    }, [buildOrder, factionId, gameProfile, opening.goldWorkers, updateDraft])
     const setGameProfile = useCallback((profile: GameProfile) => {
         updateGameProfiles(current => ({ ...current, [factionId]: profile }))
     }, [factionId])
@@ -299,6 +319,20 @@ export default function App() {
         setProfileNotice({ text: `${factions[factionId].name} saved profile loaded. Timings recalculated.`, kind: "success" })
     }
     const economy = useMemo(() => economyFromProfile(gameProfile, opening), [gameProfile, opening])
+    const openingSlider = useRef<HTMLInputElement>(null)
+    useLayoutEffect(() => {
+        const slider = openingSlider.current!
+        slider.value = String(economy.goldWorkers)
+        const commitAllocation = () => {
+            const value = slider.valueAsNumber
+            slider.value = String(economy.goldWorkers)
+            if (Number.isFinite(value)) setOpeningGoldWorkers(Math.min(4, Math.max(1, Math.round(value))))
+        }
+        // React's range onChange fires for every movement. The native change
+        // event commits on pointer release and on each keyboard adjustment.
+        slider.addEventListener("change", commitAllocation)
+        return () => slider.removeEventListener("change", commitAllocation)
+    }, [economy.goldWorkers, setOpeningGoldWorkers])
     const { baseFoodLimit } = gameProfile.player
     const { foodPerFarm } = economy
     const faction = factions[factionId]
@@ -311,6 +345,21 @@ export default function App() {
     }
     const initialWorkerCount = economy.goldWorkers + economy.woodWorkers
     const initialFoodUsed = initialWorkerCount * 2
+    const validateSimulatedEvent = useCallback((item: PlannerItem) => {
+        const proposed = editingEvent?.kind === item.kind
+            ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
+        if (proposed.length > MAX_PLAN_ACTIONS) return ACTION_LIMIT_MESSAGE
+        if (item.kind === "mana-spent") {
+            const collision = manaSpentCollision(proposed)
+            if (collision) return collision
+        }
+        return simulateBuildOrder(proposed, economy, initialFoodUsed, baseFoodLimit, foodPerFarm, faction.startingTownHall)
+            .plan.find(action => action.item === item)?.blockedReason ?? null
+    }, [baseFoodLimit, buildOrder, economy, editingEvent, faction.startingTownHall, foodPerFarm, initialFoodUsed])
+    const validateManaSpent = useCallback((command: ManaSpentCommand) => validateSimulatedEvent(createManaSpentAction(command, factionId)),
+        [factionId, validateSimulatedEvent])
+    const validateUnitKilled = useCallback((command: UnitKilledCommand) => validateSimulatedEvent(createUnitKilledAction(command, factionId)),
+        [factionId, validateSimulatedEvent])
     const [hoverTime, setHoverTime] = useState<number | null>(null)
     const reorderActions = ({ source, destination }: DropResult) => {
         if (!destination || source.index === destination.index) return
@@ -327,25 +376,49 @@ export default function App() {
         setDependencyError(null)
         setHoverTime(null)
     }
-    const applyImport = useCallback((result: ReturnType<typeof parseBuildOrder>) => {
-        setLimitError(null)
-        setFactionId(result.faction)
-        updateBuildOrders(current => ({ ...current, [result.faction]: { opening: result.opening, items: withOrderIds(result.buildOrder) } }))
-        updateGameProfiles(current => ({ ...current, [result.faction]: result.gameProfile }))
-        setDependencyError(null)
-        setHoverTime(null)
-    }, [withOrderIds])
-    const applyTemplate = (draft: BuildDraft) => {
-        setLimitError(null)
-        updateBuildOrders(current => ({ ...current, [factionId]: { opening: draft.opening, items: withOrderIds(draft.items) } }))
-        setDependencyError(null)
-        setHoverTime(null)
-        setEditingEventId(null)
+    const deferredImport = useRef<() => void>()
+    const applyImport = useCallback((result: ReturnType<typeof parseBuildOrder>, onSuccess: () => void) => {
+        const { faction, opening, buildOrder, gameProfile } = result
+        const draft = { opening, items: withOrderIds(buildOrder) }
+        const apply = () => updateDraft(faction, draft, gameProfile, () => {
+            setFactionId(faction)
+            updateGameProfiles(current => ({ ...current, [faction]: gameProfile }))
+            setLimitError(null)
+            setDependencyError(null)
+            setHoverTime(null)
+            onSuccess()
+        })
+        // A file read or hash change can finish validation during another
+        // update. Keep the latest replacement ready until the planner unlocks.
+        deferredImport.current = apply() ? undefined : apply
+    }, [updateDraft, withOrderIds])
+    useEffect(() => {
+        if (pending) return
+        const apply = deferredImport.current
+        deferredImport.current = undefined
+        apply?.()
+    }, [pending])
+    const applyTemplate = (draft: BuildDraft, onSuccess: () => void) => {
+        updateDraft(factionId, { ...draft, items: withOrderIds(draft.items) }, gameProfile, () => {
+            setLimitError(null)
+            setDependencyError(null)
+            setHoverTime(null)
+            setEditingEventId(null)
+            onSuccess()
+        })
+    }
+    const defaultGoldWorkers = Math.min(4, initialWorkerCount)
+    const clearBuildOrder = () => {
+        updateDraft(factionId, { items: [], opening: { type: "allocate-workers", goldWorkers: defaultGoldWorkers } }, gameProfile, () => {
+            setLimitError(null)
+            setHoverTime(null)
+            setDependencyError(null)
+        })
     }
     const previousSimulation = useRef<ReturnType<typeof simulateBuildOrder>>()
     const scheduled = useMemo(
         () =>
-            simulateBuildOrder(
+            calculated?.draft === activeDraft && calculated.profile === gameProfile ? calculated.result : simulateBuildOrder(
                 buildOrder,
                 economy,
                 initialFoodUsed,
@@ -354,7 +427,7 @@ export default function App() {
                 faction.startingTownHall,
                 { previous: previousSimulation.current },
             ),
-        [baseFoodLimit, buildOrder, economy, faction.startingTownHall, foodPerFarm, initialFoodUsed],
+        [activeDraft, baseFoodLimit, buildOrder, calculated, economy, faction.startingTownHall, foodPerFarm, gameProfile, initialFoodUsed],
     )
     useEffect(() => { previousSimulation.current = scheduled }, [scheduled])
     const deliveries = scheduled.deliveries
@@ -372,9 +445,9 @@ export default function App() {
     const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime, scrollDialogOpen ?? "gold-rush")
     const displayPlan = buildOrder.some(isTimedEvent) ? scheduled.orderedPlan : plan
     const defaultEventTime = Math.min(MAX_COMMAND_SECONDS, Math.ceil(Math.max(0, ...plan.filter(action => !action.blocked).map(action => action.commandTime ?? 0)) + 1))
-    const spending = plan.flatMap(({ cost, commandTime }) =>
+    const spending = useMemo(() => plan.flatMap(({ cost, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
-    )
+    ), [plan])
     const endTime = timelineEnd(plan)
     const samples = useMemo(
         () =>
@@ -453,7 +526,8 @@ export default function App() {
     const latestWorkers =
         latestCommandTime === null ? null : workerAllocationAt(economy, plan, latestCommandTime)
     return (
-        <div className="sc2-shell">
+        <>
+        <div className="sc2-shell" ref={shell} aria-busy={pending}>
             <header className="topbar">
                 <div>
                     <img className="brand-logo" src={warLegendsLogo} alt="" />
@@ -469,6 +543,9 @@ export default function App() {
             </header>
             <Notification notice={draftNotice} onDismiss={dismissDraftNotice} />
             <Notification notice={limitError} onDismiss={dismissLimitError} />
+            <div className="build-order-update-error">
+                <Notification notice={updateError ? { text: updateError, kind: "error" } : null} onDismiss={dismissUpdateError} />
+            </div>
             <main>
                 <div className="workspace">
                     <section className="title-row">
@@ -495,7 +572,7 @@ export default function App() {
                                 {dependencyError && <p role="alert">{dependencyError}</p>}
                                 {(["building", "unit", "hero", "upgrade"] as ItemKind[]).map((kind) => (
                                     <section key={kind} aria-label={kind === "hero" ? "heroes" : `${kind}s`}>
-                                        {kind === "upgrade" ? <UpgradeCards key={faction.id} faction={faction} buildOrder={buildOrder} iconSources={iconSources}
+                                        {kind === "upgrade" ? <UpgradeCards key={faction.id} faction={faction} buildOrder={buildOrder} iconSources={iconSources} portalContainer={shell}
                                             onAdd={addCatalogItem} onConfigure={item => { setDependencyError(null); setConfiguringConstruction(item) }} /> : <div className={`action-grid${kind === "hero" ? ` hero-scroll-grid${factionId === "dark" ? " dark-events-grid" : ""}` : ""}`}>
                                             {(kind === "building" ? orderedBuildings(faction) : faction.items.filter(item => item.kind === kind))
                                                 .map((item) => {
@@ -693,20 +770,17 @@ export default function App() {
                     <aside className="order panel">
                         <div className="panel-title">
                             <h2>Build order</h2>
-                            <button className="clear" onClick={() => { setBuildOrder([]); setOpeningGoldWorkers(Math.min(4, initialWorkerCount)); setDependencyError(null) }} disabled={!buildOrder.length && opening.goldWorkers === Math.min(4, initialWorkerCount)}>
+                            <button className="clear" onClick={clearBuildOrder} disabled={!buildOrder.length && opening.goldWorkers === defaultGoldWorkers}>
                                 Clear
                             </button>
                         </div>
                         <section className="opening-action" aria-label="Opening worker allocation">
                             <div className="worker-allocation">
                                 <label htmlFor="initial-worker-allocation">Initial worker allocation ({initialWorkerCount} workers)</label>
-                                <input id="initial-worker-allocation" type="range" min={1} max={4} step={1}
+                                <input ref={openingSlider} id="initial-worker-allocation" type="range" min={1} max={4} step={1}
                                     aria-label="Initial gold miners"
                                     aria-valuetext={`${economy.goldWorkers} gold miners, ${economy.woodWorkers} wood gatherers`}
-                                    value={economy.goldWorkers} onChange={event => {
-                                        const value = event.target.valueAsNumber
-                                        if (Number.isFinite(value)) setOpeningGoldWorkers(Math.min(4, Math.max(1, Math.round(value))))
-                                    }} />
+                                    defaultValue={economy.goldWorkers} />
                                 <p className="initial-allocation">Initial gold miners: {economy.goldWorkers} · Initial wood gatherers: {economy.woodWorkers}</p>
                             </div>
                         </section>
@@ -781,8 +855,8 @@ export default function App() {
                         </div>
                     </aside>
                 </div>
-                {timelineMenu && buildOrder.some(item => item === timelineMenu.item) && <TimelineActionMenu
-                    anchor={timelineMenu.anchor} actionName={timelineMenu.item.name} onClose={closeTimelineMenu}
+                {timelineMenu && shell.current && buildOrder.some(item => item === timelineMenu.item) && <TimelineActionMenu
+                    anchor={timelineMenu.anchor} container={shell.current} actionName={timelineMenu.item.name} onClose={closeTimelineMenu}
                     onEdit={isTimedEvent(timelineMenu.item) || isConstruction(timelineMenu.item) ? () => {
                         const item = timelineMenu.item as typeof buildOrder[number]
                         timelineEdit.current = { item, anchor: timelineMenu.anchor }
@@ -795,37 +869,30 @@ export default function App() {
                     globalDelay={economy.constructionStartDelay} editing={!!editingEvent} validationError={dependencyError ?? (editingEvent ? null : additionError)}
                     onClose={() => { setConfiguringConstruction(null); setEditingEventId(null); setDependencyError(null) }}
                     onSave={construction => {
+                        const complete = () => {
+                            setConfiguringConstruction(null); setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                        }
                         if (editingEvent && isConstruction(editingEvent)) {
-                            setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, construction } : item))
+                            setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, construction } : item), complete)
                         } else {
-                            try { if (!setBuildOrder(buildOrderWithDependencies(faction, buildOrder, { ...configuringConstruction!, construction }))) return }
+                            try {
+                                setBuildOrder(buildOrderWithDependencies(faction, buildOrder, { ...configuringConstruction!, construction }), complete)
+                            }
                             catch (error) { setDependencyError((error as Error).message); return }
                         }
-                        setConfiguringConstruction(null); setEditingEventId(null); setDependencyError(null); setHoverTime(null)
                     }} />}
                 {(manaSpentDialogOpen || editingEvent?.kind === "mana-spent") && <ManaSpentDialog
                     key={editingEvent?.orderId ?? "new-mana-spent"} defaultTime={defaultEventTime}
                     action={editingEvent?.kind === "mana-spent" ? editingEvent : undefined}
-                    validate={command => {
-                        const item = createManaSpentAction(command, factionId)
-                        const proposed = editingEvent?.kind === "mana-spent"
-                            ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
-                        if (proposed.length > MAX_PLAN_ACTIONS) return ACTION_LIMIT_MESSAGE
-                        const collision = manaSpentCollision(proposed)
-                        if (collision) return collision
-                        return simulateBuildOrder(proposed, economy, initialFoodUsed, baseFoodLimit, foodPerFarm, faction.startingTownHall)
-                            .plan.find(action => action.item === item)?.blockedReason ?? null
-                    }}
+                    validate={validateManaSpent}
                     onClose={() => { setManaSpentDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {
                         const action = createManaSpentAction(command, factionId)
-                        if (!setBuildOrder(current => editingEvent?.kind === "mana-spent"
+                        setBuildOrder(current => editingEvent?.kind === "mana-spent"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
-                            : [...current, action])) return
-                        setManaSpentDialogOpen(false)
-                        setEditingEventId(null)
-                        setDependencyError(null)
-                        setHoverTime(null)
+                            : [...current, action], () => {
+                            setManaSpentDialogOpen(false); setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                        })
                     }} />}
                 {(workerEventDialogOpen || editingEvent?.kind === "worker-event") && <WorkerEventDialog
                     key={editingEvent?.orderId ?? workerEventDialogOpen!} faction={factionId} defaultTime={defaultEventTime}
@@ -835,10 +902,11 @@ export default function App() {
                     onClose={() => { setWorkerEventDialogOpen(null); setEditingEventId(null) }}
                     onSave={command => {
                         const action = createWorkerEvent(command, factionId)
-                        if (!setBuildOrder(current => editingEvent?.kind === "worker-event"
+                        setBuildOrder(current => editingEvent?.kind === "worker-event"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
-                            : [...current, action])) return
-                        setWorkerEventDialogOpen(null); setEditingEventId(null); setHoverTime(null)
+                            : [...current, action], () => {
+                            setWorkerEventDialogOpen(null); setEditingEventId(null); setHoverTime(null)
+                        })
                     }} />}
                 {(resourcesCollectedDialogOpen || editingEvent?.kind === "resources-collected") && <ResourcesCollectedDialog
                     key={editingEvent?.orderId ?? "new-resources-collected-event"}
@@ -848,35 +916,24 @@ export default function App() {
                     onClose={() => { setResourcesCollectedDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {
                         const action = createResourcesCollectedAction(command)
-                        if (!setBuildOrder(current => editingEvent?.kind === "resources-collected"
+                        setBuildOrder(current => editingEvent?.kind === "resources-collected"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
-                            : [...current, action])) return
-                        setResourcesCollectedDialogOpen(false)
-                        setEditingEventId(null)
-                        setDependencyError(null)
-                        setHoverTime(null)
+                            : [...current, action], () => {
+                            setResourcesCollectedDialogOpen(false); setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                        })
                     }} />}
                 {(unitKilledDialogOpen || editingEvent?.kind === "unit-is-killed") && <UnitKilledDialog
                     key={editingEvent?.orderId ?? "new-unit-is-killed"} faction={factionId} defaultTime={defaultEventTime}
                     action={editingEvent?.kind === "unit-is-killed" ? editingEvent : undefined}
-                    validate={command => {
-                        const item = createUnitKilledAction(command, factionId)
-                        const proposed = editingEvent?.kind === "unit-is-killed"
-                            ? buildOrder.map(entry => entry === editingEvent ? item : entry) : [...buildOrder, item]
-                        if (proposed.length > MAX_PLAN_ACTIONS) return ACTION_LIMIT_MESSAGE
-                        return simulateBuildOrder(proposed, economy, initialFoodUsed, baseFoodLimit, foodPerFarm, faction.startingTownHall)
-                            .plan.find(action => action.item === item)?.blockedReason ?? null
-                    }}
+                    validate={validateUnitKilled}
                     onClose={() => { setUnitKilledDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {
                         const action = createUnitKilledAction(command, factionId)
-                        if (!setBuildOrder(current => editingEvent?.kind === "unit-is-killed"
+                        setBuildOrder(current => editingEvent?.kind === "unit-is-killed"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
-                            : [...current, action])) return
-                        setUnitKilledDialogOpen(false)
-                        setEditingEventId(null)
-                        setDependencyError(null)
-                        setHoverTime(null)
+                            : [...current, action], () => {
+                            setUnitKilledDialogOpen(false); setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                        })
                     }} />}
                 {(wellDialogOpen || editingEvent?.kind === "mana-well") && <EventTimeDialog
                     key={editingEvent?.orderId ?? wellDialogOpen!}
@@ -894,38 +951,33 @@ export default function App() {
                     onClose={() => { setWellDialogOpen(null); setEditingEventId(null) }}
                     onSave={commandTime => {
                         const action = createManaWellAction({ type: editingEvent?.kind === "mana-well" ? editingEvent.wellEvent : wellDialogOpen!, commandTime })
-                        if (!setBuildOrder(current => editingEvent?.kind === "mana-well"
+                        setBuildOrder(current => editingEvent?.kind === "mana-well"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
-                            : [...current, action])) return
-                        setWellDialogOpen(null)
-                        setEditingEventId(null)
-                        setDependencyError(null)
-                        setHoverTime(null)
+                            : [...current, action], () => {
+                            setWellDialogOpen(null); setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                        })
                     }} />}
                 {editingEvent && isScrollAction(editingEvent) && editingEvent.scrollId === "legions-call" && <ScrollDialog key={editingEvent.orderId}
                     scrollId="legions-call" levels={gameProfile.player} minimumTime={0} automaticTime={null}
                     validateTime={commandTime => scrollCollision(commandTime, editingEvent)} initialCommandTime={editingEvent.commandTime} initialTargetItemId={editingEvent.targetItemId} targetsAt={scrollTargetsAt} targetOptions={scrollTargetOptions}
                     onClose={() => setEditingEventId(null)} onAdd={(commandTime, targetItemId) => {
-                        setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime, targetItemId } : item))
-                        setEditingEventId(null)
-                        setDependencyError(null)
-                        setHoverTime(null)
+                        setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime, targetItemId } : item), () => {
+                            setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                        })
                     }} />}
                 {editingEvent && isScrollAction(editingEvent) && editingEvent.scrollId !== "legions-call" && <EventTimeDialog key={editingEvent.orderId}
                     name={editingEvent.name} commandTime={editingEvent.commandTime} validateTime={commandTime => scrollCollision(commandTime, editingEvent)}
                     onClose={() => setEditingEventId(null)} onSave={commandTime => {
-                        setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime } : item))
-                        setEditingEventId(null)
-                        setDependencyError(null)
-                        setHoverTime(null)
+                        setBuildOrder(current => current.map(item => item === editingEvent ? { ...item, commandTime } : item), () => {
+                            setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                        })
                     }} />}
                 {scrollDialogOpen && <ScrollDialog validateTime={commandTime => scrollCollision(commandTime)} validationError={additionError} scrollId={scrollDialogOpen} levels={gameProfile.player} minimumTime={scrollDialogOpen === "legions-call" ? 0 : minimumScrollTime} automaticTime={automaticScrollTime}
                     targetsAt={scrollTargetsAt} targetOptions={scrollTargetOptions} automaticTimeForTarget={targetItemId => earliestLegionsCallTime(economy, plan, targetItemId)}
                     onClose={() => setScrollDialogOpen(null)} onAdd={(commandTime, targetItemId) => {
-                        if (!setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime, targetItemId }, factionId)])) return
-                        setScrollDialogOpen(null)
-                        setDependencyError(null)
-                        setHoverTime(null)
+                        setBuildOrder(current => [...current, createScrollAction({ type: "use-scroll", scrollId: scrollDialogOpen, commandTime, targetItemId }, factionId)], () => {
+                            setScrollDialogOpen(null); setDependencyError(null); setHoverTime(null)
+                        })
                     }} />}
             </main>
             <footer className="site-footer">
@@ -935,6 +987,11 @@ export default function App() {
                 </a>.
             </footer>
         </div>
+        <span className="build-order-live-status" aria-live="polite">{pending ? "Updating build order…" : ""}</span>
+        {pending && <div className="build-order-lock" aria-hidden="true">
+            {showSpinner && <div className="build-order-spinner" />}
+        </div>}
+        </>
     )
 }
 type ResourceRowProps = {

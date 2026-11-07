@@ -16,8 +16,8 @@ type Props = {
     faction: FactionId
     profile: GameProfile
     plan: ScheduledAction[]
-    onImport: (result: ReturnType<typeof parseBuildOrder>) => void
-    onSelectTemplate: (draft: BuildDraft) => void
+    onImport: (result: ReturnType<typeof parseBuildOrder>, onSuccess: () => void) => void
+    onSelectTemplate: (draft: BuildDraft, onSuccess: () => void) => void
 }
 
 export default function BuildOrderFiles({ faction, profile, plan, opening, onImport, onSelectTemplate }: Props) {
@@ -38,7 +38,7 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
     const dismissNotice = useCallback(() => setNotice(null), [])
     useEffect(() => {
         const dismissOutside = (event: MouseEvent) => {
-            if (menu.current?.open && event.target instanceof Node && !menu.current.contains(event.target)) {
+            if (menu.current?.open && !menu.current.closest("[inert]") && event.target instanceof Node && !menu.current.contains(event.target)) {
                 menu.current.open = false
             }
         }
@@ -55,17 +55,21 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
                 }
             } else trackedHash.current = null
             try {
-                const result = parseShareableLink(window.location.hash)
+                const result = parseShareableLink(hash)
                 if (!result) return
-                onImport(result)
-                // Consume this import so reloads restore the latest saved draft.
-                const url = new URL(window.location.href)
-                const fragment = new URLSearchParams(url.hash.slice(1))
-                fragment.delete("build")
-                url.hash = fragment.toString()
-                window.history.replaceState(window.history.state, "", url.href)
-                setNotice({ text: result.warning ?? "Shared build order and game profile loaded. Timings recalculated.", kind: result.warning ? "warning" : "success" })
+                setNotice(null)
                 if (menu.current) menu.current.open = false
+                onImport(result, () => {
+                    // Consume the applied link so reloads restore the latest
+                    // draft. A newer fragment may be waiting to apply.
+                    if (window.location.hash !== hash) return
+                    const url = new URL(window.location.href)
+                    const fragment = new URLSearchParams(url.hash.slice(1))
+                    fragment.delete("build")
+                    url.hash = fragment.toString()
+                    window.history.replaceState(window.history.state, "", url.href)
+                    setNotice({ text: result.warning ?? "Shared build order and game profile loaded. Timings recalculated.", kind: result.warning ? "warning" : "success" })
+                })
             } catch (reason) {
                 setNotice({ text: reason instanceof Error ? reason.message : "Could not open the shareable link.", kind: "error" })
             }
@@ -123,11 +127,13 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
             <div className="file-buttons">
                 {buildOrderTemplates[faction].map(template => <button key={template.name} type="button" disabled={busy} onClick={() => {
                     if (plan.length > 0 && !window.confirm(`“${template.name}” will replace your current build order. Continue?`)) return
-                    onSelectTemplate(createBuildOrderFromTemplate(faction, template))
                     setError(null)
                     setManualLink(null)
-                    setNotice({ text: "Build order template loaded. Resource collection settings preserved. Timings recalculated.", kind: "success" })
+                    setNotice(null)
                     closeMenu()
+                    onSelectTemplate(createBuildOrderFromTemplate(faction, template), () => {
+                        setNotice({ text: "Build order template loaded. Resource collection settings preserved. Timings recalculated.", kind: "success" })
+                    })
                 }}>{template.name}</button>)}
             </div>
         </section>}
@@ -156,9 +162,10 @@ export default function BuildOrderFiles({ faction, profile, plan, opening, onImp
                 try {
                     if (file.size > MAX_FILE_BYTES) throw new Error("Choose a JSON file smaller than 1 MB.")
                     const result = parseBuildOrder(await file.text())
-                    onImport(result)
-                    setNotice({ text: result.warning ?? "Build order and game profile imported. Timings recalculated.", kind: result.warning ? "warning" : "success" })
                     closeMenu()
+                    onImport(result, () => {
+                        setNotice({ text: result.warning ?? "Build order and game profile imported. Timings recalculated.", kind: result.warning ? "warning" : "success" })
+                    })
                 } catch (reason) {
                     setError(reason instanceof Error ? reason.message : "Could not read the file.")
                 } finally { setBusy(false) }

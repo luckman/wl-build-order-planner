@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import DurationInput from "./DurationInput"
 import { formatDuration, parseDuration } from "./durationTime"
 import type { ManaSpentAction, ManaSpentCommand } from "./game/manaSpent"
@@ -14,8 +14,10 @@ export default function ManaSpentDialog({ defaultTime, action, validate, onSave,
     const commandTime = parseDuration(time)
     const valid = commandTime !== null && Number.isInteger(commandTime) && amount.trim() !== "" &&
         Number.isFinite(Number(amount)) && Number.isInteger(Number(amount)) && Number(amount) > 0
-    const command: ManaSpentCommand = { type: "mana-spent", commandTime: commandTime!, mana: Number(amount) }
-    const error = valid ? validate(command) : "Enter a time from 00:00 to 29:59 and a positive whole-number mana amount."
+    const command = useMemo<ManaSpentCommand>(() => ({ type: "mana-spent", commandTime: commandTime!, mana: Number(amount) }),
+        [amount, commandTime])
+    const error = useMemo(() => valid ? validate(command) : "Enter a time from 00:00 to 29:59 and a positive whole-number mana amount.",
+        [command, valid, validate])
     useEffect(() => {
         const previousFocus = document.activeElement as HTMLElement | null
         dialog.current?.querySelector<HTMLInputElement>("input")?.focus()

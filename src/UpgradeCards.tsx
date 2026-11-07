@@ -1,3 +1,5 @@
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react"
+import { createPortal } from "react-dom"
 import { type Faction, itemCost, type PlannerItem } from "./game/gameData"
 import { orderedBuildings } from "./buildingDisplayOrder"
 
@@ -5,11 +7,12 @@ type Props = {
     faction: Faction
     buildOrder: PlannerItem[]
     iconSources: Record<string, string>
+    portalContainer: RefObject<HTMLDivElement>
     onConfigure: (item: PlannerItem) => void
     onAdd: (item: PlannerItem) => void
 }
 
-export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd, onConfigure }: Props) {
+export default function UpgradeCards({ faction, buildOrder, iconSources, portalContainer, onAdd, onConfigure }: Props) {
     const [open, setOpen] = useState<{ building: PlannerItem; anchor: HTMLButtonElement; last: boolean } | null>(null)
     const menu = useRef<HTMLDivElement>(null)
     const upgrades = open ? faction.items.filter(item => item.kind === "upgrade" && item.buildingId === open.building.id)
@@ -32,7 +35,8 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd, 
         if (!open) return
         const anchorBounds = open.anchor.getBoundingClientRect()
         const dismissOutside = (event: Event) => {
-            if (event.target instanceof Node && !menu.current?.contains(event.target) && !open.anchor.contains(event.target)) {
+            if (!portalContainer.current?.hasAttribute("inert") && event.target instanceof Node &&
+                !menu.current?.contains(event.target) && !open.anchor.contains(event.target)) {
                 setOpen(null)
             }
         }
@@ -51,7 +55,7 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd, 
             document.removeEventListener("scroll", dismissOnScroll, true)
             window.removeEventListener("resize", dismissOnResize)
         }
-    }, [open])
+    }, [open, portalContainer])
     const buildings = orderedBuildings(faction).filter(building =>
         faction.items.some(item => item.kind === "upgrade" && item.buildingId === building.id))
 
@@ -73,7 +77,7 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd, 
                 <span className="upgrade-arrow" aria-hidden="true">▾</span>
             </button>
         })}
-    </div>{open && createPortal(<div ref={menu} className="upgrade-menu" role="menu"
+    </div>{open && portalContainer.current && createPortal(<div ref={menu} className="upgrade-menu" role="menu"
         id={`upgrade-menu-${faction.id}-${open.building.id}`} aria-label={`${open.building.name} upgrades`}
         onKeyDown={event => {
             if (event.key === "Escape" || event.key === "Tab") {
@@ -96,7 +100,5 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, onAdd, 
                 <span className="upgrade-option-cost">{cost.gold} gold · {cost.wood} wood</span>
             </button>
         })}
-    </div>, document.body)}</>
+    </div>, portalContainer.current)}</>
 }
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"

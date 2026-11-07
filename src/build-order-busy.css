@@ -1,0 +1,39 @@
+.build-order-lock {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    display: grid;
+    place-items: center;
+    cursor: progress;
+}
+
+.build-order-spinner {
+    width: 3rem;
+    height: 3rem;
+    border: 4px solid #263e55;
+    border-top-color: #e4ba64;
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px #101d2c, 0 0 12px 5px #080e17;
+    animation: build-order-spin .75s linear infinite;
+}
+
+@keyframes build-order-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .build-order-spinner { animation: none; }
+}
+
+.build-order-update-error .file-notice {
+    z-index: 105;
+}
+
+.build-order-live-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}

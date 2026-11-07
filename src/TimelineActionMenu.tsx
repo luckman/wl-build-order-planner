@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 
-export default function TimelineActionMenu({ anchor, actionName, onEdit, onDelete, onClose }: {
-    anchor: HTMLButtonElement; actionName: string; onEdit?: () => void; onDelete: () => void; onClose: () => void
+export default function TimelineActionMenu({ anchor, container, actionName, onEdit, onDelete, onClose }: {
+    anchor: HTMLButtonElement; container: HTMLElement; actionName: string; onEdit?: () => void; onDelete: () => void; onClose: () => void
 }) {
     const menu = useRef<HTMLDivElement>(null)
     useLayoutEffect(() => {
@@ -54,5 +54,5 @@ export default function TimelineActionMenu({ anchor, actionName, onEdit, onDelet
             onEdit()
         }}>Edit</button>}
         <button type="button" role="menuitem" className="delete-action" onClick={() => { onClose(); onDelete() }}>Delete</button>
-    </div>, document.body)
+    </div>, container)
 }
