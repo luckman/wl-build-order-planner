@@ -148,15 +148,6 @@ function constructionPrerequisites(plan: ScheduledAction[], index: number, start
     return prerequisites
 }
 
-function prerequisiteReadinessLowerBound(prerequisites: ConstructionPrerequisite[], orderDelay: number) {
-    return Math.max(-Infinity, ...prerequisites.map(({ count, sources }) => {
-        const durations = sources.map(({ duration }) => duration).sort((a, b) => a - b)
-        // The clock starts at the order delay. Ignore travel, resources and
-        // competition for builders to allow the earliest possible completion.
-        return orderDelay + durations[count - 1] + orderDelay
-    }))
-}
-
 function cannotMeetPrerequisites(prerequisites: ConstructionPrerequisite[], time: number, departure: number, orderDelay: number) {
     // In this replay only the new departure differs. It runs before catalog
     // commands at the same time. Earlier commands keep their builder and finish
@@ -212,7 +203,6 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, start
             }
         }
         const prerequisites = constructionPrerequisites(probe.plan, index, startingBuilding, economy)
-        const earliestPrerequisiteTime = prerequisiteReadinessLowerBound(prerequisites, economy.orderDelay)
         const wasSuccessful = result.plan.map(action => !action.blocked)
         const evaluate = (time: number) => {
             const candidate = new Map(schedule.commands)
@@ -237,8 +227,7 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, start
         }
         for (const time of candidates) {
             if (time < earliestCommandTime) continue
-            if (time < earliestPrerequisiteTime ||
-                (prerequisites.length && cannotMeetPrerequisites(prerequisites, time, time - preparation, economy.orderDelay))) {
+            if (prerequisites.length && cannotMeetPrerequisites(prerequisites, time, time - preparation, economy.orderDelay)) {
                 // Reuse also requires unchanged fixed events and forecasts.
                 reuse.minimumPrefixLength = Math.max(reuse.minimumPrefixLength, index + 1)
                 continue
