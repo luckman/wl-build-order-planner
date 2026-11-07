@@ -47,16 +47,17 @@
 .construction-duration-row p { margin: 4px 0 0; }
 .construction-duration-row label { display: block; }
 .construction-source {
+    grid-column: 1;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 2px 8px;
-    margin-top: 4px;
     color: #a9c5df;
     font-size: .8rem;
 }
 .construction-inactive label, .construction-inactive .construction-source > span { opacity: .6; }
 .construction-dialog input[type="number"] { min-width: 0; border-radius: 4px; }
+.construction-travel-input { grid-area: 1 / 2 / 3; }
 .construction-dialog .construction-idle {
     display: flex;
     align-items: center;
