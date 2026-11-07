@@ -22,6 +22,7 @@ export type BuildingLimit = {
 }
 export type IconId =
     | "lightUnitIsKilled" | "darkUnitIsKilled"
+    | "lightWorkerIdle" | "lightWorkerActive" | "darkSlaveIdle" | "darkSlaveActive"
     | "manaWellIsCaptured" | "manaWellIsLost"
     | "lightManaSpent" | "darkManaSpent"
     | "resourcesCollected"

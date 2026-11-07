@@ -2,7 +2,7 @@ import ConstructionPhases, { timelineBounds } from "./ConstructionPhases"
 import ConstructionDialog from "./ConstructionDialog"
 import { isConstruction, hasCustomConstruction, constructionDescription } from "./game/constructionSettings"
 import WorkerEventDialog from "./WorkerEventDialog"
-import { createWorkerEvent, type WorkerEventCommand } from "./game/workerEvents"
+import { createWorkerEvent, workerEventIdentity, type WorkerEventCommand } from "./game/workerEvents"
 import ManaSpentDialog from "./ManaSpentDialog"
 import { createManaSpentAction, manaSpentCollision } from "./game/manaSpent"
 import Notification, { type NotificationMessage } from "./Notification"
@@ -77,6 +77,10 @@ const iconSources: Record<string, string> = {
     lightCrossbowTower: require("./icons/buildings/light-crossbow-tower.png"),
     lightArtilleryTower: require("./icons/buildings/light-artillery-tower.png"),
     lightTowerOfMana: require("./icons/buildings/light-tower-of-mana.png"),
+    lightWorkerIdle: require("./icons/light-worker-idle.png"),
+    lightWorkerActive: require("./icons/light-worker-active.png"),
+    darkSlaveIdle: require("./icons/dark-slave-idle.png"),
+    darkSlaveActive: require("./icons/dark-slave-active.png"),
     lightWorker: require("./icons/units/light-worker.png"),
     lightSwordsman: require("./icons/units/light-swordsman.png"),
     lightWarsmith: require("./icons/units/light-warsmith.png"),
@@ -142,10 +146,24 @@ const formatTimeWithTenths = (seconds: number) => {
 type TimelineEvent = ScheduledAction & { index: number }
 type TimelineLane = { label: string; events: TimelineEvent[] }
 
-function actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason, useIdleWorker }:
-    Pick<ScheduledAction, "departureTime" | "commandTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime" | "blockedReason"> & { useIdleWorker?: boolean }) {
-    if (commandTime === null || startTime === null || finishTime === null) return blockedReason
-    return `${departureTime != null ? `Departure ${formatTime(departureTime)} · ` : ""}Command ${formatTime(commandTime)} · start ${formatTime(startTime)} · finish ${formatTime(finishTime)}${useIdleWorker ? ` · worker idle at completion ${formatTime(finishTime)} (no return travel)` : workerReturnTime === null ? "" : ` · eligible for construction ${formatTime(finishTime)} · ${workerReturnEndTime != null && workerReturnEndTime < workerReturnTime ? `return interrupted ${formatTime(workerReturnEndTime)} (projected arrival ${formatTime(workerReturnTime)})` : `worker returns ${formatTime(workerReturnTime)}`}`}`
+function actionTimingTitle(action: ScheduledAction, globalDelay: number) {
+    const { item, departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason } = action
+    const custom = hasCustomConstruction(item)
+    const details = custom ? constructionDescription(item, globalDelay) : undefined
+    if (commandTime === null || startTime === null || finishTime === null) {
+        return [details, blockedReason].filter(Boolean).join("\n") || undefined
+    }
+    const command = `Command ${formatTime(commandTime)}`
+    if (!isConstruction(item)) return `${command} · start ${formatTime(startTime)} · finish ${formatTime(finishTime)}`
+
+    const timing = `${command} · Start ${formatTime(startTime)} · Finish ${formatTime(finishTime)}`
+    if (!custom) return timing
+    const departure = departureTime == null ? undefined : `Departure ${formatTime(departureTime)}`
+    const returnTiming = item.construction?.useIdleWorker || workerReturnTime === null ? undefined
+        : workerReturnEndTime != null && workerReturnEndTime < workerReturnTime
+            ? `return interrupted ${formatTime(workerReturnEndTime)}`
+            : `worker returns ${formatTime(workerReturnTime)}`
+    return [details, [departure, timing, returnTiming].filter(Boolean).join(" · ")].join("\n")
 }
 
 function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
@@ -217,6 +235,7 @@ export default function App() {
         if (timelineMenu && !buildOrder.some(item => item === timelineMenu.item)) closeTimelineMenu()
     }, [buildOrder, timelineMenu, closeTimelineMenu])
     const editingEvent = buildOrder.find(item => item.orderId === editingEventId)
+    const constructionDialogItem = editingEvent && isConstruction(editingEvent) ? editingEvent : configuringConstruction
     useEffect(() => {
         if (editingEventId || !timelineEdit.current) return
         const { item, anchor } = timelineEdit.current
@@ -513,10 +532,6 @@ export default function App() {
                                             </>}
                                             {kind === "hero" && <>
                                                 <span className="scroll-card-delimiter" aria-hidden="true" />
-                                                {(["make-idle", "make-active"] as const).map(type => <button key={type} className="action resource-card"
-                                                    aria-label={type === "make-idle" ? "Make idle" : "Make active"} onClick={() => setWorkerEventDialogOpen(type)}>
-                                                    <span className="action-name">{type === "make-idle" ? "Make idle" : "Make active"}</span>
-                                                </button>)}
                                                 <button className="action resource-card" aria-label="Resources collected" title="Adjust gold and wood instantly at a chosen timestamp"
                                                     onClick={() => setResourcesCollectedDialogOpen(true)}>
                                                     <span className="action-name">Resources collected</span>
@@ -538,6 +553,14 @@ export default function App() {
                                                     <span className="action-name">Unit is killed</span>
                                                     <img src={iconSources[factionId === "light" ? "lightUnitIsKilled" : "darkUnitIsKilled"]} alt="" />
                                                 </button>
+                                                {(["make-idle", "make-active"] as const).map(type => {
+                                                    const { name, icon } = workerEventIdentity(type, factionId)
+                                                    return <button key={type} className="action resource-card"
+                                                        aria-label={name} onClick={() => setWorkerEventDialogOpen(type)}>
+                                                        <span className="action-name">{name}</span>
+                                                        <img src={iconSources[icon]} alt="" />
+                                                    </button>
+                                                })}
                                             </>}
                                         </div>}
                                     </section>
@@ -550,9 +573,6 @@ export default function App() {
                                     <h2>Timeline</h2>
                                     <TimelineHelp />
                                 </div>
-                            </div>
-                            <div className="construction-phase-legend" aria-label="Construction phases">
-                                <span className="legend-preparation">Preparation</span><span className="legend-outward">Outward</span><span className="legend-construction">Construction</span><span className="legend-return">Return</span>
                             </div>
                             <div className="timeline-grid">
                                 <div className="timeline-fixed timeline-legend">
@@ -612,13 +632,13 @@ export default function App() {
                                             <div className="queue-track" key={lane.label}>
                                                     {lane.events.map(
                                                         (action) => {
-                                                            const { item, commandTime, departureTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, index } = action
+                                                            const { item, index } = action
                                                             const bounds = timelineBounds(action)
                                                             return <button
                                                                 className={`event ${item.kind}${isConstruction(item) ? " construction-event" : ""}${item.kind === "hero" ? " unit" : ""}${isTimedEvent(item) ? " timed-event" : ""}`}
                                                                 key={`${item.id}-${index}`}
                                                                 style={{ left: `${(bounds.start / endTime) * 100}%`, width: `${((bounds.end - bounds.start) / endTime) * 100}%` }}
-                                                                title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, useIdleWorker: item.construction?.useIdleWorker })].filter(Boolean).join("\n")}
+                                                                title={actionTimingTitle(action, economy.constructionStartDelay)}
                                                                 aria-label={isConstruction(item) ? item.name : undefined}
                                                                 aria-haspopup="menu"
                                                                 data-order-id={(item as typeof buildOrder[number]).orderId}
@@ -691,9 +711,10 @@ export default function App() {
                             <DragDropContext onDragEnd={reorderActions}>
                             <Droppable droppableId="build-order">
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
-                                {displayPlan.map(({ item, departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blocked, blockedReason }, index) => (
-                                    <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
-                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason, useIdleWorker: item.construction?.useIdleWorker })].filter(Boolean).join("\n")}
+                                {displayPlan.map((action, index) => {
+                                    const { item, commandTime, startTime, finishTime, blocked, blockedReason } = action
+                                    return <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
+                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle(action, economy.constructionStartDelay)}
                                         tabIndex={isConstruction(item) ? 0 : undefined}
                                         onKeyDown={event => { if (isConstruction(item) && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setEditingEventId((item as typeof buildOrder[number]).orderId) } }}
                                         onClick={isTimedEvent(item) || isConstruction(item) ? () => { setDependencyError(null); setEditingEventId((item as typeof buildOrder[number]).orderId) } : undefined}>
@@ -728,7 +749,7 @@ export default function App() {
                                         </button>
                                     </li>}
                                     </Draggable>
-                                ))}
+                                })}
                                 {provided.placeholder}
                             </ol>}
                             </Droppable>
@@ -763,8 +784,9 @@ export default function App() {
                         setEditingEventId(item.orderId)
                     } : undefined}
                     onDelete={() => setBuildOrder(current => current.filter(item => item !== timelineMenu.item))} />}
-                {(configuringConstruction || (editingEvent && isConstruction(editingEvent))) && <ConstructionDialog
-                    key={editingEvent?.orderId ?? configuringConstruction!.id} item={editingEvent && isConstruction(editingEvent) ? editingEvent : configuringConstruction!}
+                {constructionDialogItem && <ConstructionDialog
+                    key={editingEvent?.orderId ?? constructionDialogItem.id} item={constructionDialogItem}
+                    buildingName={faction.items.find(item => item.id === constructionDialogItem.buildingId)?.name ?? constructionDialogItem.name}
                     globalDelay={economy.constructionStartDelay} editing={!!editingEvent} validationError={dependencyError ?? (editingEvent ? null : additionError)}
                     onClose={() => { setConfiguringConstruction(null); setEditingEventId(null); setDependencyError(null) }}
                     onSave={construction => {
@@ -801,13 +823,13 @@ export default function App() {
                         setHoverTime(null)
                     }} />}
                 {(workerEventDialogOpen || editingEvent?.kind === "worker-event") && <WorkerEventDialog
-                    key={editingEvent?.orderId ?? workerEventDialogOpen!} defaultTime={defaultEventTime}
+                    key={editingEvent?.orderId ?? workerEventDialogOpen!} faction={factionId} defaultTime={defaultEventTime}
                     type={editingEvent?.kind === "worker-event" ? editingEvent.workerEvent : workerEventDialogOpen!}
                     action={editingEvent?.kind === "worker-event" ? editingEvent : undefined}
                     validationError={editingEvent ? null : additionError}
                     onClose={() => { setWorkerEventDialogOpen(null); setEditingEventId(null) }}
                     onSave={command => {
-                        const action = createWorkerEvent(command)
+                        const action = createWorkerEvent(command, factionId)
                         if (!setBuildOrder(current => editingEvent?.kind === "worker-event"
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
                             : [...current, action])) return

@@ -34,12 +34,19 @@ Right-click a building or an upgrade target level to configure its outward and r
 before adding. Click construction rows, or choose **Edit** on their timeline items, to change
 settings. **Preparation** reserves the worker before the purchase command, stopping gathering
 for the entered interval; its departure moves when the command is rescheduled. Timeline items
-show distinct preparation, outward, construction and return phases, with hover timing details. **Use idle worker** selects only an available idle builder; it becomes idle at completion
+separate preparation, outward travel, work and return travel with vertical dividers.
+Hover for command, start and finish times and additional details on customized orders.
+**Use idle worker** selects only an available idle builder; it becomes idle at completion
 without return travel. A returning gatherer can start another construction at completion; its
-unfinished return journey is retained as a minimum after the next job. Each travel field inherits the live global delay until overridden; **Use global** resets it.
+unfinished return journey is retained as a minimum after the next job. The construction and
+upgrade dialogs use 0.1-second steps and mark each travel setting as **Global** or **Custom**.
+**Use global (3.0 s)** shows the current profile delay and restores live inheritance.
+Idle mode disables return travel and keeps its saved duration.
 
-**Make idle** removes a chosen count of gatherers from income and ordinary builder selection.
-**Make active** restores their previous assignments, optionally after travel. Both use fixed times
+**Make Worker idle** (Light) and **Make Slave idle** (Dark) remove a chosen count of gatherers
+from income and ordinary builder selection. **Make Worker active** and **Make Slave active**
+restore their previous assignments, optionally after travel. The two cards follow **Unit is killed**
+and use matching pause and resume icons in the build order and timeline. Both events use fixed times
 and apply the full count or report an error. Latest order state lists idle workers separately. Worker losses let you choose Gathering
 or Idle; an unavailable group reports an error without removing a worker from the other group.
 

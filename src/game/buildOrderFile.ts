@@ -129,7 +129,7 @@ export function parseBuildOrder(text: string): {
         if (action.type === "make-idle" || action.type === "make-active") {
             return createWorkerEvent({ type: action.type, commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
                 count: number(action.count, `Action ${index + 1}.count`, true, true),
-                travelDuration: action.travelDuration === undefined ? 0 : number(action.travelDuration, `Action ${index + 1}.travelDuration`) })
+                travelDuration: action.travelDuration === undefined ? 0 : number(action.travelDuration, `Action ${index + 1}.travelDuration`) }, faction)
         }
         if (action.type === "mana-spent") {
             return createManaSpentAction({ type: "mana-spent", commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),

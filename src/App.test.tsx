@@ -244,12 +244,11 @@ test("timeline shows a 120-second window and extends 30 seconds past the last re
     expect(within(container.querySelector(".time-scale") as HTMLElement).getByText("2:00")).toBeTruthy()
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "100000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "100000" } })
-    const actions = within(container.querySelector(".action-panel") as HTMLElement)
     chooseUpgrade("Castle lvl 2")
     expect(canvas.style.width).toBe("100%")
     chooseUpgrade("Castle lvl 3")
-    const finishes = Array.from(container.querySelectorAll(".queue-track .event"))
-        .map(event => event.getAttribute("title")!.match(/worker returns (\d+):(\d+(?:\.\d+)?)/) ?? event.getAttribute("title")!.match(/finish (\d+):(\d+(?:\.\d+)?)/)!)
+    const finishes = Array.from(container.querySelectorAll(".queue-track .construction-phase"))
+        .map(phase => phase.getAttribute("aria-label")!.match(/ to (\d+):(\d+(?:\.\d+)?)$/)!)
         .map(match => Number(match[1]) * 60 + Number(match[2]))
     const horizon = Math.max(...finishes) + 30
     expect(horizon).toBeGreaterThan(120)
@@ -399,7 +398,7 @@ test.each([
         fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     }
     const action = container.querySelector(".action-panel") as HTMLElement
-    const addWorker = within(action).getByRole("button", { name: new RegExp(worker) })
+    const addWorker = within(action).getByRole("button", { name: new RegExp(`^${worker} \\d`) })
     fireEvent.click(addWorker)
     fireEvent.click(addWorker)
     const order = container.querySelector(".order") as HTMLElement
@@ -512,7 +511,7 @@ test("latest-command markers stay inside graphs during hover while amounts follo
     expect(container.querySelector(".latest-command-caption")).toBeNull()
 })
 
-test("the editable construction delay changes building and worker return times", () => {
+test("standard construction shows only command, start and finish as global travel changes", () => {
     const { container } = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     const delay = screen.getByLabelText("Construction start delay (seconds)") as HTMLInputElement
@@ -522,19 +521,19 @@ test("the editable construction delay changes building and worker return times",
     fireEvent.click(
         within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Barracks \d/ }),
     )
-    expect(screen.getAllByTitle(/Command 0:01 · start 0:04 · finish 0:34 · eligible for construction 0:34 · worker returns 0:37/)).toHaveLength(2)
+    expect(screen.getAllByTitle("Command 0:01 · Start 0:04 · Finish 0:34")).toHaveLength(2)
     fireEvent.change(delay, { target: { value: "2.5" } })
-    expect(screen.getAllByTitle(/Command 0:01 · start 0:03.5 · finish 0:33.5 · eligible for construction 0:33.5 · worker returns 0:36/)).toHaveLength(2)
+    expect(screen.getAllByTitle("Command 0:01 · Start 0:03.5 · Finish 0:33.5")).toHaveLength(2)
 })
 
-test("town hall upgrades show builder travel and return time in the construction timeline", () => {
+test("standard town hall upgrades show the same compact timing in both panels", () => {
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "2000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "2000" } })
     chooseUpgrade("Castle lvl 2")
 
-    expect(container.querySelector(".event.upgrade")?.getAttribute("title")).toContain(
-        "Command 0:35 · start 0:38 · finish 1:23 · eligible for construction 1:23 · worker returns 1:26",
+    expect(container.querySelector(".event.upgrade")?.getAttribute("title")).toBe(
+        "Command 0:35 · Start 0:38 · Finish 1:23",
     )
     const upgradeRow = screen.getByRole("button", { name: "Remove Castle lvl 2" }).closest("li")!
     expect(upgradeRow.title).toBe(container.querySelector(".event.upgrade")?.getAttribute("title"))

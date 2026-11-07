@@ -30,5 +30,5 @@ export function constructionDescription(item: PlannerItem, globalDelay: number) 
     if (!isConstruction(item)) return ""
     const settings = item.construction
     const travel = (label: string, override?: number) => `${label}: ${override ?? globalDelay}s (${override === undefined ? "global" : "override"})`
-    return `Preparation: ${settings?.preparationDuration ?? 0}s · ${settings?.useIdleWorker ? "Idle worker (idle at completion; no return travel)" : "Gathering worker"} · ${travel("Outward", settings?.outwardDuration)} · ${settings?.useIdleWorker ? "Return: none (idle at completion)" : travel("Return", settings?.returnDuration)}`
+    return `Preparation: ${settings?.preparationDuration ?? 0}s · ${settings?.useIdleWorker ? "Idle worker" : "Gathering worker"} · ${travel("Outward", settings?.outwardDuration)} · ${settings?.useIdleWorker ? "Worker idle at completion (no return travel)" : travel("Return", settings?.returnDuration)}`
 }

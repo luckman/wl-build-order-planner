@@ -149,8 +149,9 @@ by Whip; outward/return travel retains movement effects and unfinished journey m
 ## Timeline phases
 
 Each construction or upgrade is one editable item spanning actual departure through
-the end of its return segment. Preparation, outward, construction and return have
-distinct colors; zero-duration phases and idle-builder return are omitted. Chaining
-ends a return segment at reassignment. Tooltips distinguish completion/construction
-eligibility from return arrival, include effective settings and inheritance, and
-identify interrupted returns. Phase labels and a legend explain the colors.
+the end of its return segment. Construction is blue and upgrades are purple, with
+vertical dividers between their phases. Zero-duration phases and idle-builder return
+are omitted. Chaining ends a return segment at reassignment. Both the build order and
+the timeline show command, start and finish times on hover. Orders with preparation,
+an idle builder or a travel override also show worker and travel details, including
+the actual end of an interrupted return.

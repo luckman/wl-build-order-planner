@@ -128,19 +128,12 @@
 .resource-tooltip.align-right { transform: translateX(calc(-100% - 4px)); }
 .resource-row { grid-template-columns: 73px minmax(0, 1fr) 74px; }
 
-.construction-phase-legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 7px 12px; color: #bacbd9; font-size: .68rem; }
-.construction-phase-legend span::before { content: ""; display: inline-block; width: 10px; height: 8px; margin-right: 4px; border: 1px solid #aac1d0; }
-.legend-preparation::before { background: #796236; }
-.legend-outward::before { background: #346b8c; }
-.legend-construction::before { background: #32618a; }
-.legend-return::before { background: #31514d; }
-.event.construction-event { min-width: 0; padding: 0; gap: 0; background: transparent; }
-.construction-phase { position: absolute; top: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-end; overflow: hidden; padding-bottom: 2px; border-right: 1px solid #c8d9e644; font-size: .56rem; color: #ebf3f8; pointer-events: none; }
-.phase-preparation { background: repeating-linear-gradient(135deg, #796236, #796236 4px, #66532e 4px, #66532e 8px); }
-.phase-outward { background: #346b8c; }
-.phase-construction { background: linear-gradient(#32618a, #1d3f5d); }
-.upgrade .phase-construction { background: linear-gradient(#725183, #482e57); }
-.phase-return { background: #31514d; }
-.construction-caption { position: absolute; top: 0; height: 100%; display: flex; align-items: center; gap: 4px; padding: 3px; overflow: hidden; pointer-events: none; }
+.event.construction-event { min-width: 0; padding: 0; gap: 0; }
+.construction-phase { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+.construction-phase + .construction-phase { border-left: 1px solid #c8d9e680; }
+.construction-caption { position: absolute; top: 0; left: var(--caption-left); width: var(--caption-width); height: 100%; display: flex; align-items: center; gap: 4px; padding: 3px; overflow: hidden; pointer-events: none; }
 .construction-caption > span { overflow: hidden; text-overflow: ellipsis; }
 .construction-caption img { flex-shrink: 0; }
+@media (max-width: 600px) {
+    .construction-caption { left: 0; width: 100%; justify-content: center; }
+}

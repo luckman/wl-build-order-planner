@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import type { PlannerItem } from "./game/gameData"
 import { parseConstructionSettings, type ConstructionSettings } from "./game/constructionSettings"
 
-export default function ConstructionDialog({ item, globalDelay, editing, onSave, onClose, validationError }: {
-    item: PlannerItem; globalDelay: number; editing: boolean; validationError?: string | null
+export default function ConstructionDialog({ item, buildingName, globalDelay, editing, onSave, onClose, validationError }: {
+    item: PlannerItem; buildingName: string; globalDelay: number; editing: boolean; validationError?: string | null
     onSave: (settings: ConstructionSettings) => void; onClose: () => void
 }) {
     const dialog = useRef<HTMLDivElement>(null)
@@ -24,8 +24,11 @@ export default function ConstructionDialog({ item, globalDelay, editing, onSave,
         dialog.current?.querySelector<HTMLInputElement>("input")?.focus()
         return () => { if (previous?.isConnected) previous.focus() }
     }, [])
+    const upgrade = item.kind === "upgrade"
+    const globalSeconds = `${globalDelay.toFixed(1)} s`
+    const resetLabel = `Use global (${globalSeconds})`
     return <div className="scroll-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
-        <div ref={dialog} className="scroll-dialog panel" role="dialog" aria-modal="true" aria-labelledby="construction-dialog-title"
+        <div ref={dialog} className="scroll-dialog construction-dialog panel" role="dialog" aria-modal="true" aria-labelledby="construction-dialog-title"
             onKeyDown={event => {
                 if (event.key === "Escape") { event.stopPropagation(); onClose() }
                 if (event.key === "Tab") {
@@ -35,19 +38,47 @@ export default function ConstructionDialog({ item, globalDelay, editing, onSave,
                     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
                 }
             }}>
-            <h2 id="construction-dialog-title">{editing ? "Edit" : "Configure"} {item.name}</h2>
-            <form onSubmit={event => { event.preventDefault(); if (!error) onSave(settings) }}>
-                <label>Preparation (seconds)<input type="number" min="0" step="any" value={preparation} onChange={event => setPreparation(event.target.value)} /></label>
-                <p>Preparation reserves the worker this many seconds before the scheduled command.</p>
-                <label><input type="checkbox" checked={useIdleWorker} onChange={event => setUseIdleWorker(event.target.checked)} />Use idle worker</label>
-                {([{ label: "Outward travel (seconds)", value: outward, set: setOutward, disabled: false },
-                    { label: "Return travel (seconds)", value: back, set: setBack, disabled: useIdleWorker }]).map(field => <div key={field.label}>
-                    <label>{field.label}<input type="number" min="0" step="any" disabled={field.disabled} value={field.value ?? globalDelay}
-                        onChange={event => field.set(event.target.value)} /></label>
-                    <span>{field.value === undefined ? `Global: ${globalDelay}s` : "Override"}</span>
-                    <button type="button" disabled={field.value === undefined || (field.disabled)} onClick={() => field.set(undefined)} aria-label={`Use global ${field.label.toLowerCase()}`}>Use global</button>
+            <h2 id="construction-dialog-title">{editing ? "Edit" : "Configure"} {buildingName} {upgrade ? "Upgrade" : "Construction"}</h2>
+            {upgrade && item.level !== undefined && <p className="construction-target-level">Target level {item.level}</p>}
+            {/* Keep accepting valid imported durations that are finer than the input's step. */}
+            <form noValidate onSubmit={event => { event.preventDefault(); if (!error) onSave(settings) }}>
+                <div className="construction-duration-row">
+                    <div>
+                        <label htmlFor="construction-preparation">Preparation<span className="construction-unit-label"> (seconds)</span></label>
+                        <p id="construction-preparation-help">Time before the construction command.</p>
+                    </div>
+                    <div className="construction-seconds">
+                        <input id="construction-preparation" type="number" min="0" step="0.1" value={preparation}
+                            aria-describedby="construction-preparation-help" onChange={event => setPreparation(event.target.value)} />
+                        <span aria-hidden="true">s</span>
+                    </div>
+                </div>
+                <label className="construction-idle"><input type="checkbox" checked={useIdleWorker}
+                    onChange={event => setUseIdleWorker(event.target.checked)} />Use idle worker</label>
+                {([
+                    { id: "construction-outward", label: "Outward travel", value: outward, set: setOutward, disabled: false },
+                    { id: "construction-return", label: "Return travel", value: back, set: setBack, disabled: useIdleWorker },
+                ]).map(field => <div key={field.id} className="construction-duration-row">
+                    <div>
+                        <label htmlFor={field.id}>{field.label}<span className="construction-unit-label"> (seconds)</span></label>
+                        <p id={`${field.id}-source`}>{field.value === undefined ? `Global: ${globalSeconds}` : "Custom"}</p>
+                    </div>
+                    <div className="construction-seconds">
+                        <input id={field.id} type="number" min="0" step="0.1" disabled={field.disabled} value={field.value ?? globalDelay}
+                            aria-describedby={`${field.id}-source${field.disabled ? " construction-return-help" : ""}`}
+                            onChange={event => field.set(event.target.value)} />
+                        <span aria-hidden="true">s</span>
+                    </div>
+                    {field.value !== undefined && <button type="button" className="construction-reset" disabled={field.disabled}
+                        onClick={event => {
+                            const input = event.currentTarget.form?.elements.namedItem(field.id)
+                            if (input instanceof HTMLInputElement) input.focus()
+                            field.set(undefined)
+                        }} aria-label={`${resetLabel} for ${field.label.toLowerCase()}`}>{resetLabel}</button>}
+                    {field.disabled && <p id="construction-return-help" className="construction-return-help">
+                        Idle builders skip return travel. Your saved duration is kept.
+                    </p>}
                 </div>)}
-                {useIdleWorker && <p>Idle builders become idle at completion and have no return travel. Your return override is retained.</p>}
                 {error && <p role="alert">{error}</p>}
                 <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!!error}>{editing ? "Save order" : "Add order"}</button></div>
             </form>
