@@ -410,7 +410,9 @@ export class WorkerEconomy {
         return worker.cargoWood
     }
 
-    selectBuilder() { return this.selectBuilderExcluding(new Set()) }
+    selectBuilder(useIdleWorker = false) {
+        return useIdleWorker ? this.workers.find(worker => worker.assignment === "idle" && worker.state === "idle") : this.selectBuilderExcluding(new Set())
+    }
 
     private selectBuilderExcluding(excluded: Set<number>) {
         const amount = (worker: GatheringWorker) => {
@@ -471,7 +473,7 @@ export class WorkerEconomy {
         this.delayedInitialWoodWorkerIds = this.delayedInitialWoodWorkerIds.filter(id => id !== worker.id)
         // Pause wood gathering through construction; gold cargo is still discarded.
         worker.cargoGold = 0
-        worker.cargoWood = this.gatheredWood(worker)
+        worker.cargoWood = worker.assignment === "idle" ? worker.cargoWood : this.gatheredWood(worker)
         worker.constructionDuration = buildTime
         worker.constructionReturnDuration = returnTravelTime
         // Travel is projected separately so future casts can also affect a builder en route.

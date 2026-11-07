@@ -333,7 +333,7 @@ function simulateBuildOrderPass(
                 : readyProducers.find(building => building.availableAt <= time)
             const heroTierUnlocked = item.kind !== "hero" || requirementCount(unlockedBuildings,
                 { item: item.producerBuildingId!, count: 1, minLevel: requiredAltarLevel }, time) >= 1
-            const builder = requiresConstructionWorker(item) ? simulation.selectBuilder() : undefined
+            const builder = requiresConstructionWorker(item) ? simulation.selectBuilder(item.construction?.useIdleWorker) : undefined
             const state = resourceAt(economy, simulation.deliveries, spending, time)
             // Avoid missing a delivery at the exact boundary through subtraction rounding.
             const readinessTime = Math.max(0, Math.min(time, time - economy.orderDelay + 1e-9))
@@ -361,10 +361,9 @@ function simulateBuildOrderPass(
                     : isRecruitable(item) && foodUsed + item.food > foodLimit
                         ? `Insufficient supply: requires ${item.food}, available ${Math.max(0, foodLimit - foodUsed)} (${foodUsed}/${foodLimit} used)`
                     : "Waiting for resources, food, producer, or worker"
-            if (
+            const purchaseReady = (
                 time >= commandReadyAt &&
                 (!needsProducer || producer) &&
-                (!requiresConstructionWorker(item) || builder) &&
                 item.prerequisites.every((name) => completedNames.has(name)) &&
                 !missingRequirement && withinLimit && heroTierUnlocked && !maxCountReached &&
                 state.gold >= cost.gold &&
@@ -372,14 +371,19 @@ function simulateBuildOrderPass(
                 (cost.gold === 0 || readyResources.gold >= cost.gold) &&
                 (cost.wood === 0 || readyResources.wood >= cost.wood) &&
                 (!isRecruitable(item) || (foodUsed + item.food <= foodLimit && readyFoodUsed + item.food <= readyFoodLimit))
-            ) {
+            )
+            if (purchaseReady && item.construction?.useIdleWorker && !builder) {
+                blockedReason = "No available idle worker at construction departure."
+                break
+            }
+            if (purchaseReady && (!requiresConstructionWorker(item) || builder)) {
                 const travelTime = builder ? simulation.constructionTravelTime(builder, item.construction?.outwardDuration) : 0
                 const startTime = time + travelTime
                 const duration = actionDuration(item, economy)
                 const finishTime = isRecruitable(item) && producer
                     ? recruitmentFinish(startTime, duration, buildings.indexOf(producer), recruitmentWindows, recruitmentReduction)
                     : startTime + duration
-                const returnTravelTime = builder ? simulation.constructionReturnTravelTime(finishTime, Math.max(item.construction?.returnDuration ?? economy.constructionStartDelay, simulation.remainingReactivation(builder))) : 0
+                const returnTravelTime = builder && !item.construction?.useIdleWorker ? simulation.constructionReturnTravelTime(finishTime, Math.max(item.construction?.returnDuration ?? economy.constructionStartDelay, simulation.remainingReactivation(builder))) : 0
                 const workerReturnTime = builder ? finishTime + returnTravelTime : null
                 if ((workerReturnTime ?? finishTime) > MAX_PLAN_SECONDS) {
                     blockedReason = "Action would exceed the 30:00 plan limit"

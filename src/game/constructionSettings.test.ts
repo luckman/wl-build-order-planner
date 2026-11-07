@@ -5,6 +5,7 @@ import { parseBuildOrder, serializeBuildOrder } from "./buildOrderFile"
 import { createWorkerEvent } from "./workerEvents"
 import { createScrollAction } from "./scrolls"
 import { createShareableLink, parseShareableLink } from "./shareableLink"
+import { workerAllocationAt } from "./resourceSimulation"
 
 const economy = { ...economyFromProfile(initialGameProfile), startingGold: 10000, startingWood: 10000 }
 test.each(["light", "dark"] as const)("%s construction travel overrides are per occurrence and preserve explicit zero", faction => {
@@ -51,4 +52,18 @@ test("Whip applies to overridden outward travel and construction clears its old 
     const plan = simulateBuildOrder([farm, cast], { ...economy, startingMana: 500, baseManaLimit: 500, workerCount: 1, goldWorkers: 0, woodWorkers: 1 }, 2, 200, 20, "Citadel").plan
     expect(plan[0].startTime! - plan[0].commandTime!).toBeCloseTo(10 / 1.15)
     expect(plan[0].workerReturnTime! - plan[0].finishTime!).toBe(7)
+})
+
+test.each(["light", "dark"] as const)("%s explicitly uses an idle builder, returns it idle at completion, and never waits for future idle events", faction => {
+    const farm = { ...factions[faction].items.find(item => item.id === (faction === "light" ? "farm" : "pigsty"))!, construction: { useIdleWorker: true, returnDuration: 40 } }
+    const idle = (commandTime: number) => createWorkerEvent({ type: "make-idle", commandTime, count: 1 })
+    const run = (items: PlannerItem[]) => simulateBuildOrder(items, economy, 10, 200, 20, factions[faction].startingTownHall)
+    const plan = run([idle(1), farm]).plan
+    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 1 })
+    expect(plan[1].workerReturnTime).toBe(plan[1].finishTime)
+    expect(workerAllocationAt(economy, plan, plan[1].finishTime!)).toMatchObject({ idle: 1, buildingOrTravelling: 0 })
+    const rejected = run([farm, idle(20)])
+    expect(rejected.plan[0].blocked).toBe(true)
+    expect(rejected.plan[0].blockedReason).toContain("idle worker")
+    expect(rejected.deliveries).toEqual(run([idle(20)]).deliveries)
 })

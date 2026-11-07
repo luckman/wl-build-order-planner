@@ -9,7 +9,8 @@ export default function ConstructionDialog({ item, globalDelay, editing, onSave,
     const dialog = useRef<HTMLDivElement>(null)
     const [outward, setOutward] = useState<string | undefined>(item.construction?.outwardDuration?.toString())
     const [back, setBack] = useState<string | undefined>(item.construction?.returnDuration?.toString())
-    const settings: ConstructionSettings = { ...(outward !== undefined ? { outwardDuration: Number(outward) } : {}),
+    const [useIdleWorker, setUseIdleWorker] = useState(item.construction?.useIdleWorker ?? false)
+    const settings: ConstructionSettings = { useIdleWorker, ...(outward !== undefined ? { outwardDuration: Number(outward) } : {}),
         ...(back !== undefined ? { returnDuration: Number(back) } : {}) }
     let error = validationError
     try {
@@ -34,13 +35,15 @@ export default function ConstructionDialog({ item, globalDelay, editing, onSave,
             }}>
             <h2 id="construction-dialog-title">{editing ? "Edit" : "Configure"} {item.name}</h2>
             <form onSubmit={event => { event.preventDefault(); if (!error) onSave(settings) }}>
-                {([{ label: "Outward travel (seconds)", value: outward, set: setOutward },
-                    { label: "Return travel (seconds)", value: back, set: setBack }]).map(field => <div key={field.label}>
-                    <label>{field.label}<input type="number" min="0" step="any" value={field.value ?? globalDelay}
+                <label><input type="checkbox" checked={useIdleWorker} onChange={event => setUseIdleWorker(event.target.checked)} />Use idle worker</label>
+                {([{ label: "Outward travel (seconds)", value: outward, set: setOutward, disabled: false },
+                    { label: "Return travel (seconds)", value: back, set: setBack, disabled: useIdleWorker }]).map(field => <div key={field.label}>
+                    <label>{field.label}<input type="number" min="0" step="any" disabled={field.disabled} value={field.value ?? globalDelay}
                         onChange={event => field.set(event.target.value)} /></label>
                     <span>{field.value === undefined ? `Global: ${globalDelay}s` : "Override"}</span>
-                    <button type="button" disabled={field.value === undefined} onClick={() => field.set(undefined)} aria-label={`Use global ${field.label.toLowerCase()}`}>Use global</button>
+                    <button type="button" disabled={field.value === undefined || (field.disabled)} onClick={() => field.set(undefined)} aria-label={`Use global ${field.label.toLowerCase()}`}>Use global</button>
                 </div>)}
+                {useIdleWorker && <p>Idle builders become idle at completion and have no return travel. Your return override is retained.</p>}
                 {error && <p role="alert">{error}</p>}
                 <div className="scroll-dialog-buttons"><button type="button" onClick={onClose}>Cancel</button><button type="submit" disabled={!!error}>{editing ? "Save order" : "Add order"}</button></div>
             </form>

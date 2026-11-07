@@ -111,3 +111,11 @@ Activation during travel and expiry preserve distance already traveled. Construc
 resulting arrival time and immediately removes Whip; construction duration stays unchanged. Return
 travel uses normal speed unless a fresh cast activates after construction finishes. A builder
 already constructing cannot receive the effect. See [WHIP.md](WHIP.md) .
+
+## Explicit idle builders
+
+Use idle worker selects only a deliberately idle, available worker when the command
+is ready. An empty idle pool blocks the order without costs or a reservation, instead
+of waiting for a later idle event. An idle builder retains its prior gathering progress
+and becomes idle immediately at completion with no return journey. Its saved return
+override remains stored but inactive. Ordinary construction continues to exclude idle workers.

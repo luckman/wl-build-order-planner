@@ -554,3 +554,6 @@ Construction/upgrade item records may include `construction: { outwardDuration: 
 returnDuration: 7 }`. Each omitted field inherits the current global construction delay.
 Explicit zero or an override equal to the current global value stays explicit. Settings
 are per occurrence; derived timings and worker identities remain non-authoritative.
+
+`construction.useIdleWorker` is optional boolean, default false. Its return override
+is retained in persistence but inactive while the order explicitly uses an idle worker.
