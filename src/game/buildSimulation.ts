@@ -520,7 +520,7 @@ function simulateBuildOrderPass(
         if (capture && itemIndex === buildOrder.length - 1 && !preparation?.commands.has(itemIndex)) {
             beforeTail = captureAt(itemIndex)
         }
-        if (item.construction) parseConstructionSettings(item.construction)
+        if (item.construction) parseConstructionSettings(item, item.construction)
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)
         const needsProducer = item.kind !== "building"
         let scheduled = false

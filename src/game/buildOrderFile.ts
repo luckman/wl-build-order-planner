@@ -15,7 +15,7 @@ import { createScrollAction, isScrollAction, scrollCommand, type ScrollCommand }
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-11-07.1"
+export const GAME_RULES_VERSION = "2026-11-07.2"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -49,6 +49,13 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
 function object(value: unknown, path: string): Record<string, unknown> {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${path} must be an object.`)
     return value as Record<string, unknown>
+}
+
+function rejectEventConstructionModifier(value: unknown) {
+    const modifier = (value as Record<string, unknown> | undefined)?.timeModifier
+    if (modifier !== undefined && modifier !== 0) {
+        throw new Error("Construction time modifier is only available for buildings other than Castle and Citadel.")
+    }
 }
 function number(value: unknown, path: string, positive = false, integer = false): number {
     if (typeof value !== "number" || !Number.isFinite(value) || (positive ? value <= 0 : value < 0) ||
@@ -119,6 +126,7 @@ export function parseBuildOrder(text: string): {
     validateActionCount(doc.buildOrder.length - 1)
     const first = object(doc.buildOrder[0], "Opening action")
     if (first.type !== "allocate-workers") throw new Error("The first action must allocate starting workers.")
+    rejectEventConstructionModifier(first.construction)
     const goldWorkers = number(first.goldWorkers, "Opening action.goldWorkers", false, true)
     if (goldWorkers > STARTING_WORKER_COUNT) throw new Error("The opening allocation exceeds the starting worker count of five.")
     const opening: OpeningAction = { type: "allocate-workers", goldWorkers }
@@ -126,6 +134,7 @@ export function parseBuildOrder(text: string): {
     const catalog = new Map(factions[faction].items.map(item => [item.id, item]))
     const buildOrder = doc.buildOrder.slice(1).map((entry: unknown, index: number) => {
         const action = object(entry, `Action ${index + 1}`)
+        if ("type" in action) rejectEventConstructionModifier(action.construction)
         if (action.type === "make-idle" || action.type === "make-active") {
             return createWorkerEvent({ type: action.type, commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
                 count: number(action.count, `Action ${index + 1}.count`, true, true),
@@ -163,7 +172,7 @@ export function parseBuildOrder(text: string): {
         if (!item) throw new Error(`Action ${index + 1}: unknown item ID ${String(action.itemId)} for ${doc.faction}.`)
         if (action.construction !== undefined) {
             if (item.kind !== "building" && item.kind !== "upgrade") throw new Error("Construction settings require a building or upgrade.")
-            return { ...item, construction: parseConstructionSettings(action.construction) }
+            return { ...item, construction: parseConstructionSettings(item, action.construction) }
         }
         return item
     })

@@ -33,7 +33,10 @@ an order delay or spell effect; edit or delete it like other timed events.
 
 Right-click a building or an upgrade target level to configure its outward and return travel
 before adding. Click construction rows, or choose **Edit** on their timeline items, to change
-settings. **Preparation** reserves the worker before the purchase command, stopping gathering
+settings. **Construction time modifier** sets each eligible building to normal time, +50%, or
++100% after worker-level bonuses. Quick adds and inserted prerequisites use normal time.
+Castles, Citadels, and upgrades use their usual timing rules.
+**Preparation** reserves the worker before the purchase command, stopping gathering
 for the entered interval; its departure moves when the command is rescheduled. Timeline items
 separate preparation, outward travel, work and return travel with vertical dividers.
 Hover for command, start and finish times and additional details on customized orders.

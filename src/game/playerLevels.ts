@@ -50,7 +50,8 @@ export function productionDuration(item: PlannerItem, levels: PlayerBuildingLeve
 /** Worker bonuses shorten construction/upgrades without changing either travel leg. */
 export function actionDuration(item: PlannerItem, levels: PlayerBuildingLevels) {
     if (item.kind === "building" || item.kind === "upgrade") {
-        return item.seconds * (1 - playerLevelTier(levels.workerLevel) / 100)
+        const adjustedDuration = item.seconds * (1 - playerLevelTier(levels.workerLevel) / 100)
+        return adjustedDuration * (1 + (item.construction?.timeModifier ?? 0) / 100)
     }
     return productionDuration(item, levels)
 }

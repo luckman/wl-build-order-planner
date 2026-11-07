@@ -567,3 +567,12 @@ Save/load, drafts and sharing preserve the interval and recalculate all phase ti
 Optional diagnostic timings also include `departureTime` and `workerReturnEndTime`.
 The latter clips an interrupted return segment at reassignment; `workerReturnTime`
 retains that job's projected arrival. Like all saved timings, these are ignored on import.
+
+### Construction time modifier (rules 2026-11-07.2)
+
+`construction.timeModifier` is an optional numeric percentage. Supported values are
+`0`, `50`, and `100`. For example, `{ "itemId": "barracks", "construction": { "timeModifier": 50 } }`
+sets one Barracks order to +50%. A missing field means normal time. A nonzero value is
+valid only on building construction other than Castle or Citadel. JSON imports and share
+links reject invalid values and leave the current plan available. Drafts store the same
+per-order field. The JSON and link format versions remain 2.

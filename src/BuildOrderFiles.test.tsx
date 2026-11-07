@@ -400,6 +400,10 @@ test("import replaces faction, profile and order, recalculates timings and prese
     expect((container.querySelector(".file-menu") as HTMLDetailsElement).open).toBe(true)
     expect(screen.getByRole("button", { name: "Dark", exact: true }).classList.contains("selected")).toBe(true)
     expect(order.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
+    const invalidModifier = { ...doc, buildOrder: [doc.buildOrder[0], { itemId: "citadel", construction: { timeModifier: 100 } }] }
+    upload(JSON.stringify(invalidModifier))
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Construction time modifier is only available"))
+    expect(order.getAllByRole("button", { name: "Remove Goon" })).toHaveLength(2)
     const invalidOpening = { ...doc, buildOrder: [{ type: "allocate-workers", goldWorkers: 6 }, ...doc.buildOrder.slice(1)] }
     upload(JSON.stringify(invalidOpening))
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("exceeds the starting worker count"))

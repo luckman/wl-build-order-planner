@@ -70,6 +70,32 @@ test("empty orders import", () => {
     expect(parseBuildOrder(JSON.stringify(doc)).buildOrder).toEqual([])
 })
 
+test.each([-50, 25, 150, "50", null, false])("rejects unsupported construction time modifier %p", timeModifier => {
+    const doc = JSON.parse(sample())
+    doc.buildOrder[1].construction = { timeModifier }
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("must be 0, 50, or 100 percent")
+})
+
+test.each([
+    ["light", "castle"], ["dark", "citadel"], ["light", "castle-lvl-2"], ["dark", "citadel-lvl-2"],
+] as const)("%s %s allows normal construction time only", (faction, itemId) => {
+    const doc = JSON.parse(sample(faction))
+    doc.buildOrder[1] = { itemId, construction: { timeModifier: 0, outwardDuration: 4 } }
+    expect(parseBuildOrder(JSON.stringify(doc)).buildOrder[0].construction).toEqual({ timeModifier: 0, outwardDuration: 4 })
+    doc.buildOrder[1].construction.timeModifier = 50
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("Construction time modifier is only available")
+})
+
+test.each([
+    { itemId: "swordsman" },
+    { type: "make-idle", commandTime: 20, count: 1 },
+    { type: "allocate-workers", goldWorkers: 3 },
+])("rejects a construction time modifier on %p", action => {
+    const doc = JSON.parse(sample())
+    doc.buildOrder[action.type === "allocate-workers" ? 0 : 1] = { ...action, construction: { timeModifier: 100 } }
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(/Construction (time modifier|settings)/)
+})
+
 test("every missing profile field or block uses its default and unknown fields are discarded", () => {
     const original = JSON.parse(sample())
     for (const [block, defaults] of Object.entries(initialGameProfile)) {

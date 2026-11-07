@@ -1,8 +1,63 @@
 import { fireEvent, render, screen, within } from "@testing-library/react"
+import "@testing-library/jest-dom"
 import App from "./App"
 
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
+
+test.each(["Light", "Dark"])("%s construction modifier is editable per order and persists in drafts", faction => {
+    const view = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
+    fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "10000" } })
+    fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "10000" } })
+    const card = screen.getByRole("button", { name: /^Barracks \d/ })
+    fireEvent.click(card)
+    fireEvent.contextMenu(card)
+    const dialog = screen.getByRole("dialog", { name: "Configure Barracks Construction" })
+    const modifier = within(dialog).getByRole("combobox", { name: "Construction time modifier" })
+    const preparation = within(dialog).getByLabelText("Preparation (s)")
+    expect(modifier.compareDocumentPosition(preparation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(modifier).getAllByRole("option").map(option => option.textContent)).toEqual([
+        "0% (Normal construction time)", "+50%", "+100%",
+    ])
+    expect(modifier).toHaveValue("0")
+    expect(modifier).toHaveFocus()
+    const submit = within(dialog).getByRole("button", { name: "Add order" })
+    submit.focus()
+    fireEvent.keyDown(submit, { key: "Tab" })
+    expect(within(dialog).getByRole("button", { name: "Construction timing help" })).toHaveFocus()
+    fireEvent.change(modifier, { target: { value: "50" } })
+    fireEvent.click(submit)
+    const rows = screen.getAllByRole("button", { name: "Remove Barracks" }).map(button => button.closest("li")!)
+    expect(rows[0].title).toContain("Start 0:04 · Finish 0:34")
+    expect(rows[1].title).toContain("Start 0:05 · Finish 0:50")
+    expect(rows[1].title).not.toContain("+50%")
+    expect(view.container.querySelectorAll(".event.building")[1].getAttribute("title")).toBe(rows[1].title)
+    fireEvent.click(rows[0])
+    expect(screen.getByRole("combobox", { name: "Construction time modifier" })).toHaveValue("0")
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
+    view.unmount()
+
+    render(<App />)
+    const restored = screen.getAllByRole("button", { name: "Remove Barracks" })[1].closest("li")!
+    fireEvent.click(restored)
+    const savedModifier = screen.getByRole("combobox", { name: "Construction time modifier" })
+    expect(savedModifier).toHaveValue("50")
+    fireEvent.change(savedModifier, { target: { value: "0" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save order" }))
+    expect(restored.title).toContain("Start 0:05 · Finish 0:35")
+    expect(restored).not.toHaveClass("order-custom-construction")
+})
+
+test("an inserted prerequisite defaults to normal time and can be edited", () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: /^Swordsman \d/ }))
+    fireEvent.click(screen.getByRole("button", { name: "Remove Barracks" }).closest("li")!)
+    expect(screen.getByRole("combobox", { name: "Construction time modifier" })).toHaveValue("0")
+    fireEvent.change(screen.getByRole("combobox", { name: "Construction time modifier" }), { target: { value: "100" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save order" }))
+    expect(screen.getByRole("button", { name: "Remove Barracks" }).closest("li")).toHaveClass("order-custom-construction")
+})
 
 test.each(["Light", "Dark"])("%s construction pre-add, row and timeline share settings without mutating other occurrences", faction => {
     const view = render(<App />)
@@ -43,6 +98,11 @@ test.each([["Light", "Castle"], ["Dark", "Citadel"]])("%s upgrades use shared ad
     fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "10000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "10000" } })
+    fireEvent.contextMenu(screen.getByRole("button", { name: new RegExp(`^${building} \\d`) }))
+    const construction = within(screen.getByRole("dialog", { name: `Configure ${building} Construction` }))
+    expect(construction.queryByRole("combobox", { name: "Construction time modifier" })).toBeNull()
+    expect(construction.getByLabelText("Preparation (s)")).toHaveFocus()
+    fireEvent.click(construction.getByRole("button", { name: "Cancel" }))
     const card = screen.getByRole("button", { name: `${building} upgrade` })
     const level = `${building} lvl 2`
     const configure = () => {
@@ -51,6 +111,7 @@ test.each([["Light", "Castle"], ["Dark", "Citadel"]])("%s upgrades use shared ad
         return within(screen.getByRole("dialog", { name: `Configure ${building} Upgrade` }))
     }
     let dialog = configure()
+    expect(dialog.queryByRole("combobox", { name: "Construction time modifier" })).toBeNull()
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
     expect(view.container.querySelectorAll(".sortable-order li")).toHaveLength(0)
     dialog = configure()

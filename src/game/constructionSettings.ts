@@ -1,12 +1,31 @@
 import type { PlannerItem } from "./gameData"
 import { validatePlanTime } from "./plannerLimits"
 
-export type ConstructionSettings = { preparationDuration?: number; useIdleWorker?: boolean; outwardDuration?: number; returnDuration?: number }
+export const constructionTimeModifiers = [0, 50, 100] as const
+export type ConstructionTimeModifier = typeof constructionTimeModifiers[number]
+export type ConstructionSettings = {
+    timeModifier?: ConstructionTimeModifier
+    preparationDuration?: number
+    useIdleWorker?: boolean
+    outwardDuration?: number
+    returnDuration?: number
+}
 export function isConstruction(item: PlannerItem) { return item.kind === "building" || item.kind === "upgrade" }
-export function parseConstructionSettings(value: unknown): ConstructionSettings {
+export function canModifyConstructionTime(item: PlannerItem) {
+    return item.kind === "building" && item.id !== "castle" && item.id !== "citadel"
+}
+export function parseConstructionSettings(item: PlannerItem, value: unknown): ConstructionSettings {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Construction settings must be an object.")
     const raw = value as Record<string, unknown>
     const settings: ConstructionSettings = {}
+    if (raw.timeModifier !== undefined) {
+        const modifier = constructionTimeModifiers.find(percent => percent === raw.timeModifier)
+        if (modifier === undefined) throw new Error("Construction time modifier must be 0, 50, or 100 percent.")
+        if (modifier !== 0 && !canModifyConstructionTime(item)) {
+            throw new Error("Construction time modifier is only available for buildings other than Castle and Citadel.")
+        }
+        settings.timeModifier = modifier
+    }
     for (const field of ["preparationDuration", "outwardDuration", "returnDuration"] as const) {
         if (raw[field] !== undefined) {
             if (typeof raw[field] !== "number") throw new Error(`${field} must be a finite nonnegative duration.`)
@@ -21,10 +40,12 @@ export function parseConstructionSettings(value: unknown): ConstructionSettings 
     return settings
 }
 export function constructionCommand(item: PlannerItem) {
-    return { itemId: item.id, ...(isConstruction(item) && item.construction ? { construction: parseConstructionSettings(item.construction) } : {}) }
+    return { itemId: item.id, ...(isConstruction(item) && item.construction ? { construction: parseConstructionSettings(item, item.construction) } : {}) }
 }
 export function hasCustomConstruction(item: PlannerItem) {
-    return isConstruction(item) && ((item.construction?.preparationDuration ?? 0) > 0 || item.construction?.useIdleWorker || item.construction?.outwardDuration !== undefined || item.construction?.returnDuration !== undefined)
+    const settings = item.construction
+    return isConstruction(item) && (!!settings?.timeModifier || (settings?.preparationDuration ?? 0) > 0 ||
+        settings?.useIdleWorker || settings?.outwardDuration !== undefined || settings?.returnDuration !== undefined)
 }
 export function constructionDescription(item: PlannerItem, globalDelay: number) {
     if (!isConstruction(item)) return ""

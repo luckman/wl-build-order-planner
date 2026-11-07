@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { PlannerItem } from "./game/gameData"
-import { parseConstructionSettings, type ConstructionSettings } from "./game/constructionSettings"
+import { canModifyConstructionTime, constructionTimeModifiers, parseConstructionSettings, type ConstructionSettings, type ConstructionTimeModifier } from "./game/constructionSettings"
 
 export default function ConstructionDialog({ item, buildingName, globalDelay, editing, onSave, onClose, validationError }: {
     item: PlannerItem; buildingName: string; globalDelay: number; editing: boolean; validationError?: string | null
@@ -10,21 +10,25 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
     const [outward, setOutward] = useState<string | undefined>(item.construction?.outwardDuration?.toString())
     const [back, setBack] = useState<string | undefined>(item.construction?.returnDuration?.toString())
     const [preparation, setPreparation] = useState(String(item.construction?.preparationDuration ?? 0))
+    const [timeModifier, setTimeModifier] = useState<ConstructionTimeModifier>(item.construction?.timeModifier ?? 0)
     const [useIdleWorker, setUseIdleWorker] = useState(item.construction?.useIdleWorker ?? false)
     const [helpHovered, setHelpHovered] = useState(false)
     const [helpFocused, setHelpFocused] = useState(false)
     const helpOpen = helpHovered || helpFocused
-    const settings: ConstructionSettings = { useIdleWorker, preparationDuration: Number(preparation), ...(outward !== undefined ? { outwardDuration: Number(outward) } : {}),
+    const showTimeModifier = canModifyConstructionTime(item)
+    const settings: ConstructionSettings = { useIdleWorker, preparationDuration: Number(preparation),
+        ...(showTimeModifier && timeModifier !== 0 ? { timeModifier } : {}),
+        ...(outward !== undefined ? { outwardDuration: Number(outward) } : {}),
         ...(back !== undefined ? { returnDuration: Number(back) } : {}) }
     let error = validationError
     try {
         if (!preparation.trim()) throw new Error("Enter a preparation duration.")
         if (outward?.trim() === "" || back?.trim() === "") throw new Error("Enter a travel duration or use global.")
-        parseConstructionSettings(settings)
+        parseConstructionSettings(item, settings)
     } catch (failure) { error = (failure as Error).message }
     useEffect(() => {
         const previous = document.activeElement as HTMLElement | null
-        dialog.current?.querySelector<HTMLInputElement>("input")?.focus()
+        dialog.current?.querySelector<HTMLElement>("select, input")?.focus()
         return () => { if (previous?.isConnected) previous.focus() }
     }, [])
     const upgrade = item.kind === "upgrade"
@@ -41,7 +45,7 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
                     } else onClose()
                 }
                 if (event.key === "Tab") {
-                    const controls = Array.from(dialog.current!.querySelectorAll<HTMLElement>("input:not(:disabled), button:not(:disabled)"))
+                    const controls = Array.from(dialog.current!.querySelectorAll<HTMLElement>("select:not(:disabled), input:not(:disabled), button:not(:disabled)"))
                     const first = controls[0], last = controls[controls.length - 1]
                     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
                     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
@@ -65,6 +69,13 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
             {upgrade && item.level !== undefined && <p className="construction-target-level">Target level {item.level}</p>}
             {/* Keep accepting valid imported durations that are finer than the input's step. */}
             <form noValidate onSubmit={event => { event.preventDefault(); if (!error) onSave(settings) }}>
+                {showTimeModifier && <label>Construction time modifier
+                    <select value={timeModifier} onChange={event => setTimeModifier(Number(event.target.value) as ConstructionTimeModifier)}>
+                        {constructionTimeModifiers.map(percent => <option key={percent} value={percent}>
+                            {percent === 0 ? "0% (Normal construction time)" : `+${percent}%`}
+                        </option>)}
+                    </select>
+                </label>}
                 <div className="construction-duration-row">
                     <label htmlFor="construction-preparation">Preparation (s)</label>
                     <input id="construction-preparation" type="number" min="0" step="0.1" inputMode="decimal" value={preparation}

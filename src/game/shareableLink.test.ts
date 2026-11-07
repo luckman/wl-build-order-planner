@@ -60,6 +60,15 @@ test("link documents reuse JSON validation, ignore timings, and warn on differen
     doc.gameRulesVersion = GAME_RULES_VERSION
 })
 
+test("a shared link rejects an unsupported construction modifier", () => {
+    const doc = {
+        format: "wl-build-order", version: 2, gameRulesVersion: GAME_RULES_VERSION, faction: "light",
+        gameProfile: initialGameProfile,
+        buildOrder: [{ type: "allocate-workers", goldWorkers: 3 }, { itemId: "barracks", construction: { timeModifier: 25 } }],
+    }
+    expect(() => parseShareableLink(encodeDocument(doc))).toThrow("Construction time modifier must be 0, 50, or 100 percent")
+})
+
 test("oversized links and compressed documents are rejected", () => {
     expect(() => parseShareableLink(`#build=2.${"A".repeat(MAX_SHARE_LINK_LENGTH)}`)).toThrow("too large")
     expect(() => parseShareableLink(encodeDocument({ padding: "A".repeat(MAX_FILE_BYTES + 1) }))).toThrow("too large")

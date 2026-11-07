@@ -10,6 +10,22 @@ import { workerAllocationAt } from "./resourceSimulation"
 import { createResourcesCollectedAction } from "./resourcesCollected"
 
 const economy = { ...economyFromProfile(initialGameProfile), startingGold: 10000, startingWood: 10000 }
+
+test.each([[0, 43.5], [50, 57.75], [100, 72]] as const)(
+    "%i%% changes only worker-adjusted construction, then delays builder return and recruitment",
+    (timeModifier, finishTime) => {
+        const { items, startingTownHall } = factions.light
+        const barracks: PlannerItem = { ...items.find(item => item.id === "barracks")!,
+            construction: { timeModifier, preparationDuration: 10, outwardDuration: 5, returnDuration: 7 } }
+        const swordsman = items.find(item => item.id === "swordsman")!
+        const settings = { ...economy, workerLevel: 24, orderDelay: 1 }
+        const { plan } = simulateBuildOrder([barracks, swordsman], settings, 10, 200, 20, startingTownHall)
+        expect(plan[0]).toMatchObject({ departureTime: 0, commandTime: 10, startTime: 15, finishTime, workerReturnTime: finishTime + 7 })
+        expect(plan[1].startTime).toBe(finishTime + 1)
+        expect(workerAllocationAt(settings, plan, finishTime + 6).buildingOrTravelling).toBe(1)
+        expect(workerAllocationAt(settings, plan, finishTime + 7).buildingOrTravelling).toBe(0)
+    },
+)
 test.each(["light", "dark"] as const)("%s construction travel overrides are per occurrence and preserve explicit zero", faction => {
     const farm = factions[faction].items.find(item => item.id === "barracks")!
     const custom = { ...farm, construction: { outwardDuration: 0, returnDuration: 7 } }
@@ -23,6 +39,21 @@ test.each(["light", "dark"] as const)("%s construction travel overrides are per 
     expect(items[1].construction).toBeUndefined()
     expect(run(items, 5)[0].startTime).toBe(run(items, 5)[0].commandTime)
     expect(run(items, 5)[1].startTime! - run(items, 5)[1].commandTime!).toBe(5)
+})
+
+test.each(["light", "dark"] as const)("%s JSON and share links preserve modifiers and default older orders to normal", faction => {
+    const { items, startingTownHall } = factions[faction]
+    const building = items.find(item => item.id === (faction === "light" ? "farm" : "pigsty"))!
+    const custom: PlannerItem = { ...building, construction: { timeModifier: 50 } }
+    const run = (orders: PlannerItem[]) => simulateBuildOrder(orders, economy, 10, 200, 20, startingTownHall).plan
+    const barracks = items.find(item => item.id === "barracks")!
+    const plan = run([custom, barracks])
+    const json = serializeBuildOrder(faction, initialGameProfile, plan)
+    const link = createShareableLink("https://example.com", faction, initialGameProfile, plan)
+    for (const result of [parseBuildOrder(json), parseShareableLink(new URL(link).hash)!]) {
+        expect(result.buildOrder.map(item => item.construction?.timeModifier)).toEqual([50, undefined])
+        expect(run(result.buildOrder).map(action => action.finishTime! - action.startTime!)).toEqual([37.5, 30])
+    }
 })
 
 test.each(["light", "dark"] as const)("%s upgrade travel settings apply only to the requested occurrence and survive sharing", faction => {

@@ -131,6 +131,20 @@ assignments. Whip preserves distance travelled. Twelve seconds interrupted after
 leaves seven; a next return override of three or zero still requires seven. Plan results
 record interrupted return endpoints, separately from projected return arrival.
 
+## Construction time modifier
+
+In Configure or Edit, choose **0% (Normal construction time)**, **+50%**, or **+100%**
+before Preparation. The setting applies to one building order. Quick adds, automatically
+inserted prerequisites, and older orders start at 0%. Castle and Citadel construction and
+upgrades use the existing timing rules.
+
+The modifier multiplies the worker-adjusted construction duration by 1, 1.5, or 2.
+For example, a worker-adjusted duration of 28.5 seconds takes 42.75 seconds at +50%.
+Scheduling keeps full precision and applies the existing display format. Preparation and
+both travel legs keep their timing rules. The revised finish determines when the worker
+becomes idle or starts return travel, when dependent orders can proceed, and when building
+effects begin. Plan limits use the resulting timings.
+
 ## Command-relative preparation
 
 Per-order preparation defaults to zero. The full interval fits after time zero; an
@@ -153,5 +167,5 @@ the end of its return segment. Construction is blue and upgrades are purple, wit
 vertical dividers between their phases. Zero-duration phases and idle-builder return
 are omitted. Chaining ends a return segment at reassignment. Both the build order and
 the timeline show command, start and finish times on hover. Orders with preparation,
-an idle builder or a travel override also show worker and travel details, including
+an idle builder, a travel override, or a nonzero modifier also show worker and travel details, including
 the actual end of an interrupted return.
