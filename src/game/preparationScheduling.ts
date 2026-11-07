@@ -17,7 +17,7 @@ type Replay = (schedule: PreparationSchedule, collectCandidatesThrough?: number)
 
 /** Replays discard obsolete reservations. The engine remains responsible for all
  * purchase readiness, worker selection, fixed events and movement rules. */
-export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, run: Replay): Result {
+export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, run: Replay) {
     const prepared = items.flatMap((item, index) => (item.construction?.preparationDuration ?? 0) > 0 ? [index] : [])
     const schedule: PreparationSchedule = { commands: new Map(), blocked: new Map() }
     let result = run(schedule)
@@ -77,7 +77,7 @@ export function schedulePreparation(items: PlannerItem[], economy: EconomySettin
                 break
             }
         }
-        if (!changed) return refinePreparation(items, economy, schedule, result, run)
+        if (!changed) return { ...refinePreparation(items, economy, schedule, result, run), preparation: schedule }
     }
     throw new Error("Construction preparation scheduling did not converge.")
 }

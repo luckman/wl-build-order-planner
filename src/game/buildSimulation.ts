@@ -1,5 +1,5 @@
 import { schedulePreparation, type PreparationSchedule } from "./preparationScheduling"
-import { parseConstructionSettings } from "./constructionSettings"
+import { isConstruction, parseConstructionSettings } from "./constructionSettings"
 import { parseWorkerEvent, workerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
@@ -8,7 +8,7 @@ import { evaluateManaWells } from "./manaWells"
 import { createResourcesCollectedAction, resourcesCollectedCommand, isTimedEvent } from "./resourcesCollected"
 import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount } from "./buildingRules"
-import { type EconomySettings, type WhipWindow, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
+import { type EconomySettings, type ResourceDelivery, type WhipWindow, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
 import { createScrollAction, scrollEffect, legionsCallEffect, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
 import { actionDuration } from "./playerLevels"
 import { productionBuildingsAt, recruitmentFinish, recruitmentWork, type RecruitmentWindow } from "./recruitment"
@@ -33,8 +33,53 @@ export type ScheduledAction = {
     manaCost?: number
 }
 
-function requiresConstructionWorker(item: PlannerItem) {
-    return item.kind === "building" || item.kind === "upgrade"
+type BuildSimulation = {
+    plan: ScheduledAction[]
+    orderedPlan: ScheduledAction[]
+    deliveries: ResourceDelivery[]
+}
+
+// Tie reservations to a result produced by this simulator and snapshot its inputs
+// so an in-place edit cannot make old preparation appear current.
+const appendSources = new WeakMap<BuildSimulation, {
+    buildOrder: PlannerItem[]
+    prefix: string
+    economy: EconomySettings
+    inputs: string
+    preparation: PreparationSchedule
+}>()
+
+function projectSimulation(result: ReturnType<typeof simulateBuildOrderPass>): BuildSimulation {
+    const buildEnd = Math.max(0, ...result.orderedPlan.map(action => action.blocked ? 0 : action.finishTime!))
+    const horizon = Math.min(MAX_PLAN_SECONDS, Math.max(buildEnd + RESOURCE_PROJECTION_SECONDS, timelineEnd(result.plan)))
+    return { plan: result.plan, orderedPlan: result.orderedPlan, deliveries: result.projectDeliveries(horizon) }
+}
+
+function verifyAppend(previous: BuildSimulation, preparation: PreparationSchedule,
+    run: (preparation: PreparationSchedule) => ReturnType<typeof simulateBuildOrderPass>) {
+    try {
+        const replay = run(preparation)
+        const appended = replay.plan[replay.plan.length - 1]
+        const command = appended.commandTime
+        if (appended.blocked || command === null || replay.preparationFailures.size ||
+            [...preparation.commands].some(([index, time]) => replay.plan[index].commandTime !== time)) return
+
+        // Later fixed commands or active timed effects may interact with the append.
+        if (previous.plan.some(action => isTimedEvent(action.item) &&
+            (action.commandTime! >= command || action.finishTime! > command))) return
+
+        const result = projectSimulation(replay)
+        if (JSON.stringify(result.plan.slice(0, -1)) !== JSON.stringify(previous.plan)) return
+        const prefixOrder = result.orderedPlan.filter(action => action !== appended)
+        if (prefixOrder.some((action, index) => result.plan.indexOf(action) !== previous.plan.indexOf(previous.orderedPlan[index]))) return
+        const beforeCommand = (delivery: ResourceDelivery) => delivery.time < command
+        if (JSON.stringify(result.deliveries.filter(beforeCommand)) !== JSON.stringify(previous.deliveries.filter(beforeCommand))) return
+        return result
+    } catch {
+        // A verification replay can exhaust simulation limits. Let the normal
+        // search try other schedules and report any error that still applies.
+        return undefined
+    }
 }
 
 export function simulateBuildOrder(
@@ -44,25 +89,49 @@ export function simulateBuildOrder(
     baseFoodLimit: number,
     foodPerFarm: number,
     initialTownHall: string,
-    until = MAX_PLAN_SECONDS,
-) {
+    options: number | { until?: number; previous?: BuildSimulation } = MAX_PLAN_SECONDS,
+): BuildSimulation {
+    const until = typeof options === "number" ? options : options.until ?? MAX_PLAN_SECONDS
+    const previous = typeof options === "number" ? undefined : options.previous
+    const inputKey = () => JSON.stringify([economy, initialFoodUsed, baseFoodLimit, foodPerFarm, initialTownHall, until])
     let windows: WhipWindow[] = []
     let recruitmentWindows: RecruitmentWindow[] = []
+    const run = (preparation?: PreparationSchedule, collectCandidatesThrough?: number) => simulateBuildOrderPass(buildOrder, economy,
+        initialFoodUsed, baseFoodLimit, foodPerFarm, initialTownHall, until, windows, recruitmentWindows, preparation, collectCandidatesThrough)
+    const remember = (result: BuildSimulation, preparation?: PreparationSchedule) => {
+        // Forecast-sensitive casts need the normal convergence loop.
+        if (preparation?.commands.size && !preparation.blocked.size && !windows.length && !recruitmentWindows.length &&
+            result.plan.every(action => !action.blocked)) {
+            appendSources.set(result, { buildOrder: [...buildOrder], prefix: JSON.stringify(buildOrder),
+                economy, inputs: inputKey(), preparation })
+        }
+        return result
+    }
+
+    const source = previous && appendSources.get(previous)
+    const appended = buildOrder[buildOrder.length - 1]
+    if (previous && source && source.economy === economy && buildOrder.length === source.buildOrder.length + 1 &&
+        isConstruction(appended) && (appended.construction?.preparationDuration ?? 0) === 0 &&
+        source.buildOrder.every((item, index) => item === buildOrder[index]) &&
+        source.prefix === JSON.stringify(buildOrder.slice(0, -1)) && source.inputs === inputKey() &&
+        Object.values(factions).some(faction => faction.startingTownHall === initialTownHall &&
+            faction.items.some(item => item.id === appended.id && item.kind === appended.kind))) {
+        const verified = verifyAppend(previous, source.preparation, run)
+        if (verified) return remember(verified, source.preparation)
+    }
+
     // Casts can change work already scheduled into the future. Replay with accepted
     // travel/recruitment forecasts, keeping target and mana validation chronological.
     for (let pass = 0; pass <= MAX_PLAN_ACTIONS + 1; pass++) {
-        const run = (preparation?: PreparationSchedule, collectCandidatesThrough?: number) => simulateBuildOrderPass(buildOrder, economy,
-            initialFoodUsed, baseFoodLimit, foodPerFarm, initialTownHall, until, windows, recruitmentWindows, preparation, collectCandidatesThrough)
-        const result = buildOrder.some(item => (item.construction?.preparationDuration ?? 0) > 0)
-            ? schedulePreparation(buildOrder, economy, run) : run()
+        const prepared = buildOrder.some(item => (item.construction?.preparationDuration ?? 0) > 0)
+            ? schedulePreparation(buildOrder, economy, run) : undefined
+        const result = prepared ?? run()
         const next = result.orderedPlan.filter(action => action.item.id === "whip" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime! }))
         const nextRecruitment = result.orderedPlan.filter(action => action.item.id === "legions-call" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime!, buildingInstanceId: action.buildingInstanceId! }))
         if (JSON.stringify(next) === JSON.stringify(windows) && JSON.stringify(nextRecruitment) === JSON.stringify(recruitmentWindows)) {
-            const buildEnd = Math.max(0, ...result.orderedPlan.map(action => action.blocked ? 0 : action.finishTime!))
-            const horizon = Math.min(MAX_PLAN_SECONDS, Math.max(buildEnd + RESOURCE_PROJECTION_SECONDS, timelineEnd(result.plan)))
-            return { plan: result.plan, orderedPlan: result.orderedPlan, deliveries: result.projectDeliveries(horizon) }
+            return remember(projectSimulation(result), prepared?.preparation)
         }
         windows = next
         recruitmentWindows = nextRecruitment
@@ -349,7 +418,7 @@ function simulateBuildOrderPass(
             if (preparationFailures.has(itemIndex)) { blockedReason = preparationFailures.get(itemIndex)!; break }
             const preparationCommand = preparation?.commands.get(itemIndex) ?? item.construction?.preparationDuration ?? 0
             // Only construction commands need spacing; recruitment retains its normal queue.
-            const commandReadyAt = requiresConstructionWorker(item)
+            const commandReadyAt = isConstruction(item)
                 ? Math.max(lastCatalogCommand, lastScrollCommand) + economy.orderDelay : -Infinity
             const unlockedBuildings = unlockedBuildingsAt(time)
             const maxCountReached = item.maxCount !== undefined && unitInstances.filter(unit => unit.item.id === item.id && !unit.killed).length >= item.maxCount
@@ -376,7 +445,7 @@ function simulateBuildOrderPass(
             const heroTierUnlocked = item.kind !== "hero" || requirementCount(unlockedBuildings,
                 { item: item.producerBuildingId!, count: 1, minLevel: requiredAltarLevel }, time) >= 1
             const prepared = preparedWorkers.get(itemIndex)
-            const builder = requiresConstructionWorker(item) ? preparation?.commands.has(itemIndex)
+            const builder = isConstruction(item) ? preparation?.commands.has(itemIndex)
                 ? prepared ? simulation.workers[prepared.workerId] : undefined
                 : simulation.selectBuilder(item.construction?.useIdleWorker) : undefined
             const state = resourceAt(economy, simulation.deliveries, spending, time)
@@ -421,7 +490,7 @@ function simulateBuildOrderPass(
                 blockedReason = "No available idle worker at construction departure."
                 break
             }
-            if (purchaseReady && (!requiresConstructionWorker(item) || builder)) {
+            if (purchaseReady && (!isConstruction(item) || builder)) {
                 const travelTime = builder ? simulation.constructionTravelTime(builder, item.construction?.outwardDuration) : 0
                 const startTime = time + travelTime
                 const duration = actionDuration(item, economy)

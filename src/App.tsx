@@ -342,6 +342,7 @@ export default function App() {
         setHoverTime(null)
         setEditingEventId(null)
     }
+    const previousSimulation = useRef<ReturnType<typeof simulateBuildOrder>>()
     const scheduled = useMemo(
         () =>
             simulateBuildOrder(
@@ -351,9 +352,11 @@ export default function App() {
                 baseFoodLimit,
                 foodPerFarm,
                 faction.startingTownHall,
+                { previous: previousSimulation.current },
             ),
         [baseFoodLimit, buildOrder, economy, faction.startingTownHall, foodPerFarm, initialFoodUsed],
     )
+    useEffect(() => { previousSimulation.current = scheduled }, [scheduled])
     const deliveries = scheduled.deliveries
     const plan = scheduled.plan
     const scrollTargetOptions = legionsCallTargetOptions(plan, faction.items.find(item => item.name === faction.startingTownHall)!)
