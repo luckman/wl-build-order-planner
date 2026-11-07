@@ -1,4 +1,4 @@
-import { schedulePreparation, type PreparationReuse, type PreparationSchedule } from "./preparationScheduling"
+import { matchesPreparation, matchesPreparationReuse, schedulePreparation, type PreparationReuse, type PreparationSchedule } from "./preparationScheduling"
 import { isConstruction, parseConstructionSettings } from "./constructionSettings"
 import { parseWorkerEvent, workerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
@@ -13,8 +13,10 @@ import { createScrollAction, scrollEffect, legionsCallEffect, isScrollAction, sc
 import { actionDuration } from "./playerLevels"
 import { productionBuildingsAt, recruitmentFinish, recruitmentWork, type RecruitmentWindow } from "./recruitment"
 import { timelineEnd } from "./timelineBounds"
+import { replayBoundary, replayOrder, replayPreparation, ReplayHistory, type ReplayOrder } from "./buildSimulationReplay"
 
 const RESOURCE_PROJECTION_SECONDS = 5 * 60
+const CATALOG_CHECKPOINT_INTERVAL = 4
 
 export type ScheduledAction = {
     item: PlannerItem
@@ -48,6 +50,8 @@ type Checkpoint = {
     unitInstances: Array<{ item: PlannerItem; readyAt: number; killed: boolean }>
     workerCompletions: number[]
     timedEventsByIndex: Map<number, ScheduledAction>
+    preparationFailures: Map<number, string>
+    preparedWorkers: Map<number, { workerId: number; departureTime: number }>
     lastScrollCommand: number
     lastCatalogCommand: number
 }
@@ -59,14 +63,49 @@ function copyCheckpoint(checkpoint: Checkpoint): Checkpoint {
         simulation: checkpoint.simulation.fork(),
         plan: checkpoint.plan.map(copyAction),
         spending: [...checkpoint.spending],
-        buildings: checkpoint.buildings.map(building => ({ ...building })),
-        unitInstances: checkpoint.unitInstances.map(unit => ({ ...unit })),
+        buildings: checkpoint.buildings.map(building => ({ ...building,
+            upgrade: building.upgrade && { ...building.upgrade, item: { ...building.upgrade.item } },
+        })),
+        unitInstances: checkpoint.unitInstances.map(unit => ({ ...unit, item: { ...unit.item } })),
         workerCompletions: [...checkpoint.workerCompletions],
         timedEventsByIndex: new Map([...checkpoint.timedEventsByIndex].map(([index, action]) => [index, copyAction(action)])),
+        preparationFailures: new Map(checkpoint.preparationFailures),
+        preparedWorkers: new Map(checkpoint.preparedWorkers),
     }
 }
 
-type PassOptions = { resume?: Checkpoint; capture?: boolean }
+function restoreCheckpoint(checkpoint: Checkpoint, buildOrder: PlannerItem[], order: ReplayOrder, rowMap?: Map<number, number>) {
+    const restored = copyCheckpoint(checkpoint)
+    restored.nextIndex = order.catalog[restored.plan.length]?.index ?? buildOrder.length
+    if (!rowMap) return restored
+
+    for (const [position, action] of restored.plan.entries()) {
+        action.item = buildOrder[order.catalog[position].index]
+    }
+    const remap = <T>(entries: Map<number, T>) =>
+        new Map([...entries].map(([index, value]) => [rowMap.get(index)!, value]))
+    restored.preparedWorkers = remap(restored.preparedWorkers)
+    restored.preparationFailures = remap(restored.preparationFailures)
+    // Wells are resolved from the entire fixed timeline for every pass.
+    for (const [index, action] of restored.timedEventsByIndex) {
+        if (action.item.kind === "mana-well") restored.timedEventsByIndex.delete(index)
+        else action.item = buildOrder[rowMap.get(index)!]
+    }
+    restored.timedEventsByIndex = remap(restored.timedEventsByIndex)
+    return restored
+}
+
+type PassOptions = {
+    resume?: Checkpoint
+    capture?: boolean
+    captureCheckpoint?: (state: Checkpoint) => void
+}
+type TailReplay = {
+    preparation: PreparationSchedule
+    reuse: PreparationReuse
+    beforeTail?: Checkpoint
+    end?: Checkpoint
+}
 
 // Results and their input items are public. Keep independent state and reject
 // reuse after in-place input edits.
@@ -75,10 +114,9 @@ const simulationSources = new WeakMap<BuildSimulation, {
     orderKey: string
     economy: EconomySettings
     inputs: string
-    preparation: PreparationSchedule
-    reuse: PreparationReuse
-    beforeTail?: Checkpoint
-    end?: Checkpoint
+    order: ReplayOrder
+    history?: ReplayHistory<Checkpoint>
+    tail?: TailReplay
 }>()
 
 function projectSimulation(result: Pick<ReturnType<typeof simulateBuildOrderPass>, "plan" | "orderedPlan" | "projectDeliveries">): BuildSimulation {
@@ -100,12 +138,6 @@ function isSupportedTail(item: PlannerItem, initialTownHall: string) {
         })
 }
 
-function matchesPreparation(result: Pick<ReturnType<typeof simulateBuildOrderPass>, "plan" | "preparationFailures">,
-    preparation: PreparationSchedule) {
-    return !result.preparationFailures.size && result.plan.every(action => !action.blocked) &&
-        [...preparation.commands].every(([index, time]) => result.plan[index].commandTime === time)
-}
-
 export function simulateBuildOrder(
     buildOrder: PlannerItem[],
     economy: EconomySettings,
@@ -117,35 +149,69 @@ export function simulateBuildOrder(
 ): BuildSimulation {
     const until = typeof options === "number" ? options : options.until ?? MAX_PLAN_SECONDS
     const previous = typeof options === "number" ? undefined : options.previous
-    const inputKey = () => JSON.stringify([economy, initialFoodUsed, baseFoodLimit, foodPerFarm, initialTownHall, until])
+    const inputs = JSON.stringify([economy, initialFoodUsed, baseFoodLimit, foodPerFarm, initialTownHall, until])
+    const prior = previous && simulationSources.get(previous)
+    const source = prior && prior.economy === economy && prior.inputs === inputs &&
+        prior.orderKey === JSON.stringify(prior.buildOrder) ? prior : undefined
+    const order = replayOrder(buildOrder)
+    // These effects can change the finish or travel time of work started
+    // before the cast. Let the forecast convergence replay from the opening.
+    const forecasts = buildOrder.some(item => item.id === "whip" || item.id === "legions-call" ||
+        (item.kind === "scroll" && (item.scrollId === "whip" || item.scrollId === "legions-call")))
+    const history = !forecasts && order.catalog.length >= CATALOG_CHECKPOINT_INTERVAL ? new ReplayHistory<Checkpoint>() : undefined
+    const boundary = history && source?.history && replayBoundary(source.order, order)
+    // A removed late event may also shrink the effective scheduling horizon.
+    const fixedBoundary = boundary?.fixedTime === Infinity ? Infinity : Math.min(boundary?.fixedTime ?? Infinity, until)
     let windows: WhipWindow[] = []
     let recruitmentWindows: RecruitmentWindow[] = []
-    const run = (preparation?: PreparationSchedule, collectCandidatesThrough?: number, passOptions?: PassOptions) =>
-        simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit, foodPerFarm,
-            initialTownHall, until, windows, recruitmentWindows, preparation, collectCandidatesThrough, passOptions)
-    const remember = (pass: ReturnType<typeof run>, preparation: PreparationSchedule, reuse: PreparationReuse) => {
+    const run = (preparation?: PreparationSchedule, collectCandidatesThrough?: number,
+        options?: Pick<PassOptions, "resume" | "capture"> & { speculative?: boolean }) => {
+        const signature = history && replayPreparation(buildOrder, order, preparation)
+        const collecting = collectCandidatesThrough !== undefined
+        // Capturing the dedicated final-removal checkpoint requires processing
+        // the final row, even if a general checkpoint already includes it.
+        const maxCount = order.catalog.length - Number(!!options?.capture)
+        const local = signature && !options?.resume
+            ? history!.find(signature, collecting, maxCount, Infinity) : undefined
+        const reused = signature && !options?.resume && boundary
+            ? source!.history!.find(signature, collecting, Math.min(maxCount, boundary.catalogCount), fixedBoundary, local?.count) : undefined
+        const point = reused || local
+        const resume = options?.resume ? copyCheckpoint(options.resume) : point &&
+            restoreCheckpoint(point.state, buildOrder, order, reused && boundary ? boundary.rowMap : undefined)
+        const captureCheckpoint = signature && !options?.speculative ? (state: Checkpoint) => {
+            const { simulation } = state
+            const weight = simulation.deliveries.length + simulation.eventBoundaries.size + simulation.workers.length +
+                state.plan.length + state.unitInstances.length + state.timedEventsByIndex.size
+            history!.capture(state.plan.length, simulation.time, collecting, signature, weight, () => copyCheckpoint(state))
+        } : undefined
+        return simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit, foodPerFarm,
+            initialTownHall, until, windows, recruitmentWindows, preparation, collectCandidatesThrough,
+            { resume, capture: options?.capture, captureCheckpoint })
+    }
+    const verify = (preparation: PreparationSchedule) => run(preparation, undefined, { speculative: true })
+    const remember = (pass: Parameters<typeof projectSimulation>[0], tail?: TailReplay) => {
         const result = projectSimulation(pass)
-        simulationSources.set(result, { buildOrder: [...buildOrder], orderKey: JSON.stringify(buildOrder),
-            economy, inputs: inputKey(), preparation, reuse, beforeTail: pass.beforeTail, end: pass.end })
+        if (history || tail) {
+            simulationSources.set(result, { buildOrder: [...buildOrder], orderKey: JSON.stringify(buildOrder),
+                economy, inputs, order, history, tail })
+        }
         return result
     }
 
-    const source = previous && simulationSources.get(previous)
-    if (source && source.economy === economy && Math.abs(buildOrder.length - source.buildOrder.length) === 1 &&
-        source.orderKey === JSON.stringify(source.buildOrder) && source.inputs === inputKey()) {
+    const tail = source?.tail
+    if (source && tail && Math.abs(buildOrder.length - source.buildOrder.length) === 1) {
         const removing = buildOrder.length < source.buildOrder.length
         const shorter = removing ? buildOrder : source.buildOrder
         const longer = removing ? source.buildOrder : buildOrder
-        if (shorter.length >= source.reuse.minimumPrefixLength && shorter.every((item, index) => item === longer[index]) &&
+        if (shorter.length >= tail.reuse.minimumPrefixLength && shorter.every((item, index) => item === longer[index]) &&
             isSupportedTail(longer[longer.length - 1], initialTownHall)) {
             try {
-                const selected = run(source.preparation, undefined,
-                    { resume: removing ? source.beforeTail : source.end, capture: true })
+                const selected = run(tail.preparation, undefined,
+                    { resume: removing ? tail.beforeTail : tail.end, capture: true, speculative: true })
                 // The unchanged prefix keeps earlier rejected candidates invalid.
                 // Every accepted refinement must also work with the changed tail.
-                if (matchesPreparation(selected, source.preparation) &&
-                    source.reuse.acceptedBeforeFinal.every(schedule => matchesPreparation(run(schedule), schedule))) {
-                    return remember(selected, source.preparation, source.reuse)
+                if (matchesPreparationReuse(verify, selected, tail)) {
+                    return remember(selected, { ...tail, beforeTail: selected.beforeTail, end: selected.end })
                 }
             } catch {
                 // Let the full search handle a speculative replay that exceeds a limit.
@@ -153,11 +219,18 @@ export function simulateBuildOrder(
         }
     }
 
+    const firstChangedRow = source?.buildOrder.findIndex((item, index) => item !== buildOrder[index]) ?? 0
+    const commonRows = firstChangedRow < 0 ? source!.buildOrder.length : firstChangedRow
+    const reusablePreparation = tail && boundary && boundary.fixedTime === Infinity &&
+        commonRows >= tail.reuse.minimumPrefixLength &&
+        buildOrder.every((item, index) => (item.construction?.preparationDuration ?? 0) <= 0 || index < commonRows)
+        ? { ...tail, verify } : undefined
+
     // Casts can change work already scheduled into the future. Replay with accepted
     // travel/recruitment forecasts, keeping target and mana validation chronological.
     for (let pass = 0; pass <= MAX_PLAN_ACTIONS + 1; pass++) {
         const prepared = buildOrder.some(item => (item.construction?.preparationDuration ?? 0) > 0)
-            ? schedulePreparation(buildOrder, economy, run) : undefined
+            ? schedulePreparation(buildOrder, economy, run, reusablePreparation) : undefined
         const result = prepared ?? run()
         const next = result.orderedPlan.filter(action => action.item.id === "whip" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime! }))
@@ -169,9 +242,10 @@ export function simulateBuildOrder(
                 !windows.length && !recruitmentWindows.length && prepared.reuse.minimumPrefixLength <= buildOrder.length &&
                 matchesPreparation(result, prepared.preparation)) {
                 const selected = run(prepared.preparation, undefined, { capture: true })
-                return remember(selected, prepared.preparation, prepared.reuse)
+                return remember(selected, { preparation: prepared.preparation, reuse: prepared.reuse,
+                    beforeTail: selected.beforeTail, end: selected.end })
             }
-            return projectSimulation(result)
+            return remember(result)
         }
         windows = next
         recruitmentWindows = nextRecruitment
@@ -191,7 +265,7 @@ function simulateBuildOrderPass(
     recruitmentWindows: RecruitmentWindow[] = [],
     preparation?: PreparationSchedule,
     collectCandidatesThrough?: number,
-    { resume, capture }: PassOptions = {},
+    { resume: restored, capture, captureCheckpoint }: PassOptions = {},
 ) {
     validateActionCount(buildOrder.length)
     validatePlanTime(until, "Simulation horizon")
@@ -199,7 +273,6 @@ function simulateBuildOrderPass(
     const { items: catalog, id: faction } = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!
     const initial = catalog.find(item => item.name === initialTownHall)!
     const workerItem = catalog.find(item => item.id === (faction === "light" ? "worker" : "slave"))!
-    const restored = resume && copyCheckpoint(resume)
     const simulation = restored?.simulation ?? new WorkerEconomy(economy, constructionWhipWindows, collectCandidatesThrough !== undefined)
     const passState: Checkpoint = restored ?? {
         nextIndex: 0,
@@ -210,10 +283,13 @@ function simulateBuildOrderPass(
         unitInstances: simulation.workers.map(() => ({ item: workerItem, readyAt: 0, killed: false })),
         workerCompletions: [],
         timedEventsByIndex: new Map(),
+        preparationFailures: new Map(),
+        preparedWorkers: new Map(),
         lastScrollCommand: -Infinity,
         lastCatalogCommand: -Infinity,
     }
-    const { nextIndex, plan, spending, buildings, unitInstances, workerCompletions, timedEventsByIndex } = passState
+    const { nextIndex, plan, spending, buildings, unitInstances, workerCompletions, timedEventsByIndex,
+        preparationFailures, preparedWorkers } = passState
     const collision = manaSpentCollision(buildOrder)
     if (collision) throw new Error(collision)
     const pendingScrolls = buildOrder.flatMap<{ item: Extract<PlannerItem, { kind: "scroll" | "mana-spent" }>; index: number }>((item, index) => {
@@ -250,11 +326,8 @@ function simulateBuildOrderPass(
         return item.commandTime + scroll.startDelay + scroll.duration
     }))
     const scrollPlan = resolvedEvents.filter(action => isScrollAction(action.item) || action.item.kind === "mana-spent")
-    // Checkpoints are taken only after the fixed commands have been applied.
-    if (restored) {
-        pendingScrolls.length = 0
-        pendingResourcesCollected.length = 0
-        pendingWorkerAndLossEvents.length = 0
+    for (const pending of [pendingScrolls, pendingResourcesCollected, pendingWorkerAndLossEvents]) {
+        while (pending.length && timedEventsByIndex.has(pending[0].index)) pending.shift()
     }
     const wellPlan: ScheduledAction[] = evaluateManaWells(buildOrder).map(({ item, index, blocked, blockedReason }) => {
         const action: ScheduledAction = { item, cost: { gold: 0, wood: 0 }, blocked, blockedReason,
@@ -266,10 +339,9 @@ function simulateBuildOrderPass(
     until = Math.max(until, ...wellPlan.map(action => action.commandTime!))
     until = Math.min(MAX_PLAN_SECONDS, until)
     const namesById = new Map([...catalog, ...buildOrder].map(item => [item.id, item.name]))
-    const preparationFailures = new Map<number, string>()
-    const preparedWorkers = new Map<number, { workerId: number; departureTime: number }>()
     const pendingDepartures = [...(preparation?.commands ?? [])]
-        .filter(([index]) => index >= nextIndex && !preparation?.blocked.has(index))
+        .filter(([index]) => index >= nextIndex && !preparation?.blocked.has(index) &&
+            !preparedWorkers.has(index) && !preparationFailures.has(index))
         .map(([index, command]) => ({ index, time: command - buildOrder[index].construction!.preparationDuration! }))
         .sort((a, b) => a.time - b.time || a.index - b.index)
     const interruptReturn = (workerId: number, time: number) => {
@@ -439,9 +511,11 @@ function simulateBuildOrderPass(
         ? copyCheckpoint({ ...passState, nextIndex: index })
         : undefined
     let beforeTail: Checkpoint | undefined
+    let canCapture = captureCheckpoint
     for (let itemIndex = nextIndex; itemIndex < buildOrder.length; itemIndex++) {
         const item = buildOrder[itemIndex]
         if (isTimedEvent(item)) continue
+        if (canCapture && plan.length && plan.length % CATALOG_CHECKPOINT_INTERVAL === 0) canCapture(passState)
         if (capture && itemIndex === buildOrder.length - 1 && !preparation?.commands.has(itemIndex)) {
             beforeTail = captureAt(itemIndex)
         }
@@ -629,6 +703,7 @@ function simulateBuildOrderPass(
             advanceTo(nextTime)
         }
         if (!scheduled) {
+            canCapture = undefined
             plan.push({
                 item,
                 cost,
@@ -642,6 +717,7 @@ function simulateBuildOrderPass(
             })
         }
     }
+    if (canCapture && plan.length) canCapture(passState)
     const end = capture ? captureAt(buildOrder.length) : undefined
     const replayEnd = Math.min(MAX_PLAN_SECONDS, Math.max(
         until,

@@ -7,6 +7,7 @@ import { isTimedEvent } from "./resourcesCollected"
 
 export type PreparationSchedule = { commands: Map<number, number>; blocked: Map<number, string> }
 export type PreparationReuse = {
+    initialCommands: Map<number, number>
     minimumPrefixLength: number
     acceptedBeforeFinal: PreparationSchedule[]
 }
@@ -19,9 +20,20 @@ type Result = {
 }
 type Replay = (schedule: PreparationSchedule, collectCandidatesThrough?: number) => Result
 
+export function matchesPreparation(result: Pick<Result, "plan" | "preparationFailures">, schedule: PreparationSchedule) {
+    return !result.preparationFailures.size && result.plan.every(action => !action.blocked) &&
+        [...schedule.commands].every(([index, time]) => result.plan[index].commandTime === time)
+}
+
+export function matchesPreparationReuse(run: Replay, selected: Result, previous: { preparation: PreparationSchedule; reuse: PreparationReuse }) {
+    return matchesPreparation(selected, previous.preparation) &&
+        previous.reuse.acceptedBeforeFinal.every(accepted => matchesPreparation(run(accepted), accepted))
+}
+
 /** Replays discard obsolete reservations. The engine remains responsible for all
  * purchase readiness, worker selection, fixed events and movement rules. */
-export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, run: Replay) {
+export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, run: Replay,
+    previous?: { preparation: PreparationSchedule; reuse: PreparationReuse; verify: Replay }) {
     const prepared = items.flatMap((item, index) => (item.construction?.preparationDuration ?? 0) > 0 ? [index] : [])
     const schedule: PreparationSchedule = { commands: new Map(), blocked: new Map() }
     let result = run(schedule)
@@ -81,7 +93,24 @@ export function schedulePreparation(items: PlannerItem[], economy: EconomySettin
                 break
             }
         }
-        if (!changed) return { ...refinePreparation(items, economy, schedule, result, run), preparation: schedule }
+        if (!changed) {
+            // The caller has verified the prefix that generated candidates and
+            // rejected earlier trials. Confirm stabilization and replay each
+            // accepted schedule against the changed suffix before reusing it.
+            if (previous && matchesPreparation(result, schedule) &&
+                schedule.commands.size === previous.reuse.initialCommands.size &&
+                [...schedule.commands].every(([index, time]) => previous.reuse.initialCommands.get(index) === time)) {
+                try {
+                    const selected = previous.verify(previous.preparation)
+                    if (matchesPreparationReuse(previous.verify, selected, previous)) {
+                        return { ...selected, preparation: previous.preparation, reuse: previous.reuse }
+                    }
+                } catch {
+                    // A speculative replay can exceed a limit that the fresh search avoids.
+                }
+            }
+            return { ...refinePreparation(items, economy, schedule, result, run), preparation: schedule }
+        }
     }
     throw new Error("Construction preparation scheduling did not converge.")
 }
@@ -91,9 +120,7 @@ export function schedulePreparation(items: PlannerItem[], economy: EconomySettin
 function refinePreparation(items: PlannerItem[], economy: EconomySettings, schedule: PreparationSchedule, result: Result, run: Replay) {
     // A default tail cannot change earlier catalog commands. Remember how much
     // of the prefix the search needed to generate candidates and reject trials.
-    const reuse: PreparationReuse = { minimumPrefixLength: 0, acceptedBeforeFinal: [] }
-    const lastFixedCommand = Math.max(0, ...result.plan.filter(action => isTimedEvent(action.item))
-        .map(action => action.commandTime!))
+    const reuse: PreparationReuse = { initialCommands: new Map(schedule.commands), minimumPrefixLength: 0, acceptedBeforeFinal: [] }
     const requireCatalogThrough = (trial: Result, time: number) => {
         const index = trial.plan.findIndex(action => !isTimedEvent(action.item) &&
             action.commandTime !== null && action.commandTime >= time)
@@ -101,7 +128,6 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, sched
     }
     const recordAccepted = (trial: Result) => {
         if (trial.plan.some(action => action.blocked)) reuse.minimumPrefixLength = Infinity
-        if (lastFixedCommand > 0) requireCatalogThrough(trial, lastFixedCommand)
     }
     recordAccepted(result)
     for (const [index, command] of schedule.commands) {
@@ -137,7 +163,10 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, sched
             } else if (blocked >= 0) {
                 const catalogBlock = trial.plan.findIndex((action, i) => wasSuccessful[i] && action.blocked && !isTimedEvent(action.item))
                 if (catalogBlock >= 0) reuse.minimumPrefixLength = Math.max(reuse.minimumPrefixLength, catalogBlock + 1)
-                else requireCatalogThrough(trial, lastFixedCommand)
+                // Well ownership depends only on the unchanged fixed events.
+                else if (trial.plan[blocked].item.kind !== "mana-well") {
+                    requireCatalogThrough(trial, trial.plan[blocked].commandTime!)
+                }
             } else {
                 return trial
             }
