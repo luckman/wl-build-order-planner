@@ -262,8 +262,8 @@ export default function App() {
             buildOrders[faction] !== initialOrders.current[faction] || gameProfiles[faction] !== initialDrafts[faction].gameProfile)
         if (changed.length) saveFactionDrafts(buildOrders, gameProfiles, changed)
     }, [buildOrders, gameProfiles, initialDrafts])
-    const [limitError, setLimitError] = useState<NotificationMessage | null>(null)
-    const dismissLimitError = useCallback(() => setLimitError(null), [])
+    const [actionNotice, setActionNotice] = useState<NotificationMessage | null>(null)
+    const dismissActionNotice = useCallback(() => setActionNotice(null), [])
     const gameProfile = gameProfiles[factionId]
     const { shell, pending, showSpinner, error: updateError, dismissError: dismissUpdateError, calculate } = useBuildOrderUpdate()
     const [calculated, setCalculated] = useState<{ draft: BuildDraft; profile: GameProfile; result: SimulationResult }>()
@@ -285,10 +285,10 @@ export default function App() {
         const items = typeof update === "function" ? update(buildOrder) : update
         if (items === buildOrder) return
         if (items.length > MAX_PLAN_ACTIONS) {
-            setLimitError({ text: ACTION_LIMIT_MESSAGE, kind: "error" })
+            setActionNotice({ text: ACTION_LIMIT_MESSAGE, kind: "error" })
             return
         }
-        setLimitError(null)
+        setActionNotice(null)
         updateDraft(factionId, { opening, items: withOrderIds(items) }, gameProfile, onSuccess)
     }
     const [dependencyError, setDependencyError] = useState<string | null>(null)
@@ -339,9 +339,16 @@ export default function App() {
     const additionError = buildOrder.length >= MAX_PLAN_ACTIONS ? ACTION_LIMIT_MESSAGE : null
     const addCatalogItem = (item: PlannerItem) => {
         setDependencyError(null)
-        if (additionError) { setLimitError({ text: additionError, kind: "error" }); return }
+        if (additionError) { setActionNotice({ text: additionError, kind: "error" }); return }
         try { setBuildOrder(buildOrderWithDependencies(faction, buildOrder, item)) }
-        catch (error) { setLimitError(null); setDependencyError((error as Error).message) }
+        catch (error) {
+            const message = (error as Error).message
+            if (item.kind === "upgrade") setActionNotice({ text: message, kind: "error" })
+            else {
+                setActionNotice(null)
+                setDependencyError(message)
+            }
+        }
     }
     const initialWorkerCount = economy.goldWorkers + economy.woodWorkers
     const initialFoodUsed = initialWorkerCount * 2
@@ -383,7 +390,7 @@ export default function App() {
         const apply = () => updateDraft(faction, draft, gameProfile, () => {
             setFactionId(faction)
             updateGameProfiles(current => ({ ...current, [faction]: gameProfile }))
-            setLimitError(null)
+            setActionNotice(null)
             setDependencyError(null)
             setHoverTime(null)
             onSuccess()
@@ -400,7 +407,7 @@ export default function App() {
     }, [pending])
     const applyTemplate = (draft: BuildDraft, onSuccess: () => void) => {
         updateDraft(factionId, { ...draft, items: withOrderIds(draft.items) }, gameProfile, () => {
-            setLimitError(null)
+            setActionNotice(null)
             setDependencyError(null)
             setHoverTime(null)
             setEditingEventId(null)
@@ -410,7 +417,7 @@ export default function App() {
     const defaultGoldWorkers = Math.min(4, initialWorkerCount)
     const clearBuildOrder = () => {
         updateDraft(factionId, { items: [], opening: { type: "allocate-workers", goldWorkers: defaultGoldWorkers } }, gameProfile, () => {
-            setLimitError(null)
+            setActionNotice(null)
             setHoverTime(null)
             setDependencyError(null)
         })
@@ -542,7 +549,7 @@ export default function App() {
                 </nav>
             </header>
             <Notification notice={draftNotice} onDismiss={dismissDraftNotice} />
-            <Notification notice={limitError} onDismiss={dismissLimitError} />
+            <Notification notice={actionNotice} onDismiss={dismissActionNotice} />
             <div className="build-order-update-error">
                 <Notification notice={updateError ? { text: updateError, kind: "error" } : null} onDismiss={dismissUpdateError} />
             </div>

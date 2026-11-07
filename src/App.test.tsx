@@ -333,14 +333,26 @@ test("Miriel appears in the heroes row, consumes food, and removing her releases
     expect(screen.getAllByRole("button", { name: "Remove Miriel" })).toHaveLength(1)
 })
 
-test("duplicate upgrades are rejected until another Castle is explicitly added", () => {
+test("a Factory upgrade rejected in an empty build order shows a dismissible notification", () => {
+    const { container } = render(<App />)
+    chooseUpgrade("Factory lvl 2")
+    const alert = screen.getByRole("alert")
+    expect(within(alert).getByText("Requires another Factory")).toBeTruthy()
+    expect(within(container.querySelector(".action-panel") as HTMLElement).queryByRole("alert")).toBeNull()
+    expect(screen.queryByRole("button", { name: /^Remove / })).toBeNull()
+    fireEvent.click(within(alert).getByRole("button", { name: "Dismiss message" }))
+    expect(screen.queryByRole("alert")).toBeNull()
+})
+
+test("duplicate upgrades show a notification until another Castle is explicitly added", () => {
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "100000" } })
     fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "100000" } })
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
     chooseUpgrade("Castle lvl 2")
     chooseUpgrade("Castle lvl 2")
-    expect(screen.getByRole("alert").textContent).toBe("Requires another Castle")
+    expect(within(screen.getByRole("alert")).getByText("Requires another Castle")).toBeTruthy()
+    expect(actions.queryByRole("alert")).toBeNull()
     const order = container.querySelector(".order") as HTMLElement
     expect(within(order).getAllByText("Castle lvl 2")).toHaveLength(1)
     fireEvent.click(actions.getByRole("button", { name: /^Castle 500 gold/ }))
