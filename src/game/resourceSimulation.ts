@@ -148,6 +148,20 @@ export class WorkerEconomy {
         }
     }
 
+    fork() {
+        const copy: WorkerEconomy = Object.create(WorkerEconomy.prototype)
+        return Object.assign(copy, this, {
+            workers: this.workers.map(worker => ({ ...worker })),
+            deliveries: this.deliveries.map(delivery => ({ ...delivery })),
+            eventBoundaries: new Set(this.eventBoundaries),
+            delayedInitialWoodWorkerIds: [...this.delayedInitialWoodWorkerIds],
+            sawmillCompletions: [...this.sawmillCompletions],
+            lumberGatheringWindows: [...this.lumberGatheringWindows],
+            goldRushWindows: [...this.goldRushWindows],
+            whipStarts: [...this.whipStarts],
+        })
+    }
+
     addWorker(assignment: GatheringWorker["assignment"], isInitialGoldWorker = false) {
         if (this.workers.length >= MAX_PLAN_ACTIONS + 5) throw new Error("Unsupported worker count.")
         const worker: GatheringWorker = {

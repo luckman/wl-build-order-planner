@@ -6,6 +6,10 @@ import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS } from "./plannerLimits"
 import { isTimedEvent } from "./resourcesCollected"
 
 export type PreparationSchedule = { commands: Map<number, number>; blocked: Map<number, string> }
+export type PreparationReuse = {
+    minimumPrefixLength: number
+    acceptedBeforeFinal: PreparationSchedule[]
+}
 type Result = {
     plan: ScheduledAction[]
     orderedPlan: ScheduledAction[]
@@ -85,11 +89,27 @@ export function schedulePreparation(items: PlannerItem[], economy: EconomySettin
 /** A later departure can restore an earlier delivery. Refine against observable
  * event boundaries so a conservative replay does not impose an unnecessary wait. */
 function refinePreparation(items: PlannerItem[], economy: EconomySettings, schedule: PreparationSchedule, result: Result, run: Replay) {
+    // A default tail cannot change earlier catalog commands. Remember how much
+    // of the prefix the search needed to generate candidates and reject trials.
+    const reuse: PreparationReuse = { minimumPrefixLength: 0, acceptedBeforeFinal: [] }
+    const lastFixedCommand = Math.max(0, ...result.plan.filter(action => isTimedEvent(action.item))
+        .map(action => action.commandTime!))
+    const requireCatalogThrough = (trial: Result, time: number) => {
+        const index = trial.plan.findIndex(action => !isTimedEvent(action.item) &&
+            action.commandTime !== null && action.commandTime >= time)
+        reuse.minimumPrefixLength = Math.max(reuse.minimumPrefixLength, index < 0 ? Infinity : index + 1)
+    }
+    const recordAccepted = (trial: Result) => {
+        if (trial.plan.some(action => action.blocked)) reuse.minimumPrefixLength = Infinity
+        if (lastFixedCommand > 0) requireCatalogThrough(trial, lastFixedCommand)
+    }
+    recordAccepted(result)
     for (const [index, command] of schedule.commands) {
         const preparation = items[index].construction!.preparationDuration!
         const commands = new Map(schedule.commands)
         commands.delete(index)
         const probe = run({ commands, blocked: schedule.blocked }, command)
+        requireCatalogThrough(probe, command)
         const times = [0, ...probe.candidateEventTimes, ...probe.plan.flatMap(action =>
             [action.commandTime, action.startTime, action.finishTime, action.workerReturnTime].filter((time): time is number => time !== null))]
         const candidates = Array.from(new Set([command, probe.plan[index].commandTime ?? command, preparation,
@@ -109,15 +129,33 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, sched
             const candidate = new Map(schedule.commands)
             candidate.set(index, time)
             const trial = run({ commands: candidate, blocked: schedule.blocked })
-            const valid = trial.plan.every((action, i) => !wasSuccessful[i] || !action.blocked) &&
-                [...candidate].every(([i, expected]) => !trial.preparationFailures.has(i) && trial.plan[i].commandTime === expected)
-            return valid ? trial : null
+            const blocked = trial.plan.findIndex((action, i) => wasSuccessful[i] && action.blocked)
+            const invalidPreparation = [...candidate].find(([i, expected]) =>
+                trial.preparationFailures.has(i) || trial.plan[i].commandTime !== expected)
+            if (invalidPreparation) {
+                reuse.minimumPrefixLength = Math.max(reuse.minimumPrefixLength, invalidPreparation[0] + 1)
+            } else if (blocked >= 0) {
+                const catalogBlock = trial.plan.findIndex((action, i) => wasSuccessful[i] && action.blocked && !isTimedEvent(action.item))
+                if (catalogBlock >= 0) reuse.minimumPrefixLength = Math.max(reuse.minimumPrefixLength, catalogBlock + 1)
+                else requireCatalogThrough(trial, lastFixedCommand)
+            } else {
+                return trial
+            }
+            return null
         }
         for (const time of candidates) {
             if (time < earliestCommandTime) continue
             const refined = evaluate(time)
-            if (refined) { schedule.commands.set(index, time); result = refined; break }
+            if (refined) {
+                if (time !== command) {
+                    reuse.acceptedBeforeFinal.push({ commands: new Map(schedule.commands), blocked: new Map(schedule.blocked) })
+                    recordAccepted(refined)
+                }
+                schedule.commands.set(index, time)
+                result = refined
+                break
+            }
         }
     }
-    return result
+    return { ...result, reuse }
 }
