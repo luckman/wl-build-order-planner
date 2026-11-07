@@ -59,9 +59,8 @@ releases its builder at 35.5s.
 Selection occurs when the command can actually be accepted, after simultaneous resource deliveries,
 mine transitions, and worker training completions:
 
-1. Idle workers.
-2. Wood workers, ordered by least carried/gathered wood.
-3. Gold workers, ordered by least carried gold, excluding workers inside the mine.
+1. Wood workers, ordered by least carried/gathered wood.
+2. Gold workers, ordered by least carried gold, excluding workers inside the mine.
 
 Outbound workers and workers waiting outside the mine carry zero. Wood gathered so far is
 proportional to time spent chopping; workers returning to deposit carry a full trip. Worker ID

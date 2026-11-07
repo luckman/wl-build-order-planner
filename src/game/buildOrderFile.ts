@@ -1,3 +1,4 @@
+import { createWorkerEvent, workerEventCommand, type WorkerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision, type ManaSpentCommand } from "./manaSpent"
 import { validateActionCount, validateEconomyDurations } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, type UnitKilledCommand } from "./unitsKilled"
@@ -12,7 +13,7 @@ import { createScrollAction, isScrollAction, scrollCommand, type ScrollCommand }
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-11-05.1"
+export const GAME_RULES_VERSION = "2026-11-07.1"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -20,7 +21,7 @@ export type BuildOrderDocument = {
     gameRulesVersion: string
     faction: FactionId
     gameProfile: GameProfile
-    buildOrder: Array<OpeningAction | ((ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
+    buildOrder: Array<OpeningAction | ((WorkerEventCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
         itemId: string
     }) & {
         timings?: Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime">
@@ -34,7 +35,7 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
         buildOrder: [opening, ...actions.map(({ item, commandTime, startTime, finishTime, workerReturnTime }) => ({
-            ...(item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : { itemId: item.id }),
+            ...(item.kind === "worker-event" ? workerEventCommand(item) : item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : { itemId: item.id }),
             ...(includeTimings ? { timings: { commandTime, startTime, finishTime, workerReturnTime } } : {}),
         }))],
     }
@@ -123,6 +124,11 @@ export function parseBuildOrder(text: string): {
     const catalog = new Map(factions[faction].items.map(item => [item.id, item]))
     const buildOrder = doc.buildOrder.slice(1).map((entry: unknown, index: number) => {
         const action = object(entry, `Action ${index + 1}`)
+        if (action.type === "make-idle" || action.type === "make-active") {
+            return createWorkerEvent({ type: action.type, commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
+                count: number(action.count, `Action ${index + 1}.count`, true, true),
+                travelDuration: action.travelDuration === undefined ? 0 : number(action.travelDuration, `Action ${index + 1}.travelDuration`) })
+        }
         if (action.type === "mana-spent") {
             return createManaSpentAction({ type: "mana-spent", commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
                 mana: resourceAmount(action.mana, `Action ${index + 1}.mana`) }, faction)

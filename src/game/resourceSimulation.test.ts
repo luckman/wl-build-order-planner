@@ -180,12 +180,9 @@ test("only the first initial wood gatherer receives its command immediately", ()
     ).toEqual([20, 21])
 })
 
-test("builders prefer idle workers, then wood, then eligible gold workers", () => {
+test("ordinary builders exclude idle workers and prefer wood before eligible gold", () => {
     const simulation = new WorkerEconomy({ ...settings, workerCount: 3, goldWorkers: 1, woodWorkers: 1 })
     simulation.advanceTo(5)
-    const idle = requireBuilder(simulation)
-    expect(idle.assignment).toBe("idle")
-    simulation.construct(idle, 30)
     const wood = requireBuilder(simulation)
     expect(wood.assignment).toBe("wood")
     simulation.construct(wood, 30)

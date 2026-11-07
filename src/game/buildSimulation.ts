@@ -1,3 +1,4 @@
+import { createWorkerEvent, workerEventCommand } from "./workerEvents"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, foodUsedAt } from "./unitsKilled"
@@ -91,9 +92,10 @@ function simulateBuildOrderPass(
         createResourcesCollectedAction(resourcesCollectedCommand(item))
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
-    const pendingUnitsKilled = buildOrder.flatMap((item, index) => {
-        if (item.kind !== "unit-is-killed") return []
-        createUnitKilledAction(unitKilledCommand(item), faction)
+    const pendingWorkerAndLossEvents = buildOrder.flatMap((item, index) => {
+        if (item.kind !== "unit-is-killed" && item.kind !== "worker-event") return []
+        if (item.kind === "worker-event") createWorkerEvent(workerEventCommand(item))
+        else createUnitKilledAction(unitKilledCommand(item), faction)
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
     const unitKilledPlan: ScheduledAction[] = []
@@ -101,7 +103,7 @@ function simulateBuildOrderPass(
     const unitInstances: Array<{ item: PlannerItem; readyAt: number; killed: boolean }> =
         simulation.workers.map(() => ({ item: workerItem, readyAt: 0, killed: false }))
     // Timed commands are processed independently of their position among catalog rows.
-    until = Math.max(until, ...pendingUnitsKilled.map(({ item }) => item.commandTime), ...pendingResourcesCollected.map(({ item }) => item.commandTime), ...pendingScrolls.map(({ item }) => {
+    until = Math.max(until, ...pendingWorkerAndLossEvents.map(({ item }) => item.commandTime), ...pendingResourcesCollected.map(({ item }) => item.commandTime), ...pendingScrolls.map(({ item }) => {
         if (item.kind === "mana-spent") return item.commandTime
         const scroll = scrollEffect(item.scrollId, economy)
         return item.commandTime + scroll.startDelay + scroll.duration
@@ -133,16 +135,23 @@ function simulateBuildOrderPass(
 
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
-        while (Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingUnitsKilled[0]?.item.commandTime ?? Infinity) <= time) {
-            const eventTime = Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingUnitsKilled[0]?.item.commandTime ?? Infinity)
+        while (Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity) <= time) {
+            const eventTime = Math.min(workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity)
             simulation.advanceTo(eventTime)
             while (workerCompletions[0] === eventTime) {
                 workerCompletions.shift()
                 const goldCount = simulation.workers.filter(({ assignment }) => assignment === "gold").length
                 simulation.addWorker(goldCount < saturation ? "gold" : "wood")
             }
-            while (pendingUnitsKilled[0]?.item.commandTime === eventTime) {
-                const { item, index } = pendingUnitsKilled.shift()!
+            while (pendingWorkerAndLossEvents[0]?.item.commandTime === eventTime) {
+                const { item, index } = pendingWorkerAndLossEvents.shift()!
+                if (item.kind === "worker-event") {
+                    const blocked = !simulation.applyWorkerEvent(item)
+                    timedEventsByIndex.set(index, { item, blocked, cost: { gold: 0, wood: 0 }, commandTime: eventTime,
+                        startTime: blocked ? null : eventTime, finishTime: blocked ? null : eventTime, workerReturnTime: null, workerId: null,
+                        ...(blocked ? { blockedReason: `${item.name}: not enough eligible workers for count ${item.count}.` } : {}) })
+                    continue
+                }
                 const target = catalog.find(unit => unit.id === item.unitId)!
                 const isWorker = target.id === workerItem.id
                 const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.killed && unit.readyAt <= eventTime)
@@ -276,7 +285,11 @@ function simulateBuildOrderPass(
             : item.producerBuildingId ? building.buildingId === item.producerBuildingId : building.name === item.producer)
         const earlierNames = new Set([initialTownHall, ...plan.filter(action => !action.blocked).map(action => action.item.name)])
         const missingEarlierName = item.prerequisites.find(name => !earlierNames.has(name))
-        const dependencyProblem = missingEarlierRequirement
+        const eventualHeroTier = item.kind === "hero" ? heroAltarLevel(unitInstances.filter(unit => !unit.killed).map(unit => unit.item)) : 1
+        const pendingHeroLoss = pendingWorkerAndLossEvents.some(({ item: event }) => event.kind === "unit-is-killed" && catalog.some(unit => unit.id === event.unitId && unit.kind === "hero"))
+        const missingHeroTier = item.kind === "hero" && !pendingHeroLoss && !unitInstances.some(unit => unit.item.id === item.id && !unit.killed) && requirementCount(eventualBuildings,
+            { item: item.producerBuildingId!, count: 1, minLevel: eventualHeroTier }, Infinity) < 1
+        const dependencyProblem = missingHeroTier ? `Requires at least one ${item.producer} at level ${eventualHeroTier} or higher for hero ${eventualHeroTier}` : missingEarlierRequirement
             ? `Requires ${missingEarlierRequirement.count} × ${namesById.get(missingEarlierRequirement.item) ?? missingEarlierRequirement.item}${missingEarlierRequirement.minLevel ? ` at level ${missingEarlierRequirement.minLevel} or higher` : ""}`
             : item.kind === "upgrade" && !eventualProducer
                 ? `Requires an available ${item.producer} to upgrade`
@@ -296,7 +309,7 @@ function simulateBuildOrderPass(
                 ? Math.max(lastCatalogCommand, lastScrollCommand) + economy.orderDelay : -Infinity
             const unlockedBuildings = unlockedBuildingsAt(time)
             const maxCountReached = item.maxCount !== undefined && unitInstances.filter(unit => unit.item.id === item.id && !unit.killed).length >= item.maxCount
-            if (maxCountReached && !pendingUnitsKilled.some(kill => kill.item.unitId === item.id)) {
+            if (maxCountReached && !pendingWorkerAndLossEvents.some(kill => kill.item.kind === "unit-is-killed" && kill.item.unitId === item.id)) {
                 blockedReason = `${item.name} limit reached (maximum ${item.maxCount}, including queued recruitment)`
                 break
             }
@@ -364,7 +377,7 @@ function simulateBuildOrderPass(
                 const finishTime = isRecruitable(item) && producer
                     ? recruitmentFinish(startTime, duration, buildings.indexOf(producer), recruitmentWindows, recruitmentReduction)
                     : startTime + duration
-                const returnTravelTime = builder ? simulation.constructionReturnTravelTime(finishTime) : 0
+                const returnTravelTime = builder ? simulation.constructionReturnTravelTime(finishTime, Math.max(economy.constructionStartDelay, simulation.remainingReactivation(builder))) : 0
                 const workerReturnTime = builder ? finishTime + returnTravelTime : null
                 if ((workerReturnTime ?? finishTime) > MAX_PLAN_SECONDS) {
                     blockedReason = "Action would exceed the 30:00 plan limit"
@@ -407,7 +420,7 @@ function simulateBuildOrderPass(
                     commandReadyAt,
                     pendingScrolls[0]?.item.commandTime ?? Infinity,
                     pendingResourcesCollected[0]?.item.commandTime ?? Infinity,
-                    pendingUnitsKilled[0]?.item.commandTime ?? Infinity,
+                    pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity,
                     ...workerCompletions,
                     ...buildings.map(({ availableAt }) => availableAt),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime])),

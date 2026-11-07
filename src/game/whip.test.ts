@@ -181,8 +181,8 @@ test("a cast during builder travel updates building, worker return and replay al
     expect(build.startTime).toBeCloseTo(1 + travelTime)
     expect(build.finishTime! - build.startTime!).toBe(barracks.seconds)
     expect(build.workerReturnTime).toBeCloseTo(build.finishTime! + 3)
-    expect(workerAllocationAt(settings, plan, build.workerReturnTime! - 0.01)).toMatchObject({ busyOrIdle: 1, wood: 0 })
-    expect(workerAllocationAt(settings, plan, build.workerReturnTime!)).toMatchObject({ busyOrIdle: 0, wood: 1 })
+    expect(workerAllocationAt(settings, plan, build.workerReturnTime! - 0.01)).toMatchObject({ buildingOrTravelling: 1, wood: 0 })
+    expect(workerAllocationAt(settings, plan, build.workerReturnTime!)).toMatchObject({ buildingOrTravelling: 0, wood: 1 })
     expect(deliveries[0].time).toBeCloseTo(build.workerReturnTime! + 12.1 + 4)
     // Source row placement cannot change timing or income.
     const reversed = simulate([whip(2), barracks])
@@ -205,7 +205,7 @@ test("a fresh cast can affect a returning builder after construction has finishe
     expect(build.finishTime).toBe(34)
     expect(build.workerReturnTime).toBeCloseTo(34 + 2 + 1 / 1.15)
     expect(deliveries[0].time).toBeCloseTo(build.workerReturnTime! + 10.1 + 4 / 1.15)
-    expect(workerAllocationAt(settings, plan, build.workerReturnTime!)).toMatchObject({ wood: 1, busyOrIdle: 0 })
+    expect(workerAllocationAt(settings, plan, build.workerReturnTime!)).toMatchObject({ wood: 1, buildingOrTravelling: 0 })
 })
 
 test("Whip persists through JSON, links and per-faction drafts", () => {
@@ -294,7 +294,7 @@ test("successful commands model player preparation in scheduling and replay; blo
     // First worker was due at 13, is delayed to 14 by the command at 12,
     // then travels its remaining normal second at boosted speed from 13.
     expect(actual.deliveries[4].time).toBeCloseTo(13 + 1 / 1.15 + 0.5 + 4 / 1.15)
-    expect(workerAllocationAt(economy, actual.plan, 12)).toMatchObject({ gold: 4, busyOrIdle: 0 })
+    expect(workerAllocationAt(economy, actual.plan, 12)).toMatchObject({ gold: 4, buildingOrTravelling: 0 })
 
     const blocked = { ...economy, startingMana: 0, manaPerMinute: 0 }
     expect(simulate([whip(12)], blocked).deliveries).toEqual(simulate([], blocked).deliveries)

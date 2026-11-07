@@ -7,7 +7,7 @@ import { createUnitKilledAction } from "./unitsKilled"
 const worker = factions.light.items.find(item => item.id === "worker")!
 const farm = { ...factions.light.items.find(item => item.id === "farm")!, limit: undefined }
 const settings = { ...economyFromProfile(initialGameProfile), startingGold: 10000, startingWood: 10000,
-    workerCount: 2, goldWorkers: 0, woodWorkers: 0, orderDelay: 2.5 }
+    workerCount: 2, goldWorkers: 0, woodWorkers: 2, woodPerTrip: 0, orderDelay: 2.5 }
 const collected = (time: number, gold: number, wood: number) =>
     createResourcesCollectedAction({ type: "resources-collected", commandTime: time, gold, wood })
 
@@ -35,12 +35,12 @@ test("food released by a kill waits for order delay", () => {
 })
 
 test("worker return has no extra order delay when resources are already ready", () => {
-    const { plan } = simulateBuildOrder([farm, farm], { ...settings, workerCount: 1 }, 0, 100, 20, "Castle")
+    const { plan } = simulateBuildOrder([farm, farm], { ...settings, workerCount: 1, woodWorkers: 1 }, 0, 100, 20, "Castle")
     expect(plan[1].commandTime).toBe(plan[0].workerReturnTime)
 })
 
 test("natural gathering waits and resource waits overlap rather than stack", () => {
-    const economy = { ...settings, startingGold: 0, startingWood: 0, goldWorkers: 1, woodWorkers: 1 }
+    const economy = { ...settings, startingGold: 0, startingWood: 0, goldWorkers: 1, woodWorkers: 1, woodPerTrip: 50 }
     const { plan, deliveries } = simulateBuildOrder([farm], economy, 0, 100, 20, "Castle")
     const ready = (resource: "gold" | "wood", cost: number) => {
         let total = 0

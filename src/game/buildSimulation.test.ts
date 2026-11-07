@@ -26,7 +26,7 @@ const economy: EconomySettings = {
     initialGoldTravelReduction: 1,
 }
 
-const abundantEconomy = { ...economy, startingGold: 100000, startingWood: 100000, workerCount: 20, woodWorkers: 0 }
+const abundantEconomy = { ...economy, startingGold: 100000, startingWood: 100000, workerCount: 20, woodWorkers: 20, woodPerTrip: 0 }
 
 test.each(["light", "dark"] as const)("%s food warnings count queued recruits and clear after a food building completes", factionId => {
     const faction = factions[factionId]
@@ -456,12 +456,14 @@ test.each(["light", "dark"] as const)("%s completed Sawmill accelerates income a
     const barracks = required(faction.items.find(({ id }) => id === "barracks"))
     const { plan, deliveries } = simulateBuildOrder(
         [sawmill, barracks],
-        { ...economy, workerCount: 2, startingWood: 100 },
+        { ...economy, workerCount: 2, woodWorkers: 2, startingWood: 100 },
         4, 100, 20, faction.startingTownHall, 110,
     )
     expect(plan[0]).toMatchObject({ commandTime: 1, finishTime: 25, workerReturnTime: 29 })
-    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 50.5 })
-    expect(deliveries.map(({ time }) => time)).toEqual([20, 36.5, 49.5, 63, 77, 91.5, 106.5])
+    expect(plan[1]).toMatchObject({ blocked: false, commandTime: 42.5 })
+    // One gatherer continues while the other constructs: delivery at 21, then 37.5.
+    // The builder resumes at 29 and delivers after 12 chopping + 0.5 travel.
+    expect(deliveries.slice(0, 3).map(({ time }) => time)).toEqual([21, 37.5, 41.5])
 })
 
 test("a blocked Sawmill does not change wood travel", () => {
@@ -582,7 +584,7 @@ test.each(["light", "dark"] as const)("%s Barracks orders reserve escalating pri
     const barracks = required(faction.items.find(({ id }) => id === "barracks"))
     const { plan } = simulateBuildOrder(
         [barracks, barracks, barracks, barracks],
-        { ...abundantEconomy, workerCount: 4 },
+        { ...abundantEconomy, workerCount: 4, woodWorkers: 4 },
         0, 100, 20, faction.startingTownHall,
     )
     expect(plan.map(({ commandTime }) => commandTime)).toEqual([1, 2, 3, 4])
@@ -603,7 +605,7 @@ test.each([
     const barracks = required(factions.light.items.find(({ id }) => id === "barracks"))
     const { plan } = simulateBuildOrder(
         [barracks, barracks],
-        { ...economy, ...resources, workerCount: 2, woodWorkers: 0 },
+        { ...economy, ...resources, workerCount: 2, woodWorkers: 2, woodPerTrip: 0 },
         0, 100, 20, "Castle",
     )
     expect(plan[0].blocked).toBe(false)

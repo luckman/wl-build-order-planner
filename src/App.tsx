@@ -1,3 +1,5 @@
+import WorkerEventDialog from "./WorkerEventDialog"
+import { createWorkerEvent, type WorkerEventCommand } from "./game/workerEvents"
 import ManaSpentDialog from "./ManaSpentDialog"
 import { createManaSpentAction, manaSpentCollision } from "./game/manaSpent"
 import Notification, { type NotificationMessage } from "./Notification"
@@ -174,6 +176,7 @@ export default function App() {
     const [factionId, setFactionId] = useState<FactionId>(loadActiveFaction)
     useEffect(() => saveActiveFaction(factionId), [factionId])
     const [scrollDialogOpen, setScrollDialogOpen] = useState<ScrollId | null>(null)
+    const [workerEventDialogOpen, setWorkerEventDialogOpen] = useState<WorkerEventCommand["type"] | null>(null)
     const [unitKilledDialogOpen, setUnitKilledDialogOpen] = useState(false)
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
     const [manaSpentDialogOpen, setManaSpentDialogOpen] = useState(false)
@@ -503,6 +506,10 @@ export default function App() {
                                             </>}
                                             {kind === "hero" && <>
                                                 <span className="scroll-card-delimiter" aria-hidden="true" />
+                                                {(["make-idle", "make-active"] as const).map(type => <button key={type} className="action resource-card"
+                                                    aria-label={type === "make-idle" ? "Make idle" : "Make active"} onClick={() => setWorkerEventDialogOpen(type)}>
+                                                    <span className="action-name">{type === "make-idle" ? "Make idle" : "Make active"}</span>
+                                                </button>)}
                                                 <button className="action resource-card" aria-label="Resources collected" title="Adjust gold and wood instantly at a chosen timestamp"
                                                     onClick={() => setResourcesCollectedDialogOpen(true)}>
                                                     <span className="action-name">Resources collected</span>
@@ -693,6 +700,7 @@ export default function App() {
                                         <div>
                                             <b>{item.name}</b>
                                             {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}
+                                            {item.kind === "worker-event" && <small>{item.count} workers{item.workerEvent === "make-active" ? ` · ${item.travelDuration}s travel` : ""}</small>}
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}</small>}
                                             {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
@@ -736,7 +744,8 @@ export default function App() {
                                     <span>Total workers <b>{latestWorkers.total}</b></span>
                                     <span>Gathering gold <b>{latestWorkers.gold}</b></span>
                                     <span>Gathering wood <b>{latestWorkers.wood}</b></span>
-                                    <span>Building, travelling, or idle <b>{latestWorkers.busyOrIdle}</b></span>
+                                    <span>Building or travelling <b>{latestWorkers.buildingOrTravelling}</b></span>
+                                    <span>Idle <b>{latestWorkers.idle}</b></span>
                                 </>
                             )}
                         </div>
@@ -773,6 +782,19 @@ export default function App() {
                         setEditingEventId(null)
                         setDependencyError(null)
                         setHoverTime(null)
+                    }} />}
+                {(workerEventDialogOpen || editingEvent?.kind === "worker-event") && <WorkerEventDialog
+                    key={editingEvent?.orderId ?? workerEventDialogOpen!} defaultTime={defaultEventTime}
+                    type={editingEvent?.kind === "worker-event" ? editingEvent.workerEvent : workerEventDialogOpen!}
+                    action={editingEvent?.kind === "worker-event" ? editingEvent : undefined}
+                    validationError={editingEvent ? null : additionError}
+                    onClose={() => { setWorkerEventDialogOpen(null); setEditingEventId(null) }}
+                    onSave={command => {
+                        const action = createWorkerEvent(command)
+                        if (!setBuildOrder(current => editingEvent?.kind === "worker-event"
+                            ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
+                            : [...current, action])) return
+                        setWorkerEventDialogOpen(null); setEditingEventId(null); setHoverTime(null)
                     }} />}
                 {(resourcesCollectedDialogOpen || editingEvent?.kind === "resources-collected") && <ResourcesCollectedDialog
                     key={editingEvent?.orderId ?? "new-resources-collected-event"}

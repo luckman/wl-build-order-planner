@@ -1,3 +1,4 @@
+import type { WorkerEventAction } from "./workerEvents"
 import { growingWoodTravelTime } from "./gatheringRules"
 import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
 import type { PlayerBuildingLevels } from "./playerLevels"
@@ -75,7 +76,8 @@ export type WorkerStart = { time: number; assignment: "gold" | "wood" }
 export type GatheringWorker = {
     id: number
     assignment: "gold" | "wood" | "idle"
-    state: "idle" | "outbound" | "waiting" | "gathering" | "deposit" | "construction-outbound" | "construction" | "construction-return" | "killed"
+    previousAssignment?: "gold" | "wood"
+    state: "reactivation" | "idle" | "outbound" | "waiting" | "gathering" | "deposit" | "construction-outbound" | "construction" | "construction-return" | "killed"
     stateSince: number
     nextAt: number
     cargoGold: number
@@ -93,11 +95,12 @@ export type WorkerAllocation = {
     total: number
     gold: number
     wood: number
-    busyOrIdle: number
+    idle: number
+    buildingOrTravelling: number
 }
 
 type WorkerStateAction = {
-    item: { id: string; kind: string }
+    item: { id: string; kind: string; workerEvent?: "make-idle" | "make-active"; count?: number; travelDuration?: number }
     commandTime: number | null
     finishTime: number | null
     workerReturnTime: number | null
@@ -130,9 +133,10 @@ export class WorkerEconomy {
             this.addWorker("gold", true)
         }
         for (let i = 0; i < settings.woodWorkers; i++) {
-            const worker = this.addWorker(i === 0 ? "wood" : "idle")
+            const worker = this.addWorker("wood")
             if (i > 0) {
                 this.delayedInitialWoodWorkerIds.push(worker.id)
+                this.transition(worker, "idle", Infinity)
             }
         }
         for (let i = this.workers.length; i < settings.workerCount; i++) {
@@ -220,7 +224,7 @@ export class WorkerEconomy {
         // Builder travel already includes future activation/expiry in its projection.
         // Rescaling it again here would apply the same movement bonus twice.
         if (!active) return 1
-        if (worker.state === "outbound" || worker.state === "deposit") return this.whip.movementMultiplier
+        if (worker.state === "reactivation" || worker.state === "outbound" || worker.state === "deposit") return this.whip.movementMultiplier
         if (worker.state === "gathering" && worker.assignment === "wood") {
             return Math.max(0.001, this.settings.woodGatherTime) / Math.max(0.001, this.settings.woodGatherTime - this.whip.woodTimeReduction)
         }
@@ -238,13 +242,13 @@ export class WorkerEconomy {
         return this.projectConstructionTravel(this.time, worker.whipUntil)
     }
 
-    constructionReturnTravelTime(finishTime: number) {
+    constructionReturnTravelTime(finishTime: number, duration = this.settings.constructionStartDelay) {
         // Construction removed the old effect. Only a fresh cast can speed up return.
-        return this.projectConstructionTravel(finishTime, -Infinity, true)
+        return this.projectConstructionTravel(finishTime, -Infinity, true, duration)
     }
 
-    private projectConstructionTravel(startTime: number, effectUntil: number, includeStart = false) {
-        let remaining = this.settings.constructionStartDelay
+    private projectConstructionTravel(startTime: number, effectUntil: number, includeStart = false, duration = this.settings.constructionStartDelay) {
+        let remaining = duration
         let time = startTime
         let until = effectUntil
         const starts = [...this.constructionWhipWindows, ...this.whipStarts]
@@ -355,7 +359,7 @@ export class WorkerEconomy {
                 if (worker.state === "construction-outbound") {
                     worker.whipUntil = -Infinity
                     this.transition(worker, "construction", worker.constructionDuration!)
-                } else if (worker.state === "outbound" || worker.state === "construction-return") {
+                } else if (worker.state === "reactivation" || worker.state === "outbound" || worker.state === "construction-return") {
                     this.arrive(worker)
                 } else if (worker.state === "gathering") {
                     if (worker.assignment === "gold") {
@@ -404,7 +408,9 @@ export class WorkerEconomy {
         return worker.cargoWood
     }
 
-    selectBuilder() {
+    selectBuilder() { return this.selectBuilderExcluding(new Set()) }
+
+    private selectBuilderExcluding(excluded: Set<number>) {
         const amount = (worker: GatheringWorker) => {
             if (worker.assignment === "wood") return this.gatheredWood(worker)
             if (worker.state === "deposit") {
@@ -413,17 +419,54 @@ export class WorkerEconomy {
             return 0
         }
         const priority = (worker: GatheringWorker) =>
-            worker.state === "idle" ? 0 : worker.assignment === "wood" ? 1 : 2
+            worker.assignment === "wood" ? 0 : 1
         return this.workers
             .filter(
                 (worker) =>
-                    !isBuildingWorker(worker) && worker.state !== "killed" && !(worker.assignment === "gold" && worker.state === "gathering"),
+                    !excluded.has(worker.id) && worker.assignment !== "idle" && !isBuildingWorker(worker) && worker.state !== "killed" && !(worker.assignment === "gold" && worker.state === "gathering"),
             )
             .sort((a, b) => priority(a) - priority(b) || amount(a) - amount(b) || a.id - b.id)[0]
     }
 
+    remainingReactivation(worker: GatheringWorker) {
+        return worker.state === "reactivation" ? Math.max(0, (worker.nextAt - this.time) * this.rate(worker)) : 0
+    }
+
+    applyWorkerEvent(item: WorkerEventAction) {
+        const selected: GatheringWorker[] = []
+        if (item.workerEvent === "make-active") {
+            selected.push(...this.workers.filter(worker => worker.assignment === "idle" && worker.state === "idle").slice(0, item.count))
+        } else {
+            // Select the whole batch before changing assignments. Reuse the builder ranking.
+            const excluded = new Set<number>()
+            for (let i = 0; i < item.count; i++) {
+                const worker = this.selectBuilderExcluding(excluded)
+                if (!worker) break
+                selected.push(worker)
+                excluded.add(worker.id)
+            }
+        }
+        if (selected.length !== item.count) return false
+        for (const worker of selected) {
+            if (item.workerEvent === "make-idle") {
+                worker.previousAssignment = worker.assignment as "gold" | "wood"
+                worker.cargoWood = this.gatheredWood(worker)
+                worker.cargoGold = 0
+                worker.assignment = "idle"
+                this.delayedInitialWoodWorkerIds = this.delayedInitialWoodWorkerIds.filter(id => id !== worker.id)
+                this.transition(worker, "idle", Infinity)
+            } else {
+                worker.assignment = worker.previousAssignment ?? "wood"
+                this.transition(worker, "reactivation", item.travelDuration)
+            }
+        }
+        this.advanceTo(this.time)
+        return true
+    }
+
     construct(worker: GatheringWorker, buildTime: number, travelTime = this.constructionTravelTime(worker),
         returnTravelTime = this.constructionReturnTravelTime(this.time + travelTime + buildTime)) {
+        this.delayedInitialWoodWorkerIds = this.delayedInitialWoodWorkerIds.filter(id => id !== worker.id)
         // Pause wood gathering through construction; gold cargo is still discarded.
         worker.cargoGold = 0
         worker.cargoWood = this.gatheredWood(worker)
@@ -497,12 +540,16 @@ export function workerAllocationAt(
         .flatMap((action) => {
             const events: Array<{
                 time: number
-                type: "worker" | "construction" | "kill" | "player-whip-preparation"
+                type: "worker" | "construction" | "kill" | "worker-event" | "player-whip-preparation"
+                action?: WorkerEventAction
                 workerId?: number
                 duration?: number
                 travelTime?: number
                 returnTravelTime?: number
             }> = []
+            if (action.item.kind === "worker-event" && !action.blocked && action.commandTime !== null) {
+                events.push({ time: action.commandTime, type: "worker-event", action: action.item as WorkerEventAction })
+            }
             if (action.item.id === "whip" && action.item.kind === "scroll" &&
                 !action.blocked && action.commandTime !== null) {
                 events.push({ time: action.commandTime, type: "player-whip-preparation" })
@@ -532,14 +579,16 @@ export function workerAllocationAt(
         })
         .filter((event) => event.time <= time)
         .sort((left, right) => left.time - right.time ||
-            ({ worker: 0, kill: 1, "player-whip-preparation": 2, construction: 3 }[left.type] -
-                { worker: 0, kill: 1, "player-whip-preparation": 2, construction: 3 }[right.type]))
+            ({ worker: 0, "worker-event": 1, kill: 1, "player-whip-preparation": 2, construction: 3 }[left.type] -
+                { worker: 0, "worker-event": 1, kill: 1, "player-whip-preparation": 2, construction: 3 }[right.type]))
 
     for (const event of events) {
         simulation.advanceTo(event.time)
         if (event.type === "worker") {
             const goldWorkers = simulation.workers.filter(({ assignment }) => assignment === "gold").length
             simulation.addWorker(goldWorkers < saturation ? "gold" : "wood")
+        } else if (event.type === "worker-event") {
+            simulation.applyWorkerEvent(event.action!)
         } else if (event.type === "kill") {
             simulation.killWorker(event.workerId!)
         } else if (event.type === "player-whip-preparation") {
@@ -553,13 +602,14 @@ export function workerAllocationAt(
         }
     }
     simulation.advanceTo(time)
-    const busyOrIdle = simulation.workers.filter(
-        worker => worker.state !== "killed" && (worker.assignment === "idle" || isBuildingWorker(worker) || worker.state === "idle"),
+    const buildingOrTravelling = simulation.workers.filter(
+        worker => worker.state !== "killed" && (isBuildingWorker(worker) || worker.state === "reactivation" || (worker.state === "idle" && worker.assignment !== "idle")),
     ).length
     return {
+        idle: simulation.workers.filter(worker => worker.assignment === "idle" && worker.state === "idle").length,
         total: simulation.workers.filter(worker => worker.state !== "killed").length,
-        gold: simulation.workers.filter(worker => worker.assignment === "gold" && !isBuildingWorker(worker) && worker.state !== "killed").length,
-        wood: simulation.workers.filter(worker => worker.assignment === "wood" && !isBuildingWorker(worker) && worker.state !== "killed").length,
-        busyOrIdle,
+        gold: simulation.workers.filter(worker => worker.assignment === "gold" && !isBuildingWorker(worker) && worker.state !== "reactivation" && worker.state !== "idle" && worker.state !== "killed").length,
+        wood: simulation.workers.filter(worker => worker.assignment === "wood" && !isBuildingWorker(worker) && worker.state !== "reactivation" && worker.state !== "idle" && worker.state !== "killed").length,
+        buildingOrTravelling,
     }
 }

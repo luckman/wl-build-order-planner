@@ -174,7 +174,7 @@ command acceptance, costs are paid and a selected worker stops gathering. The wo
 travels back for the same delay. The completed building becomes available before the builder
 returns.
 
-Builders are selected from idle workers, then wood gatherers with the least gathered/carried cargo,
+Builders exclude deliberately idle workers and select wood gatherers with the least gathered/carried cargo,
 then gold workers carrying the least cargo outside the mine. Worker ID breaks ties. Builders are
 unavailable through both travel legs and construction. Wood workers preserve exact partial gathering
 progress or completed cargo through construction, including progress earned under Whip. On return,
@@ -278,3 +278,15 @@ The timeline shows construction, recruitment, scrolls/events, and resource graph
 inspection of resources and worker allocation. Individual mine queues and full per-worker activity
 lanes are not displayed. There is no combat simulation, build comparison, automatic build
 optimization, or manual worker reassignment beyond the opening allocation.
+
+## Deliberate worker inactivity (2026-11-07)
+
+Make idle and Make active are fixed-time, atomic count events. They run in list order
+with Unit is killed before construction at the same time and do not alter command spacing.
+Idle selection follows wood-first builder ranking and excludes occupied builders, including
+return travel. Reactivation restores the retained assignment immediately, earns no income
+while travelling, and resumes work without another outbound trip. Wood progress/cargo is
+retained; interrupted gold cargo is discarded. Whip affects reactivation movement.
+Construction can interrupt reactivation; its eventual return is at least the unfinished
+normal-speed journey. Delayed initial gatherers remain gatherers, distinct from deliberate
+idle assignment. Latest order state reports idle separately from building/travelling.

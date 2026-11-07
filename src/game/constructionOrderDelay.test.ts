@@ -5,7 +5,7 @@ import { createScrollAction } from "./scrolls"
 import { createResourcesCollectedAction } from "./resourcesCollected"
 
 const settings = { ...economyFromProfile(initialGameProfile), startingGold: 100000, startingWood: 100000,
-    startingMana: 100, baseManaLimit: 100, workerCount: 20, goldWorkers: 0, woodWorkers: 0 }
+    startingMana: 100, baseManaLimit: 100, workerCount: 20, goldWorkers: 0, woodWorkers: 20, woodPerTrip: 0 }
 const item = (faction: FactionId, id: string) => factions[faction].items.find(candidate => candidate.id === id)!
 
 test.each([0, 0.1, 1, 2.5])("Citadel completion spaces Goblin Lab and Altar commands by %ss", orderDelay => {

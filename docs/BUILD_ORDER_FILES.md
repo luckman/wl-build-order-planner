@@ -536,3 +536,12 @@ finish after the horizon are also blocked. Profile durations must be within 0–
 profiles that could exceed the runtime budget of 200,000 simulation steps. Graphs use at most 361
 regular samples, with bounded action timestamps added for food/mana discontinuities. These checks
 apply to editing, import/export, links and draft restore/save.
+
+## Worker events (rules 2026-11-07.1)
+
+`{ "type": "make-idle", "commandTime": 10, "count": 1 }` pauses gathering.
+`{ "type": "make-active", "commandTime": 20, "count": 1, "travelDuration": 7 }`
+restores assignments with normal-speed travel in seconds (omitted travel defaults to zero).
+Counts are positive integers within the supported worker limit; times and durations use
+planner limits. Drafts, JSON files and share links use these same records. Worker identity,
+resource assignments and travel progress are derived by simulation, never stored.

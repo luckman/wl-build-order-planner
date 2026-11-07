@@ -10,7 +10,7 @@ timeline.
 
 - Buildings, units, heroes, upgrades, and faction scrolls, with automatic prerequisite insertion.
 - Gold, wood, food, and mana simulation, including gathering, construction, and production queues.
-- Editable account and map settings, plus timed events for resources, mana spending, mana wells, and unit losses.
+- Editable account and map settings, plus timed events for resources, mana spending, mana wells, unit losses, and worker idle/reactivation events.
 - Reorderable build orders, starter templates, and warnings for blocked actions.
 - Shareable links, JSON import/export, and separate browser-saved drafts for each faction.
 
@@ -29,6 +29,10 @@ stores personal resource settings separately from your build.
 **Mana spent** records immediate mana expenditure for an unmodeled spell. Choose a positive whole
 number (default 75) and fixed command time. It respects and starts shared scroll cooldown without
 an order delay or spell effect; edit or delete it like other timed events.
+
+**Make idle** removes a chosen count of gatherers from income and ordinary builder selection.
+**Make active** restores their previous assignments, optionally after travel. Both use fixed times
+and apply the full count or report an error. Latest order state lists idle workers separately.
 
 Plans support **100 actions** after the opening allocation and a **30-minute** simulation. The
 catalog is still expanding, and timings are estimates to check in-game. See the
