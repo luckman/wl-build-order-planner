@@ -1,8 +1,10 @@
 import type { ScheduledAction } from "./buildSimulation"
 import type { PlannerItem } from "./gameData"
 import type { EconomySettings, ResourceDelivery } from "./resourceSimulation"
+import { newBuilding, requirementCount } from "./buildingRules"
 import { isConstruction } from "./constructionSettings"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS } from "./plannerLimits"
+import { actionDuration } from "./playerLevels"
 import { isTimedEvent } from "./resourcesCollected"
 
 export type PreparationSchedule = { commands: Map<number, number>; blocked: Map<number, string> }
@@ -32,7 +34,7 @@ export function matchesPreparationReuse(run: Replay, selected: Result, previous:
 
 /** Replays discard obsolete reservations. The engine remains responsible for all
  * purchase readiness, worker selection, fixed events and movement rules. */
-export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, run: Replay,
+export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, startingBuilding: PlannerItem, run: Replay,
     previous?: { preparation: PreparationSchedule; reuse: PreparationReuse; verify: Replay }) {
     const prepared = items.flatMap((item, index) => (item.construction?.preparationDuration ?? 0) > 0 ? [index] : [])
     const schedule: PreparationSchedule = { commands: new Map(), blocked: new Map() }
@@ -109,15 +111,51 @@ export function schedulePreparation(items: PlannerItem[], economy: EconomySettin
                     // A speculative replay can exceed a limit that the fresh search avoids.
                 }
             }
-            return { ...refinePreparation(items, economy, schedule, result, run), preparation: schedule }
+            return { ...refinePreparation(items, economy, startingBuilding, schedule, result, run), preparation: schedule }
         }
     }
     throw new Error("Construction preparation scheduling did not converge.")
 }
 
+type ConstructionPrerequisite = { count: number; sources: ScheduledAction[] }
+
+function constructionPrerequisites(plan: ScheduledAction[], index: number, startingBuilding: PlannerItem) {
+    const { item } = plan[index]
+    const prerequisites: ConstructionPrerequisite[] = []
+    if (!isConstruction(item) || (!item.prerequisites.length && !item.requirements?.length)) return prerequisites
+    const earlier = plan.slice(0, index).filter(action => !isTimedEvent(action.item))
+    for (const name of item.prerequisites) {
+        if (name === startingBuilding.name) continue
+        const sources = earlier.filter(action => action.item.name === name)
+        if (sources.length && sources.every(action => isConstruction(action.item))) prerequisites.push({ count: 1, sources })
+    }
+    for (const requirement of item.requirements ?? []) {
+        const level = requirement.minLevel ?? 1
+        const qualifies = (building: PlannerItem) => requirementCount([newBuilding(building)], requirement) > 0
+        const count = Math.ceil(requirement.count) - Number(qualifies(startingBuilding))
+        if (!(count > 0)) continue
+        // An upgrade keeps the group of its actual producer. Optimistically
+        // count every possible upgrade and let even repeat upgrades qualify separately.
+        const sources = earlier.filter(({ item }) => item.kind === "building" ? qualifies(item) :
+            item.kind === "upgrade" && (item.level ?? Infinity) >= level)
+        if (sources.length >= count) prerequisites.push({ count, sources })
+    }
+    return prerequisites
+}
+
+function prerequisiteReadinessLowerBound(prerequisites: ConstructionPrerequisite[], economy: EconomySettings) {
+    return Math.max(-Infinity, ...prerequisites.map(({ count, sources }) => {
+        const durations = sources.map(({ item }) => actionDuration(item, economy)).sort((a, b) => a - b)
+        // The clock starts at the order delay. Ignore travel, resources and
+        // competition for builders to allow the earliest possible completion.
+        return economy.orderDelay + durations[count - 1] + economy.orderDelay
+    }))
+}
+
 /** A later departure can restore an earlier delivery. Refine against observable
  * event boundaries so a conservative replay does not impose an unnecessary wait. */
-function refinePreparation(items: PlannerItem[], economy: EconomySettings, schedule: PreparationSchedule, result: Result, run: Replay) {
+function refinePreparation(items: PlannerItem[], economy: EconomySettings, startingBuilding: PlannerItem,
+    schedule: PreparationSchedule, result: Result, run: Replay) {
     // A default tail cannot change earlier catalog commands. Remember how much
     // of the prefix the search needed to generate candidates and reject trials.
     const reuse: PreparationReuse = { initialCommands: new Map(schedule.commands), minimumPrefixLength: 0, acceptedBeforeFinal: [] }
@@ -150,6 +188,8 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, sched
                 }
             }
         }
+        const prerequisites = constructionPrerequisites(probe.plan, index, startingBuilding)
+        const earliestPrerequisiteTime = prerequisiteReadinessLowerBound(prerequisites, economy)
         const wasSuccessful = result.plan.map(action => !action.blocked)
         const evaluate = (time: number) => {
             const candidate = new Map(schedule.commands)
@@ -174,6 +214,10 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, sched
         }
         for (const time of candidates) {
             if (time < earliestCommandTime) continue
+            if (time < earliestPrerequisiteTime) {
+                reuse.minimumPrefixLength = Math.max(reuse.minimumPrefixLength, index + 1)
+                continue
+            }
             const refined = evaluate(time)
             if (refined) {
                 if (time !== command) {

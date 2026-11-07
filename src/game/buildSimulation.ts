@@ -6,7 +6,7 @@ import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTi
 import { createUnitKilledAction, unitKilledCommand, foodUsedAt } from "./unitsKilled"
 import { evaluateManaWells } from "./manaWells"
 import { createResourcesCollectedAction, resourcesCollectedCommand, isTimedEvent } from "./resourcesCollected"
-import { factions, heroAltarLevel, isRecruitable, itemCost, type PlannerItem } from "./gameData"
+import { factions, heroAltarLevel, isRecruitable, itemCost, type Faction, type PlannerItem } from "./gameData"
 import { buildingLimit, completeUpgrades, newBuilding, requirementCount, type BuildingInstance } from "./buildingRules"
 import { type EconomySettings, type ResourceDelivery, type WhipWindow, manaAt, resourceAt, WorkerEconomy } from "./resourceSimulation"
 import { createScrollAction, scrollEffect, legionsCallEffect, isScrollAction, scrollCommand, scrollCooldown } from "./scrolls"
@@ -162,6 +162,8 @@ export function simulateBuildOrder(
     const boundary = history && source?.history && replayBoundary(source.order, order)
     // A removed late event may also shrink the effective scheduling horizon.
     const fixedBoundary = boundary?.fixedTime === Infinity ? Infinity : Math.min(boundary?.fixedTime ?? Infinity, until)
+    const factionData = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!
+    const startingBuilding = factionData.items.find(item => item.name === initialTownHall)!
     let windows: WhipWindow[] = []
     let recruitmentWindows: RecruitmentWindow[] = []
     const run = (preparation?: PreparationSchedule, collectCandidatesThrough?: number,
@@ -185,7 +187,7 @@ export function simulateBuildOrder(
             history!.capture(state.plan.length, simulation.time, collecting, signature, weight, () => copyCheckpoint(state))
         } : undefined
         return simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit, foodPerFarm,
-            initialTownHall, until, windows, recruitmentWindows, preparation, collectCandidatesThrough,
+            factionData, startingBuilding, until, windows, recruitmentWindows, preparation, collectCandidatesThrough,
             { resume, capture: options?.capture, captureCheckpoint })
     }
     const verify = (preparation: PreparationSchedule) => run(preparation, undefined, { speculative: true })
@@ -228,9 +230,9 @@ export function simulateBuildOrder(
 
     // Casts can change work already scheduled into the future. Replay with accepted
     // travel/recruitment forecasts, keeping target and mana validation chronological.
+    const hasPreparation = buildOrder.some(item => (item.construction?.preparationDuration ?? 0) > 0)
     for (let pass = 0; pass <= MAX_PLAN_ACTIONS + 1; pass++) {
-        const prepared = buildOrder.some(item => (item.construction?.preparationDuration ?? 0) > 0)
-            ? schedulePreparation(buildOrder, economy, run, reusablePreparation) : undefined
+        const prepared = hasPreparation ? schedulePreparation(buildOrder, economy, startingBuilding, run, reusablePreparation) : undefined
         const result = prepared ?? run()
         const next = result.orderedPlan.filter(action => action.item.id === "whip" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime! }))
@@ -259,7 +261,8 @@ function simulateBuildOrderPass(
     initialFoodUsed: number,
     baseFoodLimit: number,
     foodPerFarm: number,
-    initialTownHall: string,
+    { items: catalog, id: faction, startingTownHall: initialTownHall }: Faction,
+    initial: PlannerItem,
     until = MAX_PLAN_SECONDS,
     constructionWhipWindows: WhipWindow[] = [],
     recruitmentWindows: RecruitmentWindow[] = [],
@@ -270,8 +273,6 @@ function simulateBuildOrderPass(
     validateActionCount(buildOrder.length)
     validatePlanTime(until, "Simulation horizon")
     const recruitmentReduction = legionsCallEffect(economy).recruitmentTimeReduction
-    const { items: catalog, id: faction } = Object.values(factions).find(faction => faction.startingTownHall === initialTownHall)!
-    const initial = catalog.find(item => item.name === initialTownHall)!
     const workerItem = catalog.find(item => item.id === (faction === "light" ? "worker" : "slave"))!
     const simulation = restored?.simulation ?? new WorkerEconomy(economy, constructionWhipWindows, collectCandidatesThrough !== undefined)
     const passState: Checkpoint = restored ?? {

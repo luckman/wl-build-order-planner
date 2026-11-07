@@ -55,6 +55,38 @@ test("the earliest prepared command after a fractional order delay preserves the
     expect(plan[1]).toMatchObject({ blocked: false, commandTime: 21.5, departureTime: 20.75, workerId: 1 })
 })
 
+test.each([0, 0.25])("a prepared command with order delay %s can use a second instance as soon as it is ready", orderDelay => {
+    const farm = { ...factions.light.items.find(item => item.id === "farm")!, limit: undefined }
+    const sawmill = factions.light.items.find(item => item.id === "sawmill")!
+    const construction = { outwardDuration: 0, returnDuration: 0 }
+    const target = { ...sawmill, requirements: [{ item: "farm", count: 2 }],
+        construction: { preparationDuration: 2, outwardDuration: 3 } }
+    const slower = { ...farm, seconds: 3, construction }
+    const faster = { ...farm, seconds: 1, construction }
+    const worker = factions.light.items.find(item => item.id === "worker")!
+    const settings = { ...economy, orderDelay, workerCount: 3, woodWorkers: 3 }
+    const args = [settings, 6, 200, 20, "Castle"] as const
+    const previous = simulateBuildOrder([slower, faster, target, worker], ...args, 200)
+
+    expect(previous.plan[2]).toMatchObject({ blocked: false, departureTime: 1 + 2 * orderDelay,
+        commandTime: 3 + 2 * orderDelay, startTime: 6 + 2 * orderDelay })
+    const changed = [{ ...slower, seconds: 2 }, faster, target, worker]
+    const result = simulateBuildOrder(changed, ...args, { until: 200, previous })
+    expect(result.plan[2]).toMatchObject({ blocked: false, commandTime: 2 + 2 * orderDelay })
+    expect(result).toEqual(simulateBuildOrder(changed, ...args, 200))
+})
+
+test("the starting Castle counts alongside an earlier Castle construction", () => {
+    const castle = factions.light.items.find(item => item.id === "castle")!
+    const sawmill = factions.light.items.find(item => item.id === "sawmill")!
+    const target = { ...sawmill, requirements: [{ item: "castle", count: 2 }],
+        construction: { preparationDuration: 2 } }
+    const { plan } = run([{ ...castle, seconds: 3, construction: { outwardDuration: 0 } }, target],
+        { ...economy, workerCount: 2, woodWorkers: 2 })
+
+    expect(plan[1]).toMatchObject({ blocked: false, departureTime: 3, commandTime: 5 })
+})
+
 test("a lone builder completes its earlier job before starting a later preparation", () => {
     const farm = factions.light.items.find(item => item.id === "farm")!
     const barracks = { ...factions.light.items.find(item => item.id === "barracks")!, construction: { preparationDuration: 20 } }

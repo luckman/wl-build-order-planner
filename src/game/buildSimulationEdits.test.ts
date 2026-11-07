@@ -96,7 +96,8 @@ test("editing Elven Tree preparation preserves the Light worker schedule and del
     changed[12] = { ...tree, construction: { ...tree.construction, preparationDuration: 4 } }
     const result = simulateBuildOrder(changed, ...args, { previous })
 
-    expect(result.plan[12].commandTime! - result.plan[12].departureTime!).toBeCloseTo(4)
+    expect(result.plan[12]).toMatchObject({ blocked: false, commandTime: 143.94, departureTime: 139.94,
+        startTime: 144.94, finishTime: 194.94, workerId: 5, workerReturnTime: 198.94 })
     expect(result).toEqual(simulateBuildOrder(changed, ...args))
 }, 60000)
 
