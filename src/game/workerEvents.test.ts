@@ -101,3 +101,11 @@ test.each(["light", "dark"] as const)("%s worker losses strictly select their gr
     const plan = run([idle(5), loss("idle")]).plan
     expect(parseBuildOrder(serializeBuildOrder(faction, initialGameProfile, plan)).buildOrder[1]).toMatchObject({ workerGroup: "idle" })
 })
+
+test("reactivation cannot invent a resource assignment for an unallocated initial worker", () => {
+    const economy = { ...settings, goldWorkers: 0, woodWorkers: 0 }
+    const result = simulateBuildOrder([active(0)], economy, 2, 200, economy.foodPerFarm, "Castle", 40)
+    expect(result.plan[0]).toMatchObject({ blocked: true, commandTime: 0 })
+    expect(result.deliveries).toEqual([])
+    expect(workerAllocationAt(economy, result.plan, 0)).toMatchObject({ idle: 1, total: 1, wood: 0, gold: 0 })
+})

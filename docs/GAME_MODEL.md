@@ -303,3 +303,8 @@ purchase command. Departure reserves the worker and stops income. Fresh chronolo
 replays recalculate departures, readiness and availability across rows when commands
 move, without committing rejected costs or reservations. Preparation must fit after
 time zero and is not shortened by Whip. See CONSTRUCTION.md for scheduling details.
+
+The construction timeline spans departure through actual return phase end, with
+separate preparation, outward, construction and return segments. Reassignments clip
+interrupted returns; zero phases and idle return are omitted. Completion/eligibility
+and eventual gathering return remain distinct tooltip milestones.

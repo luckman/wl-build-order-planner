@@ -1,3 +1,4 @@
+import ConstructionPhases, { timelineBounds } from "./ConstructionPhases"
 import ConstructionDialog from "./ConstructionDialog"
 import { isConstruction, hasCustomConstruction, constructionDescription } from "./game/constructionSettings"
 import WorkerEventDialog from "./WorkerEventDialog"
@@ -141,28 +142,28 @@ const formatTimeWithTenths = (seconds: number) => {
 type TimelineEvent = ScheduledAction & { index: number }
 type TimelineLane = { label: string; events: TimelineEvent[] }
 
-function actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason }:
-    Pick<ScheduledAction, "departureTime" | "commandTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime" | "blockedReason">) {
+function actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason, useIdleWorker }:
+    Pick<ScheduledAction, "departureTime" | "commandTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime" | "blockedReason"> & { useIdleWorker?: boolean }) {
     if (commandTime === null || startTime === null || finishTime === null) return blockedReason
-    return `${departureTime != null ? `Departure ${formatTime(departureTime)} · ` : ""}Command ${formatTime(commandTime)} · start ${formatTime(startTime)} · finish ${formatTime(finishTime)}${workerReturnTime === null ? "" : ` · eligible for construction ${formatTime(finishTime)} · ${workerReturnEndTime != null && workerReturnEndTime < workerReturnTime ? `return interrupted ${formatTime(workerReturnEndTime)} (projected arrival ${formatTime(workerReturnTime)})` : `worker returns ${formatTime(workerReturnTime)}`}`}`
+    return `${departureTime != null ? `Departure ${formatTime(departureTime)} · ` : ""}Command ${formatTime(commandTime)} · start ${formatTime(startTime)} · finish ${formatTime(finishTime)}${useIdleWorker ? ` · worker idle at completion ${formatTime(finishTime)} (no return travel)` : workerReturnTime === null ? "" : ` · eligible for construction ${formatTime(finishTime)} · ${workerReturnEndTime != null && workerReturnEndTime < workerReturnTime ? `return interrupted ${formatTime(workerReturnEndTime)} (projected arrival ${formatTime(workerReturnTime)})` : `worker returns ${formatTime(workerReturnTime)}`}`}`
 }
 
 function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
     const availableLanes = new Map<string, Array<{ availableAt: number; events: TimelineEvent[] }>>()
-    plan.forEach((action, index) => {
+    plan.map((action, index) => ({ action, index })).sort((a, b) => timelineBounds(a.action).start - timelineBounds(b.action).start).forEach(({ action, index }) => {
         if (action.blocked || action.commandTime === null || action.finishTime === null) {
             return
         }
         const group = isTimedEvent(action.item) ? "Scrolls and events"
             : isRecruitable(action.item) ? action.item.producer : "Construction"
         const lanes = availableLanes.get(group) ?? []
-        let lane = lanes.find((candidate) => candidate.availableAt <= action.commandTime!)
+        let lane = lanes.find((candidate) => candidate.availableAt <= timelineBounds(action).start)
         if (!lane) {
             lane = { availableAt: 0, events: [] }
             lanes.push(lane)
         }
         lane.events.push({ ...action, index })
-        lane.availableAt = action.workerReturnTime ?? action.finishTime
+        lane.availableAt = timelineBounds(action).end
         availableLanes.set(group, lanes)
     })
     return Array.from(availableLanes).sort(([a], [b]) =>
@@ -352,7 +353,7 @@ export default function App() {
     const spending = plan.flatMap(({ cost, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
     )
-    const lastCompletionTime = Math.max(0, ...plan.map(({ finishTime, commandTime }) => finishTime ?? commandTime ?? 0))
+    const lastCompletionTime = Math.max(0, ...plan.map(action => action.blocked ? action.commandTime ?? 0 : timelineBounds(action).end))
     const endTime = Math.min(MAX_PLAN_SECONDS, Math.max(TIMELINE_WINDOW_SECONDS, lastCompletionTime + 30))
     const samples = useMemo(
         () =>
@@ -550,6 +551,9 @@ export default function App() {
                                     <TimelineHelp />
                                 </div>
                             </div>
+                            <div className="construction-phase-legend" aria-label="Construction phases">
+                                <span className="legend-preparation">Preparation</span><span className="legend-outward">Outward</span><span className="legend-construction">Construction</span><span className="legend-return">Return</span>
+                            </div>
                             <div className="timeline-grid">
                                 <div className="timeline-fixed timeline-legend">
                                     <div className="resource-legend">
@@ -607,34 +611,24 @@ export default function App() {
                                         {timelineLanes.map((lane) => (
                                             <div className="queue-track" key={lane.label}>
                                                     {lane.events.map(
-                                                        ({
-                                                            item,
-                                                            commandTime,
-                                                            departureTime,
-                                                            startTime,
-                                                            finishTime,
-                                                            workerReturnTime,
-                                                            workerReturnEndTime,
-                                                            index,
-                                                        }) => (
-                                                            <button
-                                                                className={`event ${item.kind}${item.kind === "hero" ? " unit" : ""}${isTimedEvent(item) ? " timed-event" : ""}`}
+                                                        (action) => {
+                                                            const { item, commandTime, departureTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, index } = action
+                                                            const bounds = timelineBounds(action)
+                                                            return <button
+                                                                className={`event ${item.kind}${isConstruction(item) ? " construction-event" : ""}${item.kind === "hero" ? " unit" : ""}${isTimedEvent(item) ? " timed-event" : ""}`}
                                                                 key={`${item.id}-${index}`}
-                                                                style={{
-                                                                    left: `${(commandTime! / endTime) * 100}%`,
-                                                                    width: `${((finishTime! - commandTime!) / endTime) * 100}%`,
-                                                                }}
-                                                                title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime })].filter(Boolean).join("\n")}
+                                                                style={{ left: `${(bounds.start / endTime) * 100}%`, width: `${((bounds.end - bounds.start) / endTime) * 100}%` }}
+                                                                title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, useIdleWorker: item.construction?.useIdleWorker })].filter(Boolean).join("\n")}
+                                                                aria-label={isConstruction(item) ? item.name : undefined}
                                                                 aria-haspopup="menu"
                                                                 data-order-id={(item as typeof buildOrder[number]).orderId}
                                                                 aria-expanded={timelineMenu?.item === item}
                                                                 aria-controls={timelineMenu?.item === item ? "timeline-action-menu" : undefined}
                                                                 onClick={event => setTimelineMenu(timelineMenu?.item === item ? null : { item, anchor: event.currentTarget })}
                                                             >
-                                                                <img src={iconSources[item.icon]} alt="" />
-                                                                <span>{item.name}</span>
+                                                                {isConstruction(item) ? <ConstructionPhases action={action} icon={iconSources[item.icon]} /> : <><img src={iconSources[item.icon]} alt="" /><span>{item.name}</span></>}
                                                             </button>
-                                                        ),
+                                                        },
                                                     )}
                                             </div>
                                         ))}
@@ -699,7 +693,7 @@ export default function App() {
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
                                 {displayPlan.map(({ item, departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blocked, blockedReason }, index) => (
                                     <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
-                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason })].filter(Boolean).join("\n")}
+                                    {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={[constructionDescription(item, economy.constructionStartDelay), actionTimingTitle({ departureTime, commandTime, startTime, finishTime, workerReturnTime, workerReturnEndTime, blockedReason, useIdleWorker: item.construction?.useIdleWorker })].filter(Boolean).join("\n")}
                                         tabIndex={isConstruction(item) ? 0 : undefined}
                                         onKeyDown={event => { if (isConstruction(item) && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setEditingEventId((item as typeof buildOrder[number]).orderId) } }}
                                         onClick={isTimedEvent(item) || isConstruction(item) ? () => { setDependencyError(null); setEditingEventId((item as typeof buildOrder[number]).orderId) } : undefined}>

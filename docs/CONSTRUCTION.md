@@ -117,7 +117,7 @@ already constructing cannot receive the effect. See [WHIP.md](WHIP.md) .
 ## Explicit idle builders
 
 Use idle worker selects only a deliberately idle, available worker when the command
-is ready. An empty idle pool blocks the order without costs or a reservation, instead
+is ready (at departure when preparation is configured). An empty idle pool blocks the order without costs or a reservation, instead
 of waiting for a later idle event. An idle builder retains its prior gathering progress
 and becomes idle immediately at completion with no return journey. Its saved return
 override remains stored but inactive. Ordinary construction continues to exclude idle workers.
@@ -145,3 +145,12 @@ when restoring earlier deliveries can permit an earlier departure. Later reserva
 cannot starve earlier catalog commands. An idle-only order requires an idle worker at
 its departure; a future Make idle event cannot satisfy it. Preparation is unaffected
 by Whip; outward/return travel retains movement effects and unfinished journey minima.
+
+## Timeline phases
+
+Each construction or upgrade is one editable item spanning actual departure through
+the end of its return segment. Preparation, outward, construction and return have
+distinct colors; zero-duration phases and idle-builder return are omitted. Chaining
+ends a return segment at reassignment. Tooltips distinguish completion/construction
+eligibility from return arrival, include effective settings and inheritance, and
+identify interrupted returns. Phase labels and a legend explain the colors.

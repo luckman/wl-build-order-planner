@@ -174,3 +174,6 @@
 }
 
 .sortable-order .order-custom-construction { box-shadow: inset 3px 0 #c6a65d; background-color: #302b23; }
+
+.sortable-order .order-custom-construction.order-blocked { background-color: #3c1822; }
+.sortable-order li:focus-visible { outline: 2px solid #c6a65d; outline-offset: -2px; }

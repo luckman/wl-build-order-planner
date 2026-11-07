@@ -58,3 +58,16 @@ test.each(["Light", "Dark"])("%s idle casualty selection follows event time and 
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
     expect(screen.queryByRole("dialog")).toBeNull()
 })
+
+test("a blocked fixed-time worker event still extends the timeline to its command", () => {
+    const view = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Make idle", exact: true }))
+    const dialog = within(screen.getByRole("dialog"))
+    fireEvent.change(dialog.getByLabelText("Worker count"), { target: { value: "105" } })
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "20:00" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
+    const canvas = view.container.querySelector(".timeline-canvas") as HTMLElement
+    expect(parseFloat(canvas.style.width)).toBe(1025)
+    const marker = view.container.querySelector(".latest-command-line") as HTMLElement
+    expect(parseFloat(marker.style.left)).toBeLessThan(100)
+})

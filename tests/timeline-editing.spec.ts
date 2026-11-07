@@ -206,13 +206,13 @@ test("editing one repeated scroll follows it across chronological and lane chang
     await expect(page.getByRole("button", { name: "Remove Gold Rush", exact: true })).toHaveCount(1)
 })
 
-test("construction, recruitment and upgrade menus keep Delete only", async ({ page }) => {
+test("construction and upgrade menus offer Edit while recruitment retains Delete only", async ({ page }) => {
     await importBuild(page, "light", [{ itemId: "barracks" }, { itemId: "farm" }, { itemId: "castle-lvl-2" }, { itemId: "worker" }])
     for (const name of ["Castle lvl 2", "Worker", "Farm"]) {
         const event = page.locator(".queue-lanes").getByRole("button", { name, exact: true })
         await event.click()
-        await expect(page.getByRole("menuitem")).toHaveCount(1)
-        await expect(page.getByRole("menuitem", { name: "Delete", exact: true })).toBeFocused()
+        await expect(page.getByRole("menuitem")).toHaveCount(name === "Worker" ? 1 : 2)
+        await expect(page.getByRole("menuitem", { name: name === "Worker" ? "Delete" : "Edit", exact: true })).toBeFocused()
         await page.getByRole("menuitem", { name: "Delete", exact: true }).click()
         await expect(event).toHaveCount(0)
         await expect(page.getByRole("button", { name: `Remove ${name}`, exact: true })).toHaveCount(0)

@@ -36,7 +36,7 @@ test.each<FactionId>(["light", "dark"])("%s round trip preserves profile, order 
 
 test("optional timings stay inside each action and even malformed timings are ignored on import", () => {
     const doc = JSON.parse(sample("light", true))
-    expect(doc.buildOrder[1].timings).toEqual({ commandTime: 1, startTime: 3.5, finishTime: 33.5, workerReturnTime: 36 })
+    expect(doc.buildOrder[1].timings).toEqual({ commandTime: 1, departureTime: 1, startTime: 3.5, finishTime: 33.5, workerReturnTime: 36, workerReturnEndTime: 36 })
     doc.buildOrder.forEach((action: { timings: unknown }) => { action.timings = "invalid cached data" })
     expect(parseBuildOrder(JSON.stringify(doc))).toEqual(parseBuildOrder(sample()))
 })

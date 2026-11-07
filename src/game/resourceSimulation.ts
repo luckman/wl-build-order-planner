@@ -457,7 +457,7 @@ export class WorkerEconomy {
     applyWorkerEvent(item: WorkerEventAction) {
         const selected: GatheringWorker[] = []
         if (item.workerEvent === "make-active") {
-            selected.push(...this.workers.filter(worker => worker.assignment === "idle" && worker.state === "idle").slice(0, item.count))
+            selected.push(...this.workers.filter(worker => worker.assignment === "idle" && worker.state === "idle" && worker.previousAssignment !== undefined).slice(0, item.count))
         } else {
             // Select the whole batch before changing assignments. Reuse the builder ranking.
             const excluded = new Set<number>()
@@ -478,7 +478,7 @@ export class WorkerEconomy {
                 this.delayedInitialWoodWorkerIds = this.delayedInitialWoodWorkerIds.filter(id => id !== worker.id)
                 this.transition(worker, "idle", Infinity)
             } else {
-                worker.assignment = worker.previousAssignment ?? "wood"
+                worker.assignment = worker.previousAssignment!
                 this.transition(worker, "reactivation", item.travelDuration)
             }
         }

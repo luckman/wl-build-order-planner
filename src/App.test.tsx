@@ -237,7 +237,7 @@ test("timeline actions require Delete from their menu and dismiss safely", () =>
     expect(screen.getAllByRole("button", { name: "Remove Worker" })).toHaveLength(1)
 })
 
-test("timeline shows a 120-second window and extends 30 seconds past the last completion", () => {
+test("timeline shows a 120-second window and extends 30 seconds past the last return or completion", () => {
     const { container } = render(<App />)
     const canvas = container.querySelector(".timeline-canvas") as HTMLElement
     expect(canvas.style.width).toBe("100%")
@@ -249,7 +249,7 @@ test("timeline shows a 120-second window and extends 30 seconds past the last co
     expect(canvas.style.width).toBe("100%")
     chooseUpgrade("Castle lvl 3")
     const finishes = Array.from(container.querySelectorAll(".queue-track .event"))
-        .map(event => event.getAttribute("title")!.match(/finish (\d+):(\d+(?:\.\d+)?)/)!)
+        .map(event => event.getAttribute("title")!.match(/worker returns (\d+):(\d+(?:\.\d+)?)/) ?? event.getAttribute("title")!.match(/finish (\d+):(\d+(?:\.\d+)?)/)!)
         .map(match => Number(match[1]) * 60 + Number(match[2]))
     const horizon = Math.max(...finishes) + 30
     expect(horizon).toBeGreaterThan(120)

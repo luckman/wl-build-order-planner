@@ -26,7 +26,7 @@ export type BuildOrderDocument = {
     buildOrder: Array<OpeningAction | ((WorkerEventCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
         itemId: string; construction?: ConstructionSettings
     }) & {
-        timings?: Pick<ScheduledAction, "commandTime" | "startTime" | "finishTime" | "workerReturnTime">
+        timings?: Pick<ScheduledAction, "commandTime" | "departureTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime">
     })>
 }
 
@@ -36,9 +36,9 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
     const document: BuildOrderDocument = {
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
-        buildOrder: [opening, ...actions.map(({ item, commandTime, startTime, finishTime, workerReturnTime }) => ({
+        buildOrder: [opening, ...actions.map(({ item, commandTime, departureTime, startTime, finishTime, workerReturnTime, workerReturnEndTime }) => ({
             ...(item.kind === "worker-event" ? workerEventCommand(item) : item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : constructionCommand(item)),
-            ...(includeTimings ? { timings: { commandTime, startTime, finishTime, workerReturnTime } } : {}),
+            ...(includeTimings ? { timings: { commandTime, departureTime, startTime, finishTime, workerReturnTime, workerReturnEndTime } } : {}),
         }))],
     }
     const text = JSON.stringify(document, null, 2)

@@ -90,3 +90,26 @@ test("preparation validates, persists and exposes computed departure through the
     expect((dialog.getByLabelText("Preparation (seconds)") as HTMLInputElement).value).toBe("10")
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
 })
+
+test("construction renders distinct positive phases and omits zero travel and idle return", () => {
+    const view = render(<App />)
+    fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "10000" } })
+    fireEvent.change(screen.getByLabelText("Starting wood"), { target: { value: "10000" } })
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^Barracks \d/ }))
+    let dialog = within(screen.getByRole("dialog"))
+    fireEvent.change(dialog.getByLabelText("Preparation (seconds)"), { target: { value: "10" } })
+    fireEvent.change(dialog.getByLabelText("Outward travel (seconds)"), { target: { value: "5" } })
+    fireEvent.change(dialog.getByLabelText("Return travel (seconds)"), { target: { value: "7" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Add order" }))
+    const item = view.container.querySelector(".event.building")!
+    expect(Array.from(item.querySelectorAll(".construction-phase")).map(phase => phase.getAttribute("aria-label"))).toEqual([
+        "Preparation 0:00 to 0:10", "Outward travel 0:10 to 0:15", "Construction 0:15 to 0:45", "Return travel 0:45 to 0:52",
+    ])
+    fireEvent.click(view.container.querySelector(".sortable-order li")!)
+    dialog = within(screen.getByRole("dialog"))
+    fireEvent.change(dialog.getByLabelText("Preparation (seconds)"), { target: { value: "0" } })
+    fireEvent.change(dialog.getByLabelText("Outward travel (seconds)"), { target: { value: "0" } })
+    fireEvent.change(dialog.getByLabelText("Return travel (seconds)"), { target: { value: "0" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Save order" }))
+    expect(item.querySelectorAll(".construction-phase")).toHaveLength(1)
+})

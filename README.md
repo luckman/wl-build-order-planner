@@ -33,7 +33,8 @@ an order delay or spell effect; edit or delete it like other timed events.
 Right-click a building or an upgrade target level to configure its outward and return travel
 before adding. Click construction rows, or choose **Edit** on their timeline items, to change
 settings. **Preparation** reserves the worker before the purchase command, stopping gathering
-for the entered interval; its departure moves when the command is rescheduled. **Use idle worker** selects only an available idle builder; it becomes idle at completion
+for the entered interval; its departure moves when the command is rescheduled. Timeline items
+show distinct preparation, outward, construction and return phases, with hover timing details. **Use idle worker** selects only an available idle builder; it becomes idle at completion
 without return travel. A returning gatherer can start another construction at completion; its
 unfinished return journey is retained as a minimum after the next job. Each travel field inherits the live global delay until overridden; **Use global** resets it.
 

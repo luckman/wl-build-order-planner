@@ -561,3 +561,7 @@ is retained in persistence but inactive while the order explicitly uses an idle 
 `construction.preparationDuration` is optional, finite and nonnegative, default zero.
 It is a command-relative interval in seconds, not an absolute departure timestamp.
 Save/load, drafts and sharing preserve the interval and recalculate all phase timings.
+
+Optional diagnostic timings also include `departureTime` and `workerReturnEndTime`.
+The latter clips an interrupted return segment at reassignment; `workerReturnTime`
+retains that job's projected arrival. Like all saved timings, these are ignored on import.
