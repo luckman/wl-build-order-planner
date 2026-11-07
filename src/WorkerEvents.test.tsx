@@ -10,6 +10,7 @@ test.each(["Light", "Dark"])("%s worker events add, edit, cancel and restore dra
     const worker = faction === "Light" ? "Worker" : "Slave"
     const idleName = `Make ${worker} idle`
     const activeName = `Make ${worker} active`
+    const activateLabel = `Activate ${worker.toLowerCase()}`
     fireEvent.click(screen.getByRole("button", { name: idleName, exact: true }))
     let dialog = within(screen.getByRole("dialog", { name: idleName }))
     expect((dialog.getByLabelText("Worker count") as HTMLInputElement).value).toBe("1")
@@ -33,8 +34,8 @@ test.each(["Light", "Dark"])("%s worker events add, edit, cancel and restore dra
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
     expect(idleRow().getByText(`${idleName} (2)`)).toBeTruthy()
     expect(idleRow().queryByText("2 workers")).toBeNull()
-    fireEvent.click(screen.getByRole("button", { name: activeName, exact: true }))
-    dialog = within(screen.getByRole("dialog"))
+    fireEvent.click(screen.getByRole("button", { name: activateLabel, exact: true }))
+    dialog = within(screen.getByRole("dialog", { name: activeName }))
     fireEvent.change(dialog.getByLabelText("Reactivation travel (seconds)"), { target: { value: "7" } })
     fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
     view.unmount()

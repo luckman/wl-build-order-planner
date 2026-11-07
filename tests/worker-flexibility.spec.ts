@@ -9,15 +9,28 @@ for (const faction of ["Light", "Dark"] as const) {
         await page.goto("http://localhost:2987")
         await page.getByRole("button", { name: faction, exact: true }).click()
         const worker = faction === "Light" ? "Worker" : "Slave"
-        const names = [`Make ${worker} idle`, `Make ${worker} active`]
+        const idleName = `Make ${worker} idle`
+        const activateLabel = `Activate ${worker.toLowerCase()}`
+        const events = [
+            { name: idleName, label: idleName },
+            { name: `Make ${worker} active`, label: activateLabel, lines: ["Activate", worker.toLowerCase()] },
+        ]
         const actions = page.getByRole("region", { name: "Actions", exact: true })
         const cards = actions.getByRole("region", { name: "heroes", exact: true }).getByRole("button")
         const finalCards = await cards.evaluateAll(buttons => buttons.slice(-7).map(button => button.getAttribute("aria-label")))
-        expect(finalCards).toEqual(["Resources collected", "Mana spent", "Mana well is captured", "Mana well is lost", "Unit is killed", ...names])
+        expect(finalCards).toEqual(["Resources collected", "Mana spent", "Mana well is captured", "Mana well is lost", "Unit is killed", ...events.map(event => event.label)])
         await expect(cards.filter({ hasText: /^Make (idle|active)$/ })).toHaveCount(0)
         const sources: string[] = []
-        for (const [index, name] of names.entries()) {
-            const card = actions.getByRole("button", { name, exact: true })
+        for (const [index, { name, label, lines }] of events.entries()) {
+            const card = actions.getByRole("button", { name: label, exact: true })
+            if (lines) {
+                const layout = await card.locator(".action-name").evaluate((label: HTMLElement) => ({
+                    lines: label.innerText.split("\n"),
+                    heightInLines: label.getBoundingClientRect().height / parseFloat(getComputedStyle(label).lineHeight),
+                }))
+                expect(layout.lines).toEqual(lines)
+                expect(layout.heightInLines).toBeCloseTo(2, 1)
+            }
             const icon = card.locator("img")
             await expect(icon).toBeVisible()
             await expect.poll(() => icon.evaluate(image => [(image as HTMLImageElement).naturalWidth, (image as HTMLImageElement).naturalHeight])).toEqual([252, 252])
@@ -29,16 +42,16 @@ for (const faction of ["Light", "Dark"] as const) {
         }
         expect(sources[0]).not.toBe(sources[1])
         await page.getByRole("button", { name: faction === "Light" ? "Dark" : "Light", exact: true }).click()
-        await expect(actions.getByRole("button", { name: names[0], exact: true })).toHaveCount(0)
+        await expect(actions.getByRole("button", { name: idleName, exact: true })).toHaveCount(0)
         const otherWorker = faction === "Light" ? "Slave" : "Worker"
         await expect(actions.getByRole("button", { name: `Make ${otherWorker} idle`, exact: true }).locator("img")).not.toHaveAttribute("src", sources[0])
         await page.getByRole("button", { name: faction, exact: true }).click()
         await page.reload()
-        for (const [index, name] of names.entries()) {
+        for (const [index, { name }] of events.entries()) {
             await expect(page.getByRole("listitem").filter({ hasText: name }).locator("img")).toHaveAttribute("src", sources[index])
             await expect(page.getByRole("button", { name, exact: true }).and(page.locator('[aria-haspopup="menu"]')).locator("img")).toHaveAttribute("src", sources[index])
         }
-        await actions.getByRole("button", { name: names[1], exact: true }).scrollIntoViewIfNeeded()
+        await actions.getByRole("button", { name: activateLabel, exact: true }).scrollIntoViewIfNeeded()
         await page.screenshot({ path: `test-results/${faction}-worker-icons.png` })
     })
 }

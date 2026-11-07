@@ -652,9 +652,11 @@ export default function App() {
                                                 </button>
                                                 {(["make-idle", "make-active"] as const).map(type => {
                                                     const { name, icon } = workerEventIdentity(type, factionId)
+                                                    const activationTarget = type === "make-active" ? faction.workerName.toLowerCase() : null
                                                     return <button key={type} className="action resource-card"
-                                                        aria-label={name} onClick={() => setWorkerEventDialogOpen(type)}>
-                                                        <span className="action-name">{name}</span>
+                                                        aria-label={activationTarget ? `Activate ${activationTarget}` : name}
+                                                        onClick={() => setWorkerEventDialogOpen(type)}>
+                                                        <span className="action-name">{activationTarget ? <>Activate<br />{activationTarget}</> : name}</span>
                                                         <img src={iconSources[icon]} alt="" />
                                                     </button>
                                                 })}

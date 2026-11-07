@@ -51,8 +51,9 @@ and keeps the saved duration. The **(?)** beside the dialog title explains prepa
 builder travel, and when you need resources.
 
 **Make Worker idle** (Light) and **Make Slave idle** (Dark) remove a chosen count of gatherers
-from income and ordinary builder selection. **Make Worker active** and **Make Slave active**
-restore their previous assignments, optionally after travel. The two cards follow **Unit is killed**
+from income and ordinary builder selection. The **Activate worker** and **Activate slave**
+buttons open the **Make Worker active** and **Make Slave active** events, which restore previous
+assignments, optionally after travel. The idle and activation cards follow **Unit is killed**
 and use matching pause and resume icons in the build order and timeline. Both events use fixed times
 and apply the full count or report an error. The build-order idle event title includes a count only
 for two or more workers. Latest order state lists idle workers separately. For worker losses,
