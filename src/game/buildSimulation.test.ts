@@ -468,11 +468,11 @@ test.each(["light", "dark"] as const)("%s completed Sawmill accelerates income a
 
 test("a blocked Sawmill does not change wood travel", () => {
     const sawmill = required(factions.light.items.find(({ id }) => id === "sawmill"))
-    const { plan, deliveries } = simulateBuildOrder(
-        [sawmill], { ...economy, startingGold: 0 }, 2, 100, 20, "Castle", 60,
-    )
+    const settings = { ...economy, startingGold: 0 }
+    const { plan, deliveries } = simulateBuildOrder([sawmill], settings, 2, 100, 20, "Castle", 60)
+    const opening = simulateBuildOrder([], settings, 2, 100, 20, "Castle", 60)
     expect(plan[0].blocked).toBe(true)
-    expect(deliveries.map(({ time }) => time)).toEqual([20, 40, 60])
+    expect(deliveries).toEqual(opening.deliveries)
 })
 
 test.each(["light", "dark"] as const)("%s completed builders can accept another order before return arrival", (factionId) => {
