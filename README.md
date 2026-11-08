@@ -124,10 +124,14 @@ check, and relevant tests before submitting a pull request.
 Build drafts and personal profiles are stored locally in your browser. Shared URLs contain the build
 and profile, so anyone with the link can open those settings.
 
-The site loads GoatCounter visitor analytics for `luckman.goatcounter.com`. It also counts
-successful **Copy link** actions and openings of URLs containing a build parameter, including
+The site serves a bundled copy of GoatCounter's script and sends visitor analytics to
+`luckman.goatcounter.com`. It also counts successful **Copy link** actions and openings of
+URLs containing a build parameter, including
 invalid build links. These custom events send fixed event names and titles, without the shared URL
 or build contents. The integration is defined in `public/index.html` and `src/analytics.ts`.
+
+To update the bundled script, replace `public/count.js` with a reviewed copy of the
+[official GoatCounter script](https://gc.zgo.at/count.js) and retain its license notice.
 
 To disable analytics in your own deployment, remove the GoatCounter `<script>` tag from
 `public/index.html` and rebuild the app. The existing event hooks safely do nothing without that
