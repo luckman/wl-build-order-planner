@@ -66,6 +66,7 @@ for (const faction of ["light", "dark"] as const) for (const width of [1440, 320
         const card = page.locator(".action-panel").getByRole("button", { name: /^Barracks \d/ })
         await card.click({ button: "right" })
         const dialog = page.getByRole("dialog", { name: "Configure Barracks Construction" })
+        await expect(dialog.getByRole("combobox", { name: "Construction time modifier" })).toBeFocused()
         await dialog.getByLabel("Preparation (s)").fill("30")
         await dialog.getByLabel("Preparation (s)").press("ArrowUp")
         await expect(dialog.getByLabel("Preparation (s)")).toHaveValue("30.1")
@@ -104,7 +105,8 @@ for (const faction of ["light", "dark"] as const) for (const width of [1440, 320
         await event.click()
         await page.getByRole("menuitem", { name: "Edit", exact: true }).click()
         const editDialog = page.getByRole("dialog", { name: "Edit Barracks Construction" })
-        await expect(editDialog.getByLabel("Preparation (s)")).toBeFocused()
+        const modifier = editDialog.getByRole("combobox", { name: "Construction time modifier" })
+        await expect(modifier).toBeFocused()
         const help = editDialog.getByRole("button", { name: "Construction timing help" })
         const tooltip = editDialog.getByRole("tooltip")
         if (width === 1440) {
@@ -113,7 +115,7 @@ for (const faction of ["light", "dark"] as const) for (const width of [1440, 320
             await editDialog.getByRole("heading").hover({ position: { x: 5, y: 5 } })
             await expect(tooltip).toBeHidden()
         }
-        await editDialog.getByLabel("Preparation (s)").press("Shift+Tab")
+        await modifier.press("Shift+Tab")
         await expect(help).toBeFocused()
         await expect(tooltip).toBeVisible()
         await help.press("Escape")
@@ -133,6 +135,25 @@ for (const faction of ["light", "dark"] as const) for (const width of [1440, 320
         await expect(page.getByRole("dialog")).toHaveCount(0)
         await handle.press("Escape")
         await page.screenshot({ path: `test-results/${faction}-${width}-worker-phases.png`, fullPage: true })
+    })
+
+    test(`${faction} at ${width}px focuses Preparation when adding and editing an upgrade`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 })
+        await page.goto("http://localhost:2987")
+        await page.getByRole("button", { name: faction === "light" ? "Light" : "Dark", exact: true }).click()
+        await page.getByLabel("Starting gold", { exact: true }).fill("10000")
+        await page.getByLabel("Starting wood", { exact: true }).fill("10000")
+        const building = faction === "light" ? "Castle" : "Citadel"
+        const level = `${building} lvl 2`
+        await page.getByRole("button", { name: `${building} upgrade`, exact: true }).click()
+        await page.getByRole("menuitem", { name: new RegExp(level) }).click({ button: "right" })
+        const add = page.getByRole("dialog", { name: `Configure ${building} Upgrade` })
+        await expect(add.getByLabel("Preparation (s)")).toBeFocused()
+        await add.getByRole("button", { name: "Add order" }).click()
+        const row = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: `Remove ${level}`, exact: true }) })
+        await row.getByText(level, { exact: true }).click()
+        const edit = page.getByRole("dialog", { name: `Edit ${building} Upgrade` })
+        await expect(edit.getByLabel("Preparation (s)")).toBeFocused()
     })
 }
 

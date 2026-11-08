@@ -42,6 +42,7 @@ test.each(["Light", "Dark"])("%s construction modifier is editable per order and
     const restored = screen.getAllByRole("button", { name: "Remove Barracks" })[1].closest("li")!
     fireEvent.click(restored)
     const savedModifier = screen.getByRole("combobox", { name: "Construction time modifier" })
+    expect(savedModifier).toHaveFocus()
     expect(savedModifier).toHaveValue("50")
     fireEvent.change(savedModifier, { target: { value: "0" } })
     fireEvent.click(screen.getByRole("button", { name: "Save order" }))
@@ -112,6 +113,7 @@ test.each([["Light", "Castle"], ["Dark", "Citadel"]])("%s upgrades use shared ad
     }
     let dialog = configure()
     expect(dialog.queryByRole("combobox", { name: "Construction time modifier" })).toBeNull()
+    expect(dialog.getByLabelText("Preparation (s)")).toHaveFocus()
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
     expect(view.container.querySelectorAll(".sortable-order li")).toHaveLength(0)
     dialog = configure()
@@ -131,6 +133,7 @@ test.each([["Light", "Castle"], ["Dark", "Citadel"]])("%s upgrades use shared ad
     fireEvent.click(event)
     fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }))
     dialog = within(screen.getByRole("dialog", { name: `Edit ${building} Upgrade` }))
+    expect(dialog.getByLabelText("Preparation (s)")).toHaveFocus()
     expect((dialog.getByLabelText("Outward travel (s)") as HTMLInputElement).value).toBe("3")
     expect(dialog.getByText("Global: 2.525 s")).toBeTruthy()
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
