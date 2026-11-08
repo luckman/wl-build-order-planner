@@ -19,7 +19,7 @@ import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
 import ScrollDialog from "./ScrollDialog"
 import UpgradeCards from "./UpgradeCards"
-import TimelineActionMenu from "./TimelineActionMenu"
+import ActionMenu from "./ActionMenu"
 import { orderedBuildings } from "./buildingDisplayOrder"
 import EventTimeDialog from "./EventTimeDialog"
 import { createScrollAction, SCROLLS, type ScrollId, isScrollAction, scrollCooldown, scrollEffect } from "./game/scrolls"
@@ -207,8 +207,10 @@ export default function App() {
     const [manaSpentDialogOpen, setManaSpentDialogOpen] = useState(false)
     const [resourcesCollectedDialogOpen, setResourcesCollectedDialogOpen] = useState(false)
     const [editingEventId, setEditingEventId] = useState<string | null>(null)
-    const [timelineMenu, setTimelineMenu] = useState<{ item: PlannerItem; anchor: HTMLButtonElement } | null>(null)
-    const closeTimelineMenu = useCallback(() => setTimelineMenu(null), [])
+    const [actionMenu, setActionMenu] = useState<({ item: PlannerItem } & (
+        { source: "timeline"; anchor: HTMLButtonElement } | { source: "build-order"; anchor: HTMLLIElement }
+    )) | null>(null)
+    const closeActionMenu = useCallback(() => setActionMenu(null), [])
     const timelineScroll = useRef<HTMLDivElement>(null)
     const timelineEdit = useRef<{ item: PlannerItem & { orderId: string }; anchor: HTMLButtonElement } | null>(null)
     const nextOrderId = useRef(0)
@@ -236,8 +238,8 @@ export default function App() {
     const activeDraft = buildOrders[factionId]
     const buildOrder = activeDraft.items
     useEffect(() => {
-        if (timelineMenu && !buildOrder.some(item => item === timelineMenu.item)) closeTimelineMenu()
-    }, [buildOrder, timelineMenu, closeTimelineMenu])
+        if (actionMenu && !buildOrder.some(item => item === actionMenu.item)) closeActionMenu()
+    }, [buildOrder, actionMenu, closeActionMenu])
     const editingEvent = buildOrder.find(item => item.orderId === editingEventId)
     const constructionDialogItem = editingEvent && isConstruction(editingEvent) ? editingEvent : configuringConstruction
     useEffect(() => {
@@ -278,9 +280,9 @@ export default function App() {
             updateBuildOrders(current => ({ ...current, [target]: draft }))
             onSuccess?.(result)
         })
-        if (accepted) closeTimelineMenu()
+        if (accepted) closeActionMenu()
         return accepted
-    }, [calculate, closeTimelineMenu])
+    }, [calculate, closeActionMenu])
     const setBuildOrder = (update: SetStateAction<PlannerItem[]>, onSuccess?: () => void) => {
         const items = typeof update === "function" ? update(buildOrder) : update
         if (items === buildOrder) return
@@ -424,6 +426,10 @@ export default function App() {
             setEditingEventId(null)
             onSuccess()
         })
+    }
+    const removeAction = (item: PlannerItem) => {
+        setDependencyError(null)
+        setBuildOrder(current => current.filter(entry => entry !== item))
     }
     const defaultGoldWorkers = Math.min(4, initialWorkerCount)
     const clearBuildOrder = () => {
@@ -735,7 +741,8 @@ export default function App() {
                                                             const bounds = timelineBounds(action)
                                                             const title = actionTimingTitle(action, economy.constructionStartDelay)
                                                             const phaseDescriptionId = isConstruction(item) ? `construction-phases-${index}` : undefined
-                                                            const toggleMenu = (anchor: HTMLButtonElement) => setTimelineMenu(current => current?.item === item ? null : { item, anchor })
+                                                            const menuOpen = actionMenu?.source === "timeline" && actionMenu.item === item
+                                                            const toggleMenu = (anchor: HTMLButtonElement) => setActionMenu(menuOpen ? null : { source: "timeline", item, anchor })
                                                             return <button
                                                                 className={`event ${item.kind}${isConstruction(item) ? " construction-event" : ""}${item.kind === "hero" ? " unit" : ""}${isTimedEvent(item) ? " timed-event" : ""}`}
                                                                 key={`${item.id}-${index}`}
@@ -745,8 +752,8 @@ export default function App() {
                                                                 aria-describedby={phaseDescriptionId}
                                                                 aria-haspopup="menu"
                                                                 data-order-id={(item as typeof buildOrder[number]).orderId}
-                                                                aria-expanded={timelineMenu?.item === item}
-                                                                aria-controls={timelineMenu?.item === item ? "timeline-action-menu" : undefined}
+                                                                aria-expanded={menuOpen}
+                                                                aria-controls={menuOpen ? "planner-action-menu" : undefined}
                                                                 onClick={event => toggleMenu(event.currentTarget)}
                                                                 onContextMenu={event => { event.preventDefault(); toggleMenu(event.currentTarget) }}
                                                             >
@@ -809,16 +816,24 @@ export default function App() {
                         {!buildOrder.length ? (
                             <p className="empty">Choose actions from the panel above the timeline.</p>
                         ) : (
-                            <DragDropContext onDragEnd={reorderActions}>
+                            <DragDropContext onDragStart={closeActionMenu} onDragEnd={reorderActions}>
                             <Droppable droppableId="build-order">
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
                                 {displayPlan.map((action, index) => {
                                     const { item, commandTime, startTime, finishTime, blocked, blockedReason } = action
                                     return <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
                                     {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle(action, economy.constructionStartDelay)}
-                                        tabIndex={isConstruction(item) ? 0 : undefined}
+                                        tabIndex={isConstruction(item) ? 0 : -1}
+                                        onContextMenu={event => {
+                                            event.preventDefault()
+                                            setActionMenu({ source: "build-order", item, anchor: event.currentTarget })
+                                        }}
                                         onKeyDown={event => { if (isConstruction(item) && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setEditingEventId((item as typeof buildOrder[number]).orderId) } }}
-                                        onClick={isTimedEvent(item) || isConstruction(item) ? () => { setDependencyError(null); setEditingEventId((item as typeof buildOrder[number]).orderId) } : undefined}>
+                                        onClick={isTimedEvent(item) || isConstruction(item) ? () => {
+                                            closeActionMenu()
+                                            setDependencyError(null)
+                                            setEditingEventId((item as typeof buildOrder[number]).orderId)
+                                        } : undefined}>
                                         {isTimedEvent(item) ? <button className="scroll-order-marker" aria-label={`Change ${item.name} timestamp, action ${index + 1}`} title="Click to change timestamp">◷</button>
                                             : <button className="order-drag-handle" {...drag.dragHandleProps} onClick={event => event.stopPropagation()} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>}
                                         <span className="order-number">{index + 1}</span>
@@ -840,10 +855,7 @@ export default function App() {
                                             aria-label={`Remove ${item.name}`}
                                             onClick={event => {
                                                 event.stopPropagation()
-                                                setDependencyError(null)
-                                                setBuildOrder((current) =>
-                                                    current.filter(entry => entry !== item),
-                                                )
+                                                removeAction(item)
                                             }}
                                         >
                                             ×
@@ -877,14 +889,15 @@ export default function App() {
                         </div>
                     </aside>
                 </div>
-                {timelineMenu && shell.current && buildOrder.some(item => item === timelineMenu.item) && <TimelineActionMenu
-                    anchor={timelineMenu.anchor} container={shell.current} actionName={timelineMenu.item.name} onClose={closeTimelineMenu}
-                    onEdit={isTimedEvent(timelineMenu.item) || isConstruction(timelineMenu.item) ? () => {
-                        const item = timelineMenu.item as typeof buildOrder[number]
-                        timelineEdit.current = { item, anchor: timelineMenu.anchor }
+                {actionMenu && shell.current && buildOrder.some(item => item === actionMenu.item) && <ActionMenu
+                    anchor={actionMenu.anchor} container={shell.current} actionName={actionMenu.item.name} onClose={closeActionMenu}
+                    onEdit={isTimedEvent(actionMenu.item) || isConstruction(actionMenu.item) ? () => {
+                        const item = actionMenu.item as typeof buildOrder[number]
+                        if (actionMenu.source === "timeline") timelineEdit.current = { item, anchor: actionMenu.anchor }
+                        setDependencyError(null)
                         setEditingEventId(item.orderId)
                     } : undefined}
-                    onDelete={() => setBuildOrder(current => current.filter(item => item !== timelineMenu.item))} />}
+                    onDelete={() => removeAction(actionMenu.item)} />}
                 {constructionDialogItem && <ConstructionDialog
                     key={editingEvent?.orderId ?? constructionDialogItem.id} item={constructionDialogItem}
                     buildingName={faction.items.find(item => item.id === constructionDialogItem.buildingId)?.name ?? constructionDialogItem.name}

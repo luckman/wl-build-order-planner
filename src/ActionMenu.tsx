@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 
-export default function TimelineActionMenu({ anchor, container, actionName, onEdit, onDelete, onClose }: {
-    anchor: HTMLButtonElement; container: HTMLElement; actionName: string; onEdit?: () => void; onDelete: () => void; onClose: () => void
+export default function ActionMenu({ anchor, container, actionName, onEdit, onDelete, onClose }: {
+    anchor: HTMLElement; container: HTMLElement; actionName: string; onEdit?: () => void; onDelete: () => void; onClose: () => void
 }) {
     const menu = useRef<HTMLDivElement>(null)
     useLayoutEffect(() => {
@@ -32,7 +32,7 @@ export default function TimelineActionMenu({ anchor, container, actionName, onEd
             window.removeEventListener("resize", onClose)
         }
     }, [anchor, onClose])
-    return createPortal(<div ref={menu} id="timeline-action-menu" className="timeline-action-menu" role="menu"
+    return createPortal(<div ref={menu} id="planner-action-menu" className="planner-action-menu" role="menu"
         aria-label={`${actionName} actions`} onKeyDown={event => {
             if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
                 event.preventDefault()

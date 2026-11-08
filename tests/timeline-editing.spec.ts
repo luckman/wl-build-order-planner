@@ -231,14 +231,103 @@ test("construction and upgrade menus offer Edit while recruitment retains Delete
     }
 })
 
-test("editing from Build order leaves the timeline viewport in place", async ({ page }) => {
+test("Build order context menus cover row controls, blocked actions, and repeated names", async ({ page }) => {
+    await importBuild(page, "light", [{ itemId: "worker" }, { itemId: "barracks" },
+        { type: "resources-collected", commandTime: 60, gold: 100, wood: 0 },
+        { type: "resources-collected", commandTime: 120, gold: 200, wood: 0 },
+        { type: "mana-well-is-lost", commandTime: 180 }])
+    const rows = page.locator(".sortable-order").getByRole("listitem")
+    const secondEvent = rows.filter({ hasText: "+200 gold" })
+    const worker = rows.filter({ has: page.getByRole("button", { name: "Remove Worker", exact: true }) })
+    const barracks = rows.filter({ has: page.getByRole("button", { name: "Remove Barracks", exact: true }) })
+    const blocked = rows.filter({ hasText: "Mana well is lost" })
+    await expect(blocked).toHaveClass(/order-blocked/)
+    const menu = page.getByRole("menu")
+    const edit = menu.getByRole("menuitem", { name: "Edit", exact: true })
+    const remove = menu.getByRole("menuitem", { name: "Delete", exact: true })
+    const clock = secondEvent.getByRole("button", { name: /Change Resources collected timestamp/ })
+    const handle = worker.getByRole("button", { name: /Reorder Worker/ })
+    const directRemove = secondEvent.getByRole("button", { name: "Remove Resources collected" })
+    const originalRows = await rows.allTextContents()
+    for (const { target, name, editable } of [
+        { target: secondEvent.getByText("Resources collected", { exact: true }), name: "Resources collected", editable: true },
+        { target: clock, name: "Resources collected", editable: true },
+        { target: directRemove, name: "Resources collected", editable: true },
+        { target: handle, name: "Worker", editable: false },
+        { target: blocked, name: "Mana well is lost", editable: true },
+    ]) {
+        await target.click({ button: "right" })
+        await expect(menu).toHaveAccessibleName(`${name} actions`)
+        await expect(menu.getByRole("menuitem")).toHaveText(editable ? ["Edit", "Delete"] : ["Delete"])
+        await expect(page.getByRole("dialog")).toBeHidden()
+        await expect(rows).toHaveText(originalRows)
+        if (editable) {
+            await expect(edit).toBeFocused()
+            await page.keyboard.press("ArrowDown")
+            await expect(remove).toBeFocused()
+        }
+        await page.keyboard.press("Escape")
+        await expect(menu).toBeHidden()
+    }
+    await secondEvent.click({ button: "right" })
+    await edit.click()
+    const dialog = page.getByRole("dialog", { name: "Edit Resources collected" })
+    await expect(dialog.getByLabel("Command time (mm:ss)")).toHaveValue("02:00")
+    await dialog.getByLabel("Gold", { exact: true }).fill("250")
+    await dialog.getByRole("button", { name: "Save event" }).click()
+    const editedEvent = rows.filter({ hasText: "+250 gold" })
+    await expect(editedEvent).toBeVisible()
+    await expect(rows.filter({ hasText: "+100 gold" })).toBeVisible()
+    await editedEvent.click({ button: "right" })
+    await editedEvent.getByRole("button", { name: /Change Resources collected timestamp/ }).click()
+    await expect(dialog).toBeVisible()
+    await expect(menu).toBeHidden()
+    await dialog.getByRole("button", { name: "Cancel" }).click()
+    await editedEvent.getByText("Resources collected", { exact: true }).click()
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole("button", { name: "Cancel" }).click()
+    await handle.focus()
+    await page.keyboard.press("Space")
+    await page.keyboard.press("ArrowDown")
+    await page.keyboard.press("Space")
+    await expect(barracks.getByRole("button", { name: "Reorder Barracks, action 1" })).toBeVisible()
+    await editedEvent.click({ button: "right" })
+    await remove.click()
+    await expect(editedEvent).toHaveCount(0)
+    const firstEvent = rows.filter({ hasText: "+100 gold" })
+    await firstEvent.getByRole("button", { name: "Remove Resources collected" }).click()
+    await expect(firstEvent).toHaveCount(0)
+})
+
+test("Build order context menu positions beside the row and flips above it near the bottom", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await importBuild(page, "light", [{ itemId: "barracks" }])
+    const row = page.locator(".sortable-order").getByRole("listitem")
+    const menu = page.getByRole("menu", { name: "Barracks actions" })
+    await row.click({ button: "right" })
+    const anchor = (await row.boundingBox())!
+    expect((await menu.boundingBox())!.y).toBeGreaterThanOrEqual(anchor.y + anchor.height)
+    await page.keyboard.press("Escape")
+    await expect(row).toBeFocused()
+    await page.setViewportSize({ width: 1440, height: Math.ceil(anchor.y + anchor.height + 12) })
+    await row.click({ button: "right" })
+    const raisedMenu = (await menu.boundingBox())!
+    expect(raisedMenu.y + raisedMenu.height).toBeLessThanOrEqual((await row.boundingBox())!.y)
+    await expect(menu).toBeInViewport({ ratio: 1 })
+})
+
+for (const shortcut of ["clock", "menu"] as const) test(`editing from the Build order ${shortcut} leaves the timeline viewport in place`, async ({ page }) => {
     await importBuild(page, "light", [
         { type: "resources-collected", commandTime: 5, gold: 100, wood: 0 },
         { type: "resources-collected", commandTime: 1200, gold: 200, wood: 0 },
     ])
     const viewport = page.locator(".timeline-scroll")
     const position = await viewport.evaluate(element => element.scrollLeft)
-    await page.getByRole("button", { name: "Change Resources collected timestamp, action 1", exact: true }).click()
+    const clock = page.getByRole("button", { name: "Change Resources collected timestamp, action 1", exact: true })
+    if (shortcut === "menu") {
+        await clock.click({ button: "right" })
+        await page.getByRole("menuitem", { name: "Edit", exact: true }).click()
+    } else await clock.click()
     await page.getByRole("dialog").getByLabel("Command time (mm:ss)").fill("1000")
     await page.getByRole("dialog").getByRole("button", { name: "Save event" }).click()
     const moved = page.locator('button.event.resources-collected[title^="Command 10:00 ·"]')
