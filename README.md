@@ -20,20 +20,13 @@ timeline.
 
 Choose a faction, set your opening workers and **Resource collection** settings, then add
 **Actions** or load a template from **Share / Import**. Reorder actions and review the **Timeline**
-to refine your opening. Right-click a **Build order** row to edit or delete that action, including
-blocked actions. Left-click an editable row or its clock to open the editor directly. In **Timeline**,
-either mouse button opens a scheduled command's menu. After saving a Timeline edit, the Timeline
-follows the command's new position.
+to refine your opening. In **Timeline**, either mouse button opens a scheduled command's menu.
+After saving a Timeline edit, the Timeline follows the command's new position.
 
-**Build order** rows show a range from command time to recruitment or construction completion,
-upgrade completion, or scroll expiry. Times show tenths only when needed, as in `0:56.7 - 1:24`.
-Single-timestamp events show `Command` and their time. Make active also shows its travel duration.
-Blocked rows show their reason. Hover over a row to see its timing phases, including builder return
-when shown for a customized order.
-
-Choose **Delete from here** in a Build order row's menu to remove that action and all rows below
-it. The confirmation shows how many actions will be deleted. **Clear** asks for confirmation before
-removing all actions and restoring the default initial worker allocation.
+The **Build order** panel lists your planned actions. Timing ranges run from command to completion
+or scroll expiry. Hover over a row for timing details. Right-click a row for the action menu, or
+left-click an editable row or its clock to edit it directly. **Clear** also resets the initial
+worker allocation to its default.
 
 In **Share / Import**, use the primary **Copy link** action to share a build, choose a starter
 template, or expand **JSON files** to import or export a `.wl-build-order.json` file.
