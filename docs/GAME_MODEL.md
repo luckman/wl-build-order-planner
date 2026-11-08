@@ -1,9 +1,9 @@
 # War Legends game model
 
 This guide describes the implemented simulator. Detailed catalog rules are in
-[CATALOG_DEPENDENCIES.md](CATALOG_DEPENDENCIES.md) , builder behavior in
-[CONSTRUCTION.md](CONSTRUCTION.md) , and persisted commands and profiles in
-[BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md) .
+[CATALOG_DEPENDENCIES.md](CATALOG_DEPENDENCIES.md), builder behavior in
+[CONSTRUCTION.md](CONSTRUCTION.md), and persisted commands and profiles in
+[BUILD_ORDER_FILES.md](BUILD_ORDER_FILES.md).
 
 ## Implementation and data ownership
 
@@ -42,8 +42,8 @@ constant, not a profile field.
 
 The required opening allocation defaults to four gold miners and one wood gatherer. The UI slider
 permits 1–4 gold miners; JSON/API allocation accepts integers 0–5. All remaining starting workers
-gather wood. Initial food usage is 10, regardless of the split. There is no manual reassignment
-action after the opening.
+gather wood. Initial food usage is 10, regardless of the split. During the build, Make idle pauses
+workers and Make active restores their saved assignments.
 
 Default resources are 150 gold, 50 wood, 20 base food capacity, and 35 mana with 50 base mana
 capacity. Initial mana-well ownership is zero. Profile fields are editable or, for hidden settings,
@@ -88,7 +88,7 @@ last 30 seconds, values above 1 and up to 2 seconds last 60 seconds, values abov
 seconds last 90 seconds, and so on. Zero travel also lasts 30 seconds before its first increase.
 Zero increase disables growth; zero maximum makes new wood travel instantaneous.
 
-For initial travel `v0` , increment `b` , maximum `M` , and elapsed seconds since game start or the
+For initial travel `v0`, increment `b`, maximum `M`, and elapsed seconds since game start or the
 latest Sawmill completion:
 
 ```text
@@ -128,7 +128,7 @@ growth boundaries do not change travel already underway. Chopping durations and 
 unchanged. The rule applies to both factions.
 
 Newly recruited workers join gold until assigned gold workers reach
-`ceil((2 * goldTravelTime + effectiveGoldGatherTime) / effectiveGoldGatherTime)` , then join wood.
+`ceil((2 * goldTravelTime + effectiveGoldGatherTime) / effectiveGoldGatherTime)`, then join wood.
 Workers temporarily constructing count toward their previous assignment. Worker losses remove their
 future deliveries and assignment; recruitment uses the resulting current allocation.
 
@@ -150,7 +150,7 @@ corresponding family; there are no separate account levels per building instance
 Recruitment bonuses use `townHallLevel` for Workers/Slaves, `barracksLevel` for Barracks,
 `industrialBuildingLevel` for Factory/Workshop, `arcaneBuildingLevel` for Sanctuary/Dark Gate,
 `shipyardLevel` for Shipyard, and `altarOfHeroesLevel` for Altar of Heroes. All mappings apply to
-both factions. Duration is `baseSeconds * (1 - reduction)` .
+both factions. Duration is `baseSeconds * (1 - reduction)`.
 
 In-match upgrades unlock catalog prerequisites, producer capabilities, and building limits. They do
 not change the profile's resource yields or account bonuses.
@@ -163,26 +163,23 @@ allow it. Later commands can overlap earlier construction or training after earl
 been accepted. Reordering or removing actions recalculates the entire plan.
 
 Production and Racial buildings double their base gold/wood cost for each successive copy of the
-same ID: 1×, 2×, 4×, 8×, or `2^(n - 1)` for copy `n` . Earlier catalog orders count for pricing,
+same ID: 1×, 2×, 4×, 8×, or `2^(n - 1)` for copy `n`. Earlier catalog orders count for pricing,
 including orders whose builders are travelling. Economic/Defensive buildings, units, heroes, and
 upgrades retain fixed costs. The hidden `massConstructionCostReduction` setting is persisted but
 currently has no cost effect.
 
-Construction and upgrades expose separate command, start, finish, and builder-return times. At
-command acceptance, costs are paid and a selected worker stops gathering. The worker travels for
-`constructionStartDelay` (default 3 seconds), builds for the worker-level-adjusted duration with
-any [per-order construction time modifier](CONSTRUCTION.md#construction-time-modifier), then
-travels back for the same delay by default. Each occurrence can override either journey
-independently. The completed building becomes available before the builder returns.
+Construction and upgrades track worker departure, purchase, start, completion, and return. A worker
+stops gathering at departure. Costs are paid when the command is issued, after any preparation.
+Each order can override the default outward and return travel durations. Eligible building orders
+can also adjust their construction duration. See [Construction and gathering](CONSTRUCTION.md).
 
-Builders exclude deliberately idle workers and select wood gatherers with the least gathered/carried cargo,
-then gold workers carrying the least cargo outside the mine. Worker ID breaks ties. Builders are
-exclusive through outward travel and construction; returning gatherers are immediately eligible
-for another construction, retaining unfinished return distance as a minimum for its next return. Wood workers preserve exact partial gathering
-progress or completed cargo through construction, including progress earned under Whip. On return,
-they finish the remaining gathering or travel to deposit a completed load. Interrupted gold cargo is
-discarded. Workers resume at their previous resource without another outbound trip. These rules also
-apply to building upgrades.
+Ordinary orders select wood gatherers with the least gathered or carried cargo, then gold workers
+with the least cargo outside the mine. Worker ID breaks ties. An order can also explicitly request
+an idle worker. A returning gatherer can take another construction job immediately. The unfinished
+return distance sets a minimum for the next return trip.
+
+Construction and upgrades preserve wood progress and cargo, including progress earned under Whip.
+They discard interrupted gold cargo. Workers resume their saved assignments after returning.
 
 Upgrades reserve an exact preceding-level building instance and its queue. Its completed lower level
 still satisfies prerequisites and limits during the upgrade; the higher level unlocks at completion.
@@ -204,8 +201,8 @@ theoretical/practical mode controls.
 Food is reserved at an accepted recruitment command, including for queued heroes. Completed
 Farms/Pigsties increase capacity. Successful Unit is killed events release the lost unit's food.
 Hero limits and Altar tiers count living and queued heroes across producers; a successful hero loss
-allows replacement and reduces the next recruitment tier. See the catalog guide for the Light hero
-requirements.
+allows replacement and reduces the next recruitment tier. See
+[Catalog dependencies](CATALOG_DEPENDENCIES.md).
 
 ## Mana, scrolls, and fixed-time events
 
@@ -215,7 +212,7 @@ of Mana add capacity without adding mana. Base capacity must be at least startin
 
 Timed events retain explicit command timestamps independently of their position among catalog rows.
 Moving other actions or changing the profile recalculates validation without moving event
-timestamps. Events are edited through their build-order rows and have no drag handles. Equal-time
+timestamps. Edit an event from its Build order row or Timeline menu. Equal-time
 commands of the same event type use source order; different types follow the simulator's processing
 order. Mana spent cannot share its command timestamp with another Mana spent event or any scroll,
 including blocked commands.
@@ -227,7 +224,8 @@ including blocked commands.
 | Resources collected (both factions) | Instantly adjusts gold and wood without mana, worker, or delay requirements. Negative amounts subtract resources, clamping each resulting balance to zero at that timestamp. |
 | Mana spent (both factions) | Immediately spends a chosen finite positive whole-number amount (default 75). Respects and starts shared scroll cooldown, with no order delay or other spell effect. |
 | Mana well is captured / Mana well is lost (both factions) | Instantly adds/removes one owned well. A loss requires ownership at that timestamp. |
-| Unit is killed (both factions) | Removes one completed living recruit or starting worker, releasing food. Workers assigned to construction, including travel, are ineligible; wood workers are selected before gold workers. |
+| Unit is killed (both factions) | Removes a living unit and releases its food. For worker losses, choose Gathering or Idle. |
+| Make idle / Make active (both factions) | Pauses gathering or restores the saved assignments for a chosen number of workers. |
 
 For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively.
 Levels are independent profile settings, editable for Light in Resources collection, and default to
@@ -250,7 +248,7 @@ construction and upgrades are unaffected. See [BUILD_ORDER_FILES.md](BUILD_ORDER
 target selection and command validation.
 
 Scroll cooldown is shared between a faction’s scrolls:
-`basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)` , followed by `orderDelay` .
+`basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, followed by `orderDelay`.
 Mana must also have been sufficient for `orderDelay` before the command. Blocked scrolls spend no
 mana and start no cooldown. Mana spent checks mana and cooldown exactly at command time, without
 adding order delay; exact-balance spending is valid. Scrolls following Mana spent still apply their
@@ -261,6 +259,27 @@ order delay. Manual scroll insertion may retain a mana-blocked event. Invalid fi
 remain editable with warnings and have no effect; the mana-well and unit-is-killed dialogs also
 validate eligibility before saving. Mana spent also rejects unaffordable or cooldown-blocked saves;
 profile or earlier-command changes retain invalid saved expenditures with a blocked reason.
+
+## Worker activity and losses
+
+Make idle pauses the requested number of available gatherers, using the same wood-first ranking as
+builder selection. Make active restores their saved resource assignments immediately. Workers resume
+gathering after the specified reactivation travel. The planner blocks the event if fewer workers
+are available than requested. Workers retain wood progress and cargo. Interrupted gold cargo is
+discarded. Whip affects reactivation travel, and construction can interrupt that trip.
+
+Gathering casualties include workers travelling to or from resources and workers inside the mine.
+Idle casualties require an available, deliberately idle worker. Builders are ineligible throughout
+construction and its travel phases. If the selected group is empty, the event is blocked. Worker
+activity and casualty events at the same timestamp run in Build order sequence before construction.
+The latest order state reports idle workers separately from workers building or travelling.
+
+## Editing a plan
+
+Select a construction or timed-event row in Build order to edit it. Right-click a row to open
+its action menu. **Delete from here** asks for confirmation before removing the selected row and
+all rows after it. On the Timeline, either mouse button opens a command menu with **Delete** and
+**Edit** where available. Editing a timed event from the Timeline moves the view to its new time.
 
 ## Limits, persistence, and UI boundaries
 
@@ -279,33 +298,4 @@ not migrated.
 The timeline shows construction, recruitment, scrolls/events, and resource graphs, with hover
 inspection of resources and worker allocation. Individual mine queues and full per-worker activity
 lanes are not displayed. There is no combat simulation, build comparison, automatic build
-optimization, or manual worker reassignment beyond the opening allocation.
-
-## Deliberate worker inactivity (2026-11-07)
-
-Make idle and Make active are fixed-time, atomic count events. They run in list order
-with Unit is killed before construction at the same time and do not alter command spacing.
-Idle selection follows wood-first builder ranking and excludes occupied builders, including
-return travel. Reactivation restores the retained assignment immediately, earns no income
-while travelling, and resumes work without another outbound trip. Wood progress/cargo is
-retained; interrupted gold cargo is discarded. Whip affects reactivation movement.
-Construction can interrupt reactivation; its eventual return is at least the unfinished
-normal-speed journey. Delayed initial gatherers remain gatherers, distinct from deliberate
-idle assignment. Latest order state reports idle separately from building/travelling.
-
-Worker losses select Gathering (default, including old records) or Idle, strictly
-at the scheduled event time. Gathering casualties include travel and in-mine workers;
-idle casualties require a deliberately idle, available worker. Both exclude builders
-and construction return travel. Empty groups produce a correctable error with no
-death or food release. Worker events and losses share displayed order for ties.
-
-Construction preparation is per occurrence, measured backward from the scheduled
-purchase command. Departure reserves the worker and stops income. Fresh chronological
-replays recalculate departures, readiness and availability across rows when commands
-move, without committing rejected costs or reservations. Preparation must fit after
-time zero and is not shortened by Whip. See CONSTRUCTION.md for scheduling details.
-
-The construction timeline spans departure through actual return phase end, with
-separate preparation, outward, construction and return segments. Reassignments clip
-interrupted returns; zero phases and idle return are omitted. Completion/eligibility
-and eventual gathering return remain distinct tooltip milestones.
+optimization, or manual selection of a new gathering resource for an individual worker.

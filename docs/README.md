@@ -14,6 +14,6 @@ the user-facing feature list, see the [project README](../README.md).
 
 The catalog in [data.json](../src/game/data.json), profile defaults in
 `src/game/gameProfile.ts`, progression formulas in `src/game/playerLevels.ts`, and limits in
-`src/game/plannerLimits.ts` define the current behavior. Update these guides when the behavior they
-describe changes; routine catalog-value edits belong in `src/game/data.json`. Dated change history
-lives in [`ai-changelog/`](../ai-changelog/).
+`src/game/plannerLimits.ts` define the current behavior.
+
+See [ai-changelog](../ai-changelog/) for dated changes.

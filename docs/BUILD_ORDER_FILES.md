@@ -7,23 +7,18 @@ browser and a secure context (HTTPS or localhost). Unsupported browsers use thei
 behavior and browser save-location preferences. No custom filename dialog is shown. Save failures
 produce a visible error.
 
-The top Share / Import menu puts Copy link first, followed by faction-specific starting templates.
-The collapsed JSON files section at the bottom contains Export JSON and Import JSON. Include
-calculated timings appears directly beneath Export JSON and affects only file exports; copied
-links always omit calculated timings. Import guidance accompanies Import JSON. A divider and
-extra space separate file operations from templates. The menu is also available
-on narrow screens and closes with Escape or a click outside it. Files include the selected faction,
-the opening allocation and exact subsequent commands (including duplicates and blocked actions), and
-the complete game profile. Orders containing only the required opening allocation can share a
-profile alone. After validating the entire document, import locks the planner while it recalculates.
-The current plan remains visible during the update. On success, the planner selects the imported
-faction and shows the replacement order, profile, and completion notice together. A failed
-calculation leaves the current draft available and displays an error.
+Use **Share / Import** to copy a link or start from a template. Expand **JSON files** to import or
+export a file. **Include calculated timings** applies to JSON exports. Each format carries the
+faction, profile, opening allocation, and subsequent commands, including blocked actions.
+
+After validation, the planner keeps the current plan visible while it recalculates the imported
+build. A successful import selects the imported faction and applies its order and profile together.
+If recalculation fails, the planner keeps the current draft and displays an error.
 
 Start from template replaces the selected faction's build and opening allocation while retaining its
 active Resource collection settings. It asks before replacing a build with subsequent actions.
 Once confirmed, the template uses the same recalculation and saves the resulting working draft
-when it succeeds. Templates are declared in `src/game/buildOrderTemplates.ts` .
+when it succeeds. Templates are declared in `src/game/buildOrderTemplates.ts`.
 
 Personal profiles and working drafts are stored separately per faction in browser local storage
 (`wl-resource-profile-v2-*` and `wl-build-draft-v2-*` ). Save profile and Load saved profile appear
@@ -32,7 +27,7 @@ Save profile replaces the personal settings, including advanced and hidden setti
 profile is disabled when no valid personal profile exists; loading preserves the build order and
 opening allocation and recalculates timings. Save failures show an error instead of a success
 notice. Personal profiles use an envelope
-`{ "format": "wl-personal-profile", "version": 2, "faction": "light", "gameProfile": { ... } }` .
+`{ "format": "wl-personal-profile", "version": 2, "faction": "light", "gameProfile": { ... } }`.
 Its version reuses `FILE_VERSION` because the payload shares the public profile schema; future
 schema migrations must explicitly handle both public documents and personal profiles. No rules
 revision is needed: settings are evaluated with current rules. Reads validate the envelope identity,
@@ -45,10 +40,11 @@ Direct visits restore the faction's draft profile and build first, then its save
 if no valid draft exists, then defaults. JSON imports and `build=` links apply their own profile
 and build after full validation and successful recalculation, replacing only that faction's working
 draft. Personal profiles and the other faction's working draft are stored separately. Drafts contain
-the active profile, opening allocation, and exact action commands. They are saved together after an import or
+the active profile, opening allocation, and exact action commands. They are saved together after an
+import or
 working change, including profile edits, Load, Reset, template selection, and build-order changes;
 merely opening the planner does not create a draft. The selected faction is retained under
-`wl-active-faction` , so refresh restores the same faction, build, and active profile. Array-only
+`wl-active-faction`, so refresh restores the same faction, build, and active profile. Array-only
 drafts are unsupported. They follow the invalid-draft fallback: an empty build with default opening
 allocation and the saved personal profile or defaults. A stored draft that fails validation
 (including malformed JSON, an unsupported format, or a faction mismatch) shows a brief notice: "Your
@@ -59,13 +55,13 @@ entry. Neither personal saved profile nor a valid draft for the other faction is
 
 Reset basic to defaults restores only the main resource and level fields, preserving advanced and
 hidden settings. Reset all restores the full active profile. Both preserve the opening allocation
-and subsequent actions and update only the working draft. Clear restores the default opening split
-(up to 4 gold miners) and removes subsequent actions for the active faction, preserving its active
-and personal profiles. Empty builds still retain their draft profile. Invalid drafts fall back to
+and subsequent actions and update only the working draft. After confirmation, **Clear** removes
+subsequent actions and restores the default opening split while preserving the faction's profiles.
+Empty builds still retain their draft profile. Invalid drafts fall back to
 the personal profile or defaults; unavailable storage leaves editing usable in memory. Version 1
 browser profiles are not read or migrated. Version 1 files and links are not supported.
 
-`format` is `wl-build-order` ; `version` is the JSON schema version, currently 2. `gameRulesVersion`
+`format` is `wl-build-order`; `version` is the JSON schema version, currently 2. `gameRulesVersion`
 identifies the catalog/simulation revision. Bump `GAME_RULES_VERSION` in
 `src/game/buildOrderFile.ts` whenever catalog values or simulation rules change. Import accepts any
 non-empty rules revision, warns on a mismatch, and always uses current catalog entries and
@@ -87,7 +83,7 @@ and unsupported development formats are outside this compatibility guarantee.
 | Change link compression, encoding, or payload framing incompatibly | Bump the link encoding version and retain decoding for supported older links. A JSON schema change alone does not require a link encoding change if the transport can carry the new document unchanged. |
 | Change labels, artwork, layout, or other presentation only | No schema, link, or game-rules version change is required. |
 
-Stored `itemId` , `scrollId` , and command `type` values are stable identifiers. Display names may
+Stored `itemId`, `scrollId`, and command `type` values are stable identifiers. Display names may
 change independently. Do not reuse an existing identifier for a different entity or command meaning.
 
 Compatibility is directional: the updated app must read supported older builds, but an older app is
@@ -99,7 +95,7 @@ continue to use current rules and may acquire different timings or blocked actio
 Missing-field defaults are part of import semantics. When changing a default, assess its effect on
 supported documents that omit that field. Preserve their established interpretation through
 migration/default handling, or treat the change as an intentional rules change and bump
-`GAME_RULES_VERSION` ; do not silently change interpretation under the same revision. Renamed or
+`GAME_RULES_VERSION`; do not silently change interpretation under the same revision. Renamed or
 removed supported profile settings must follow the compatibility policy above rather than relying on
 unknown-field removal to discard their values.
 
@@ -138,19 +134,19 @@ Import rejects profiles that violate this relationship; saved profiles use the s
 the editor, increasing starting mana raises capacity when needed, and capacity cannot be reduced
 below starting mana. Equality, including zero for both values, is allowed.
 
-- `basic` : `goldGatherTime` , `woodGatherTime` , `initialGoldTravelReduction` ,
+- `basic`: `goldGatherTime`, `woodGatherTime`, `initialGoldTravelReduction`,
   `timeBetweenScrolls` (default 10 seconds, hidden from the profile UI).
-- `map` : `goldTravelTime` , `woodTravelTime` , `sawmillWoodTravelTime` ,
-  `woodTravelTimeIncreaseBase` , `maxWoodTravelTime` .
-- `player` : `startingGold` , `startingWood` , `baseFoodLimit` , `startingMana` (default 35),
-  `baseManaLimit` (default 50), `townHallLevel` , `sawmillLevel` , `farmLevel` , `manaTowerLevel` ,
-  `barracksLevel` , `industrialBuildingLevel` , `arcaneBuildingLevel` , `shipyardLevel` ,
-  `altarOfHeroesLevel` , `workerLevel` ; `manaAccumulation` , `manaFromManaWells` ,
-  `scrollCooldownReduction` , `goldMiningTimeReduction` , `woodMiningTimeReduction` ; and
-  `lightGoldRushLevel` , `lightLumberGatheringLevel` , plus `darkWhipLevel` , `darkLegionsCallLevel`
+- `map`: `goldTravelTime`, `woodTravelTime`, `sawmillWoodTravelTime`,
+  `woodTravelTimeIncreaseBase`, `maxWoodTravelTime`.
+- `player`: `startingGold`, `startingWood`, `baseFoodLimit`, `startingMana` (default 35),
+  `baseManaLimit` (default 50), `townHallLevel`, `sawmillLevel`, `farmLevel`, `manaTowerLevel`,
+  `barracksLevel`, `industrialBuildingLevel`, `arcaneBuildingLevel`, `shipyardLevel`,
+  `altarOfHeroesLevel`, `workerLevel`; `manaAccumulation`, `manaFromManaWells`,
+  `scrollCooldownReduction`, `goldMiningTimeReduction`, `woodMiningTimeReduction`; and
+  `lightGoldRushLevel`, `lightLumberGatheringLevel`, plus `darkWhipLevel`, `darkLegionsCallLevel`
   , and the hidden setting `massConstructionCostReduction` (scroll levels are integers 1–6, default
   1).
-- `delays` : `constructionStartDelay` , `orderDelay` .
+- `delays`: `constructionStartDelay`, `orderDelay`.
 
 Missing mana fields in older profiles default to the values above, with `manaTowerLevel` defaulting
 to 1. Supplied values are validated normally. Tower levels are integers 1–24 and add 50–55 capacity
@@ -166,7 +162,7 @@ UI edits are capped at 20 percent. Imported values above 20 percent are preserve
 is edited. `player.manaAccumulation` defaults to 10 when omitted and controls simulation. Each owned
 well adds `player.manaFromManaWells` mana per minute between Mana well is captured and Mana well is
 lost events, subject to mana capacity. Effective scroll cooldown is
-`basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)` , used for automatic
+`basic.timeBetweenScrolls * (1 - player.scrollCooldownReduction / 100)`, used for automatic
 suggestions, manual insertion minimums, and simulation validation. A 5% reduction yields 9.5 seconds
 with the default base; order delay still applies afterward.
 
@@ -180,7 +176,7 @@ seconds each way for gold and 3.5 seconds each way for wood). Initial gold trave
 Sawmill overrides apply to these values. Unrecognized profile fields are ignored.
 
 `player.goldMiningTimeReduction` and `player.woodMiningTimeReduction` subtract seconds from
-`basic.goldGatherTime` and `basic.woodGatherTime` , respectively. Both default to 0 for older
+`basic.goldGatherTime` and `basic.woodGatherTime`, respectively. Both default to 0 for older
 profiles. Gold accepts 0–1.0 seconds; wood accepts 0–5.0 seconds. Import rejects non-numeric,
 non-finite, negative, or over-limit values. The editor shows one decimal digit and uses 0.1-second
 steps in the first resource column; food fields appear in the second column. Effective durations
@@ -299,10 +295,10 @@ reject the whole import. Item IDs are resolved within the selected faction's cur
 Unknown IDs reject the entire import; valid but unexecutable actions import unchanged and appear
 blocked. Import does not insert missing prerequisites or deduplicate actions.
 
-The unchecked-by-default Include calculated timings option adds `timings` to each catalog action
-(the opening allocation has no cached timings), with `commandTime` , `startTime` , `finishTime` ,
+Enable **Include calculated timings** to add `timings` to each action
+(the opening allocation has no cached timings), with `commandTime`, `startTime`, `finishTime`,
 and `workerReturnTime` in seconds. Blocked actions have null times; unit recruitment has no
-worker-return time. Import never reads or validates `timings` , even when malformed, and always
+worker-return time. Import never reads or validates `timings`, even when malformed, and always
 recalculates the schedule.
 
 Validation requires finite non-negative profile numbers, integer worker assignments, and strictly
@@ -320,7 +316,7 @@ Version 2 also accepts timed scroll commands after the opening allocation:
 
 `commandTime` is a required finite number of seconds from 0 to 1799 (29:59) after game start, rather
 than cached simulation output. Scroll levels are independent `gameProfile.player` settings:
-`lightGoldRushLevel` , `lightLumberGatheringLevel` , `darkWhipLevel` , and `darkLegionsCallLevel` .
+`lightGoldRushLevel`, `lightLumberGatheringLevel`, `darkWhipLevel`, and `darkLegionsCallLevel`.
 Each is an integer from 1 to 6 and defaults to 1 when older files or profiles omit it. The four
 settings are saved, exported, shared, and reset with the profile. Light scroll levels appear in
 Resources collection as Gold Rush level and Wood Gathering level; Dark shows Whip scroll level and
@@ -330,7 +326,7 @@ scroll settings; Reset all restores all scroll levels to 1. Gold Rush and Lumber
 Light-only; Whip and Legion's Call are Dark-only. Invalid fields, unknown scroll IDs, and scrolls
 belonging to the other faction reject the whole import. Catalog-only version 2 files are also
 supported. The current rules revision is defined by `GAME_RULES_VERSION` in
-`src/game/buildOrderFile.ts` .
+`src/game/buildOrderFile.ts`.
 
 Scroll commands run at their timestamps independently of their positions among catalog rows.
 Equal-time scrolls run in source order; resource deliveries, worker recruitment completions, and
@@ -361,7 +357,7 @@ heroes row, each after a small divider. Each dialog offers a command time in mm:
 keyboard-editable field (fractional seconds are preserved) without a scroll-level control. Automatic
 timing is selected initially and disables the time field. It selects the first affordable timestamp
 at or after the latest existing scroll command plus the effective reduced cooldown plus
-`delays.orderDelay` ; with no scrolls, the minimum is zero. Manual timing also enforces that minimum
+`delays.orderDelay`; with no scrolls, the minimum is zero. Manual timing also enforces that minimum
 for Gold Rush, Lumber Gathering, and Whip. Legion's Call uses target-specific automatic timing;
 manual timing accepts any command time within the planner limit and requires an available target at
 that timestamp. The chosen timestamp is fixed when added; changing the plan or profile later
@@ -382,7 +378,7 @@ spending or bonus. Blocked commands do not start a cooldown. The insertion dialo
 requested scroll timestamp, including blocked commands, as its lower bound.
 
 Mana availability also requires `delays.orderDelay` before sending a scroll command. Even with
-sufficient starting mana, the first scroll command cannot precede `orderDelay` . If mana reaches 50
+sufficient starting mana, the first scroll command cannot precede `orderDelay`. If mana reaches 50
 at 80 and orderDelay is 1, the earliest command is 81 and its effect starts at 82. Both readiness
 waits overlap: use the later of mana readiness plus orderDelay and cooldown expiry plus orderDelay.
 If mana was already sufficient long before the command, this does not add another wait. Starting
@@ -465,7 +461,8 @@ in the address. Use Copy link to share the current plan again.
 Links use the current page's origin, path, and query, with `#build=2.<payload>` as the fragment. The
 payload is the compact JSON document compressed with zlib (the existing pako dependency), then
 encoded as URL-safe base64 without padding. The prefix versions the link encoding alongside JSON
-format version 2; game-rules revisions are unchanged. No hosting service or server storage is
+format version 2. The payload includes its own game-rules revision. No hosting service or server
+storage is
 involved. Recipients need access to the same planner address; localhost links require their own
 reachable planner at that address.
 
@@ -483,7 +480,7 @@ users can choose any timestamp from 00:00 to 29:59. Click the Build order row to
 or amounts. Events persist in drafts, JSON files and share links.
 
 The command schema is
-`{ "type": "resources-collected", "commandTime": 1, "gold": 300, "wood": 300 }` . Resource values
+`{ "type": "resources-collected", "commandTime": 1, "gold": 300, "wood": 300 }`. Resource values
 must be finite and may be negative; command time must be within 0–1799 seconds. Negative adjustments
 cannot reduce either balance below zero. The UI uses whole-second timestamps, while imports/API
 commands may retain fractional seconds.
@@ -491,8 +488,8 @@ commands may retain fractional seconds.
 ## Mana spent commands
 
 `{ "type": "mana-spent", "commandTime": 30, "mana": 75 }` records immediate expenditure for
-an unmodeled spell. The amount must be finite, positive and a whole number. The command timestamp
-must be a whole second from 0 through 1799. Both factions use their prepared Mana spent artwork.
+an unmodeled spell. The amount must be a finite positive whole number. The timestamp must be a
+whole second from 0 through 1799.
 The dialog defaults to 75 mana and one second after the latest active command, capped at 29:59.
 
 The event validates mana and shared scroll cooldown at command time, spends immediately and starts
@@ -501,12 +498,9 @@ normal order delay and effects. Exact-balance spending is valid. Existing expend
 unaffordable or cooldown-blocked stay in the plan with a reason and contribute neither spending nor
 cooldown. New or edited expenditures must be valid to save.
 
-A Mana spent timestamp cannot equal another Mana spent or scroll timestamp, including blocked
-entries. Both editors and every import/draft/share ingestion path enforce the rule; an invalid
-file does not partially replace the current plan. Edits retain event identity and fixed positioning,
-and timeline edits follow the saved position. Deletion recalculates mana and cooldown. The existing
-version-2 format remains unchanged; older plans without this event remain supported. Game rules
-version `2026-11-05.1` records the new simulation behavior.
+Mana spent requires a timestamp distinct from every other Mana spent event and scroll, including
+blocked entries. The editor and all import formats enforce this rule. Moving or deleting the event
+recalculates mana and cooldown.
 
 ## Mana well commands
 
@@ -519,27 +513,18 @@ Imports recalculate ownership validation.
 
 ## Unit is killed events
 
-`{ "type": "unit-is-killed", "unitId": "worker", "commandTime": 30 }` records one unit being killed
-at an exact timestamp with no delay or costs. unitId must identify a recruitable item in the chosen
-faction. Imports recalculate eligibility from completed recruitment, starting workers, earlier
+`{ "type": "unit-is-killed", "unitId": "worker", "commandTime": 30 }` removes a unit at the given
+timestamp. The `unitId` must identify a recruitable item in the chosen faction. Worker casualties
+accept an optional `workerGroup` of `"gathering"` or `"idle"`. Omit it to select gathering workers.
+Imports recalculate eligibility from completed recruitment, starting workers, earlier
 losses, and worker construction assignments. Successful losses release food and, for heroes, their
 recruitment cap and Altar tier reservation. Killed workers stop gathering and discard cargo. Workers
-assigned to construction (including travel) cannot be killed; wood workers are selected before gold
-workers. Invalid losses remain editable and inactive. The UI uses whole-second timestamps;
+assigned to construction, including travel, are ineligible. For gathering casualties, the planner
+selects wood workers before gold workers. Invalid losses remain editable and inactive. The UI uses
+whole-second timestamps;
 imports/API commands may retain fractional seconds.
 
-## Supported plan limits
-
-The shared policy permits 100 subsequent actions plus the opening worker allocation, with
-event/scroll command times from 00:00 to 29:59. Simulation and graphs stop at 30:00. Catalog actions
-that would finish or return their builder after 30:00 remain blocked; scrolls whose effects would
-finish after the horizon are also blocked. Profile durations must be within 0–1,800 seconds
-(gathering base durations must remain positive). A conservative gathering-work estimate rejects
-profiles that could exceed the runtime budget of 200,000 simulation steps. Graphs use at most 361
-regular samples, with bounded action timestamps added for food/mana discontinuities. These checks
-apply to editing, import/export, links and draft restore/save.
-
-## Worker events (rules 2026-11-07.1)
+## Worker activity events
 
 `{ "type": "make-idle", "commandTime": 10, "count": 1 }` pauses gathering.
 `{ "type": "make-active", "commandTime": 20, "count": 1, "travelDuration": 7 }`
@@ -548,9 +533,7 @@ Counts are positive integers within the supported worker limit; times and durati
 planner limits. Drafts, JSON files and share links use these same records. Worker identity,
 resource assignments and travel progress are derived by simulation, never stored.
 
-Worker casualty records optionally carry `workerGroup: "gathering" | "idle"`.
-Omitted groups default to gathering. New and imported events share the same strict
-choices; no legacy automatic mode or cross-group fallback exists.
+## Per-order construction settings
 
 Construction/upgrade item records may include `construction: { outwardDuration: 0,
 returnDuration: 7 }`. Each omitted field inherits the current global construction delay.
@@ -568,11 +551,23 @@ Optional diagnostic timings also include `departureTime` and `workerReturnEndTim
 The latter clips an interrupted return segment at reassignment; `workerReturnTime`
 retains that job's projected arrival. Like all saved timings, these are ignored on import.
 
-### Construction time modifier (rules 2026-11-07.2)
+### Construction time modifier
 
 `construction.timeModifier` is an optional numeric percentage. Supported values are
-`0`, `50`, and `100`. For example, `{ "itemId": "barracks", "construction": { "timeModifier": 50 } }`
+`0`, `50`, and `100`. For example,
+`{ "itemId": "barracks", "construction": { "timeModifier": 50 } }`
 sets one Barracks order to +50%. A missing field means normal time. A nonzero value is
 valid only on building construction other than Castle or Citadel. JSON imports and share
 links reject invalid values and leave the current plan available. Drafts store the same
-per-order field. The JSON and link format versions remain 2.
+per-order field.
+
+## Supported plan limits
+
+The shared policy permits 100 subsequent actions plus the opening worker allocation, with
+event/scroll command times from 00:00 to 29:59. Simulation and graphs stop at 30:00. Catalog actions
+that would finish or return their builder after 30:00 remain blocked; scrolls whose effects would
+finish after the horizon are also blocked. Profile durations must be within 0–1,800 seconds
+(gathering base durations must remain positive). A conservative gathering-work estimate rejects
+profiles that could exceed the runtime budget of 200,000 simulation steps. Graphs use at most 361
+regular samples, with bounded action timestamps added for food/mana discontinuities. These checks
+apply to editing, import/export, links and draft restore/save.
