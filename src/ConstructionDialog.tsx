@@ -88,10 +88,14 @@ export default function ConstructionDialog({ item, buildingName, globalDelay, ed
                     { id: "construction-return", label: "Return travel", value: back, set: setBack, disabled: useIdleWorker },
                 ]).map(field => <div key={field.id} className={`construction-duration-row${field.disabled ? " construction-inactive" : ""}`}>
                     <label htmlFor={field.id}>{field.label} (s)</label>
-                    <input id={field.id} type="number" min="0" step="0.1" inputMode="decimal" disabled={field.disabled} value={field.value ?? globalDelay}
-                        className="construction-travel-input"
-                        aria-describedby={`${field.id}-source${field.disabled ? " construction-return-help" : ""}`}
-                        onChange={event => field.set(event.target.value)} />
+                    <div className="construction-travel-input">
+                        <input id={field.id} type="number" min="0" step="0.1" inputMode="decimal" disabled={field.disabled} value={field.value ?? globalDelay}
+                            aria-describedby={`${field.id}-source${field.disabled ? " construction-return-help" : ""}`}
+                            onChange={event => field.set(event.target.value)} />
+                        {field.disabled && <span className="timeline-help-tooltip construction-travel-tooltip" role="tooltip">
+                            Not applicable for idle workers
+                        </span>}
+                    </div>
                     <div className="construction-source">
                         <span id={`${field.id}-source`}>{field.value === undefined ? `Global: ${globalSeconds}` : "Custom"}</span>
                         {field.value !== undefined && <button type="button" className="construction-reset" disabled={field.disabled}

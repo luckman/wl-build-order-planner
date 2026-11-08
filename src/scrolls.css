@@ -57,7 +57,16 @@
 }
 .construction-inactive label, .construction-inactive .construction-source > span { opacity: .6; }
 .construction-dialog input[type="number"] { min-width: 0; border-radius: 4px; }
-.construction-travel-input { grid-area: 1 / 2 / 3; }
+.construction-travel-input { grid-area: 1 / 2 / 3; position: relative; }
+.construction-travel-input input:disabled { pointer-events: none; }
+.construction-travel-input .construction-travel-tooltip {
+    display: none;
+    left: auto;
+    right: 0;
+    width: max-content;
+    pointer-events: none;
+}
+.construction-travel-input:hover .construction-travel-tooltip { display: block; }
 .construction-dialog .construction-idle {
     display: flex;
     align-items: center;
