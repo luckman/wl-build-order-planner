@@ -20,6 +20,7 @@ import BuildOrderFiles from "./BuildOrderFiles"
 import ScrollDialog from "./ScrollDialog"
 import UpgradeCards from "./UpgradeCards"
 import ActionMenu from "./ActionMenu"
+import ConfirmActionDialog from "./ConfirmActionDialog"
 import { orderedBuildings } from "./buildingDisplayOrder"
 import EventTimeDialog from "./EventTimeDialog"
 import { createScrollAction, SCROLLS, type ScrollId, isScrollAction, scrollCooldown, scrollEffect } from "./game/scrolls"
@@ -207,6 +208,7 @@ export default function App() {
     const [manaSpentDialogOpen, setManaSpentDialogOpen] = useState(false)
     const [resourcesCollectedDialogOpen, setResourcesCollectedDialogOpen] = useState(false)
     const [editingEventId, setEditingEventId] = useState<string | null>(null)
+    const [confirmClear, setConfirmClear] = useState(false)
     const [actionMenu, setActionMenu] = useState<({ item: PlannerItem } & (
         { source: "timeline"; anchor: HTMLButtonElement } | { source: "build-order"; anchor: HTMLLIElement }
     )) | null>(null)
@@ -799,7 +801,7 @@ export default function App() {
                     <aside className="order panel">
                         <div className="panel-title">
                             <h2>Build order</h2>
-                            <button className="clear" onClick={clearBuildOrder} disabled={!buildOrder.length && opening.goldWorkers === defaultGoldWorkers}>
+                            <button className="clear" onClick={() => setConfirmClear(true)} disabled={!buildOrder.length && opening.goldWorkers === defaultGoldWorkers}>
                                 Clear
                             </button>
                         </div>
@@ -898,6 +900,9 @@ export default function App() {
                         setEditingEventId(item.orderId)
                     } : undefined}
                     onDelete={() => removeAction(actionMenu.item)} />}
+                {confirmClear && <ConfirmActionDialog title="Clear build order" confirmLabel="Clear"
+                    message="This will remove all actions and reset the initial worker allocation to its default."
+                    onClose={() => setConfirmClear(false)} onConfirm={() => { setConfirmClear(false); clearBuildOrder() }} />}
                 {constructionDialogItem && <ConstructionDialog
                     key={editingEvent?.orderId ?? constructionDialogItem.id} item={constructionDialogItem}
                     buildingName={faction.items.find(item => item.id === constructionDialogItem.buildingId)?.name ?? constructionDialogItem.name}

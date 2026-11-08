@@ -25,6 +25,9 @@ blocked actions. Left-click an editable row or its clock to open the editor dire
 either mouse button opens a scheduled command's menu. After saving a Timeline edit, the Timeline
 follows the command's new position.
 
+**Clear** asks for confirmation before removing all actions and restoring the default initial
+worker allocation.
+
 In **Share / Import**, use the primary **Copy link** action to share a build, choose a starter
 template, or expand **JSON files** to import or export a `.wl-build-order.json` file.
 Drafts save automatically in your browser; export important builds for backup. **Save profile**

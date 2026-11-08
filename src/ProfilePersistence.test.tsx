@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import App from "./App"
 import { serializeBuildOrder } from "./game/buildOrderFile"
 import { initialGameProfile, initialOpeningAction } from "./game/gameProfile"
@@ -74,6 +74,7 @@ test("Save and Load are faction-specific; Load, Reset, and Clear preserve the ap
     expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
     click("Clear")
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Clear build order" })).getByRole("button", { name: "Clear" }))
     expect(gold()).toBe("777")
     expect(loadSavedProfile("light")).toEqual(saved)
     expect(JSON.parse(window.localStorage.getItem(draftStorageKey("light"))!).gameProfile).toEqual(saved)

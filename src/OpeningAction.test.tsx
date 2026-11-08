@@ -32,6 +32,7 @@ test("opening belongs to the order, persists with actions, and resource reset pr
     expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("2")
     fireEvent.click(screen.getByRole("button", { name: "Clear" }))
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Clear build order" })).getByRole("button", { name: "Clear" }))
     expect((screen.getByLabelText("Initial gold miners") as HTMLInputElement).value).toBe("4")
     expect(screen.queryByRole("button", { name: "Remove Worker" })).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
