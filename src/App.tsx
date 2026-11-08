@@ -836,10 +836,9 @@ export default function App() {
                                     const { item, commandTime, finishTime, blocked, blockedReason } = action
                                     let timing = blockedReason
                                     if (!blocked && commandTime !== null) {
-                                        const command = formatTime(commandTime)
                                         timing = finishTime !== null && finishTime > commandTime
-                                            ? `${command} - ${formatTime(finishTime)}`
-                                            : `Command ${command}`
+                                            ? `${formatTimeWithTenths(commandTime)} - ${formatTimeWithTenths(finishTime)}`
+                                            : `Command ${formatTime(commandTime)}`
                                     }
                                     return <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
                                     {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle(action, economy.constructionStartDelay)}

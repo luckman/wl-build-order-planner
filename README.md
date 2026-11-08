@@ -24,9 +24,9 @@ to refine your opening. In **Timeline**, either mouse button opens a scheduled c
 After saving a Timeline edit, the Timeline follows the command's new position.
 
 The **Build order** panel lists your planned actions. Timing ranges run from command to completion
-or scroll expiry. Hover over a row for timing details. Right-click a row for the action menu, or
-left-click an editable row or its clock to edit it directly. **Clear** also resets the initial
-worker allocation to its default.
+or scroll expiry, with tenths on both ends (`0:56.0 - 1:24.0`). Hover over a row for timing details.
+Right-click a row for the action menu, or left-click an editable row or its clock to edit it
+directly. **Clear** also resets the initial worker allocation to its default.
 
 In **Share / Import**, use the primary **Copy link** action to share a build, choose a starter
 template, or expand **JSON files** to import or export a `.wl-build-order.json` file.

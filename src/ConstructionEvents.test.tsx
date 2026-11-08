@@ -214,7 +214,7 @@ test("construction renders distinct positive phases and omits zero travel and id
     fireEvent.change(dialog.getByLabelText("Return travel (s)"), { target: { value: "7" } })
     fireEvent.click(dialog.getByRole("button", { name: "Add order" }))
     const row = screen.getByRole("button", { name: "Remove Barracks" }).closest("li")!
-    expect(within(row).getByText("0:10 - 0:45")).toBeVisible()
+    expect(within(row).getByText("0:10.0 - 0:45.0")).toBeVisible()
     const item = view.container.querySelector(".event.building")!
     expect(item.textContent).toBe("Barracks")
     expect(screen.queryByLabelText("Construction phases")).toBeNull()

@@ -18,7 +18,7 @@ test("Gold Rush dialog supports automatic and fixed timing on desktop and mobile
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(width)
         await page.screenshot({ path: `test-results/scroll-dialog-${width}.png`, fullPage: true })
         await dialog.getByRole("button", { name: "Add scroll" }).click()
-        await expect(page.locator(".order li")).toContainText("1:31 - 2:02")
+        await expect(page.locator(".order li")).toContainText("1:31.0 - 2:02.0")
         await expect(page.getByRole("button", { name: /^Reorder Gold Rush/ })).toHaveCount(0)
         await card.click()
         await expect(dialog.getByLabel("Command time (mm:ss)")).toHaveValue("06:32")
