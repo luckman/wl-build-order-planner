@@ -258,7 +258,9 @@ test("Build order context menus cover row controls, blocked actions, and repeate
     ]) {
         await target.click({ button: "right" })
         await expect(menu).toHaveAccessibleName(`${name} actions`)
-        await expect(menu.getByRole("menuitem")).toHaveText(editable ? ["Edit", "Delete"] : ["Delete"])
+        const choices = editable ? ["Edit", "Delete"] : ["Delete"]
+        if (target !== blocked) choices.push("Delete from here")
+        await expect(menu.getByRole("menuitem")).toHaveText(choices)
         await expect(page.getByRole("dialog")).toBeHidden()
         await expect(rows).toHaveText(originalRows)
         if (editable) {
@@ -334,6 +336,55 @@ for (const shortcut of ["clock", "menu"] as const) test(`editing from the Build 
     await expect(moved).toHaveCount(1)
     expect(await viewport.evaluate(element => element.scrollLeft)).toBe(position)
     expect((await moved.boundingBox())!.x).toBeGreaterThan((await viewport.boundingBox())!.x + (await viewport.boundingBox())!.width)
+})
+
+for (const { selection, count, remaining, latest } of [
+    { selection: "first", count: 5, remaining: [], latest: "No command has been sent yet." },
+    { selection: "middle", count: 4, remaining: ["+100 gold"], latest: "Latest command 0:20" },
+    { selection: "blocked", count: 2, remaining: ["+100 gold", "+200 gold", "+300 gold"], latest: "Latest command 1:30" },
+]) test(`Delete from here removes the displayed suffix from the ${selection} row`, async ({ page }) => {
+    await importBuild(page, "light", [
+        { type: "resources-collected", commandTime: 90, gold: 300, wood: 0 },
+        { type: "mana-well-is-lost", commandTime: 120 },
+        { type: "resources-collected", commandTime: 20, gold: 100, wood: 0 },
+        { type: "mana-well-is-lost", commandTime: 180 },
+        { type: "resources-collected", commandTime: 60, gold: 200, wood: 0 },
+    ])
+    const rows = page.locator(".sortable-order").getByRole("listitem")
+    const menu = page.getByRole("menu")
+    const deleteFromHere = menu.getByRole("menuitem", { name: "Delete from here", exact: true })
+    await expect(rows).toHaveCount(5)
+    await rows.last().click({ button: "right" })
+    await expect(menu.getByRole("menuitem", { name: "Delete", exact: true })).toBeVisible()
+    await expect(deleteFromHere).toHaveCount(0)
+    await page.keyboard.press("Escape")
+    await page.locator("button.event.resources-collected").first().click({ button: "right" })
+    await expect(menu.getByRole("menuitem", { name: "Delete", exact: true })).toBeVisible()
+    await expect(deleteFromHere).toHaveCount(0)
+    await page.keyboard.press("Escape")
+
+    const row = selection === "blocked" ? rows.filter({ hasText: "Mana well is lost" }).first()
+        : rows.filter({ hasText: selection === "first" ? "+100 gold" : "+200 gold" })
+    if (selection === "blocked") await expect(row).toHaveClass(/order-blocked/)
+    const originalRows = await rows.allTextContents()
+    await row.click({ button: "right" })
+    await expect(deleteFromHere).toBeVisible()
+    await deleteFromHere.click()
+    const dialog = page.getByRole("dialog", { name: "Delete from here" })
+    await expect(dialog).toHaveAccessibleDescription(new RegExp(`delete ${count} actions`, "i"))
+    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(dialog).toBeHidden()
+    await expect(row).toBeFocused()
+    await expect(rows).toHaveText(originalRows)
+
+    await row.click({ button: "right" })
+    await deleteFromHere.click()
+    await dialog.getByRole("button", { name: "Delete", exact: true }).click()
+    await expect(dialog).toBeHidden()
+    await expect(rows).toHaveCount(remaining.length)
+    for (const [index, gold] of remaining.entries()) await expect(rows.nth(index)).toContainText(gold)
+    await expect(page.getByText(latest, { exact: true })).toBeVisible()
 })
 
 test("a saved scroll that becomes blocked keeps existing warning and Build order editing", async ({ page }) => {

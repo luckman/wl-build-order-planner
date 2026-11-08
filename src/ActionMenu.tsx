@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 
-export default function ActionMenu({ anchor, container, actionName, onEdit, onDelete, onClose }: {
+export default function ActionMenu({ anchor, container, actionName, onEdit, onDelete, onDeleteFrom, onClose }: {
     anchor: HTMLElement; container: HTMLElement; actionName: string; onEdit?: () => void; onDelete: () => void; onClose: () => void
+    onDeleteFrom?: () => void
 }) {
     const menu = useRef<HTMLDivElement>(null)
     useLayoutEffect(() => {
@@ -54,5 +55,10 @@ export default function ActionMenu({ anchor, container, actionName, onEdit, onDe
             onEdit()
         }}>Edit</button>}
         <button type="button" role="menuitem" className="delete-action" onClick={() => { onClose(); onDelete() }}>Delete</button>
+        {onDeleteFrom && <button type="button" role="menuitem" className="delete-action" onClick={() => {
+            anchor.focus({ preventScroll: true })
+            onClose()
+            onDeleteFrom()
+        }}>Delete from here</button>}
     </div>, container)
 }

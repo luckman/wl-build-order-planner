@@ -25,8 +25,9 @@ blocked actions. Left-click an editable row or its clock to open the editor dire
 either mouse button opens a scheduled command's menu. After saving a Timeline edit, the Timeline
 follows the command's new position.
 
-**Clear** asks for confirmation before removing all actions and restoring the default initial
-worker allocation.
+Choose **Delete from here** in a Build order row's menu to remove that action and all rows below
+it. The confirmation shows how many actions will be deleted. **Clear** asks for confirmation before
+removing all actions and restoring the default initial worker allocation.
 
 In **Share / Import**, use the primary **Copy link** action to share a build, choose a starter
 template, or expand **JSON files** to import or export a `.wl-build-order.json` file.

@@ -208,7 +208,7 @@ export default function App() {
     const [manaSpentDialogOpen, setManaSpentDialogOpen] = useState(false)
     const [resourcesCollectedDialogOpen, setResourcesCollectedDialogOpen] = useState(false)
     const [editingEventId, setEditingEventId] = useState<string | null>(null)
-    const [confirmClear, setConfirmClear] = useState(false)
+    const [confirmation, setConfirmation] = useState<{ type: "clear" } | { type: "delete-from"; item: PlannerItem } | null>(null)
     const [actionMenu, setActionMenu] = useState<({ item: PlannerItem } & (
         { source: "timeline"; anchor: HTMLButtonElement } | { source: "build-order"; anchor: HTMLLIElement }
     )) | null>(null)
@@ -282,7 +282,10 @@ export default function App() {
             updateBuildOrders(current => ({ ...current, [target]: draft }))
             onSuccess?.(result)
         })
-        if (accepted) closeActionMenu()
+        if (accepted) {
+            closeActionMenu()
+            setConfirmation(null)
+        }
         return accepted
     }, [calculate, closeActionMenu])
     const setBuildOrder = (update: SetStateAction<PlannerItem[]>, onSuccess?: () => void) => {
@@ -470,6 +473,13 @@ export default function App() {
     const minimumScrollTime = scrollTimes.length ? Math.max(...scrollTimes) + scrollCooldown(economy) + economy.orderDelay : 0
     const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime, scrollDialogOpen ?? "gold-rush")
     const displayPlan = buildOrder.some(isTimedEvent) ? scheduled.orderedPlan : plan
+    const menuRowIndex = actionMenu?.source === "build-order" ? displayPlan.findIndex(({ item }) => item === actionMenu.item) : -1
+    const deleteFromIndex = confirmation?.type === "delete-from" ? displayPlan.findIndex(({ item }) => item === confirmation.item) : -1
+    const deleteFromHere = () => {
+        const removed = new Set(displayPlan.slice(deleteFromIndex).map(({ item }) => item))
+        setDependencyError(null)
+        setBuildOrder(current => current.filter(item => !removed.has(item)))
+    }
     const defaultEventTime = Math.min(MAX_COMMAND_SECONDS, Math.ceil(Math.max(0, ...plan.filter(action => !action.blocked).map(action => action.commandTime ?? 0)) + 1))
     const spending = useMemo(() => plan.flatMap(({ cost, commandTime }) =>
         commandTime === null ? [] : [{ time: commandTime, gold: -cost.gold, wood: -cost.wood }],
@@ -582,6 +592,7 @@ export default function App() {
                                     className={entry.id === factionId ? "selected" : ""}
                                     onClick={() => {
                                         setFactionId(entry.id)
+                                        setConfirmation(null)
                                         setDependencyError(null)
                                         setHoverTime(null)
                                     }}
@@ -801,7 +812,7 @@ export default function App() {
                     <aside className="order panel">
                         <div className="panel-title">
                             <h2>Build order</h2>
-                            <button className="clear" onClick={() => setConfirmClear(true)} disabled={!buildOrder.length && opening.goldWorkers === defaultGoldWorkers}>
+                            <button className="clear" onClick={() => setConfirmation({ type: "clear" })} disabled={!buildOrder.length && opening.goldWorkers === defaultGoldWorkers}>
                                 Clear
                             </button>
                         </div>
@@ -899,10 +910,15 @@ export default function App() {
                         setDependencyError(null)
                         setEditingEventId(item.orderId)
                     } : undefined}
-                    onDelete={() => removeAction(actionMenu.item)} />}
-                {confirmClear && <ConfirmActionDialog title="Clear build order" confirmLabel="Clear"
+                    onDelete={() => removeAction(actionMenu.item)}
+                    onDeleteFrom={menuRowIndex >= 0 && menuRowIndex < displayPlan.length - 1
+                        ? () => setConfirmation({ type: "delete-from", item: actionMenu.item }) : undefined} />}
+                {confirmation?.type === "clear" && <ConfirmActionDialog title="Clear build order" confirmLabel="Clear"
                     message="This will remove all actions and reset the initial worker allocation to its default."
-                    onClose={() => setConfirmClear(false)} onConfirm={() => { setConfirmClear(false); clearBuildOrder() }} />}
+                    onClose={() => setConfirmation(null)} onConfirm={() => { setConfirmation(null); clearBuildOrder() }} />}
+                {deleteFromIndex >= 0 && deleteFromIndex < displayPlan.length - 1 && <ConfirmActionDialog title="Delete from here" confirmLabel="Delete"
+                    message={`This will delete ${displayPlan.length - deleteFromIndex} actions, including the selected action and all following actions.`}
+                    onClose={() => setConfirmation(null)} onConfirm={() => { setConfirmation(null); deleteFromHere() }} />}
                 {constructionDialogItem && <ConstructionDialog
                     key={editingEvent?.orderId ?? constructionDialogItem.id} item={constructionDialogItem}
                     buildingName={faction.items.find(item => item.id === constructionDialogItem.buildingId)?.name ?? constructionDialogItem.name}
