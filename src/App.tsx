@@ -735,6 +735,7 @@ export default function App() {
                                                             const bounds = timelineBounds(action)
                                                             const title = actionTimingTitle(action, economy.constructionStartDelay)
                                                             const phaseDescriptionId = isConstruction(item) ? `construction-phases-${index}` : undefined
+                                                            const toggleMenu = (anchor: HTMLButtonElement) => setTimelineMenu(current => current?.item === item ? null : { item, anchor })
                                                             return <button
                                                                 className={`event ${item.kind}${isConstruction(item) ? " construction-event" : ""}${item.kind === "hero" ? " unit" : ""}${isTimedEvent(item) ? " timed-event" : ""}`}
                                                                 key={`${item.id}-${index}`}
@@ -746,7 +747,8 @@ export default function App() {
                                                                 data-order-id={(item as typeof buildOrder[number]).orderId}
                                                                 aria-expanded={timelineMenu?.item === item}
                                                                 aria-controls={timelineMenu?.item === item ? "timeline-action-menu" : undefined}
-                                                                onClick={event => setTimelineMenu(timelineMenu?.item === item ? null : { item, anchor: event.currentTarget })}
+                                                                onClick={event => toggleMenu(event.currentTarget)}
+                                                                onContextMenu={event => { event.preventDefault(); toggleMenu(event.currentTarget) }}
                                                             >
                                                                 {phaseDescriptionId ? <ConstructionPhases action={action} icon={iconSources[item.icon]} descriptionId={phaseDescriptionId} timing={title} /> : <><img src={iconSources[item.icon]} alt="" /><span>{item.name}</span></>}
                                                             </button>
@@ -1110,7 +1112,7 @@ function TimelineHelp() {
         <div id="timeline-help-text" className="timeline-help-tooltip" role="tooltip" hidden={!hovered && !focused}>
             Hover a graph to see resources at that time. Otherwise, values show the latest command.
             Hover an action to see its command, start, finish, and worker return times.
-            Left-click a command to open its menu. Choose Edit for scrolls and timed events, or Delete to remove a command.
+            Left-click or right-click a command to open its menu. Choose Edit when available, or Delete to remove the command.
             After editing a timeline event, the timeline follows its new position.
         </div>
     </div>

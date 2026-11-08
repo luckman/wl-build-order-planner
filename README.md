@@ -20,8 +20,8 @@ timeline.
 
 Choose a faction, set your opening workers and **Resource collection** settings, then add
 **Actions** or load a template from **Share / Import**. Reorder actions and review the **Timeline**
-to refine your opening. Click timed-event rows to edit them, or click a scroll or event on the
-timeline and choose **Edit**. After saving a timeline edit, the timeline follows the event's new position.
+to refine your opening. Click timed-event rows to edit them, or left-click or right-click a scheduled
+Timeline command to open its action menu. After saving a Timeline edit, the Timeline follows the command's new position.
 
 In **Share / Import**, use the primary **Copy link** action to share a build, choose a starter
 template, or expand **JSON files** to import or export a `.wl-build-order.json` file.
