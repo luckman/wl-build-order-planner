@@ -43,6 +43,7 @@ test.each(["Light", "Dark"])("%s worker events add, edit, cancel and restore dra
     expect(idleRow().getByText(`${idleName} (2)`)).toBeTruthy()
     const activeRow = within(screen.getByRole("button", { name: `Remove ${activeName}` }).closest("li")!)
     expect(activeRow.getByText("1 workers · 7s travel")).toBeTruthy()
+    expect(activeRow.getByText("Command 0:02")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: new RegExp(`Change ${activeName} timestamp`) }))
     dialog = within(screen.getByRole("dialog"))
     expect((dialog.getByLabelText("Reactivation travel (seconds)") as HTMLInputElement).value).toBe("7")

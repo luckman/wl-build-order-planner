@@ -833,7 +833,14 @@ export default function App() {
                             <Droppable droppableId="build-order">
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
                                 {displayPlan.map((action, index) => {
-                                    const { item, commandTime, startTime, finishTime, blocked, blockedReason } = action
+                                    const { item, commandTime, finishTime, blocked, blockedReason } = action
+                                    let timing = blockedReason
+                                    if (!blocked && commandTime !== null) {
+                                        const command = formatTime(commandTime)
+                                        timing = finishTime !== null && finishTime > commandTime
+                                            ? `${command} - ${formatTime(finishTime)}`
+                                            : `Command ${command}`
+                                    }
                                     return <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
                                     {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle(action, economy.constructionStartDelay)}
                                         tabIndex={isConstruction(item) ? 0 : -1}
@@ -858,11 +865,7 @@ export default function App() {
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}{item.workerGroup ? ` · ${item.workerGroup} worker` : ""}</small>}
                                             {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
-                                            <small>
-                                                {blocked || commandTime === null
-                                                    ? blockedReason
-                                                    : `Command ${formatTime(commandTime)}`}
-                                            </small>
+                                            <small>{timing}</small>
                                         </div>
                                         <button
                                             aria-label={`Remove ${item.name}`}

@@ -68,13 +68,13 @@ for (const width of [1440, 390]) {
 }
 
 const editableCases: Array<{
-    name: string; faction: "light" | "dark"; commands: BuildOrderDocument["buildOrder"]; save: string
+    name: string; faction: "light" | "dark"; commands: BuildOrderDocument["buildOrder"]; save: string; savedTiming?: string
 }> = [
-    { name: "Gold Rush", faction: "light", commands: [{ type: "use-scroll", scrollId: "gold-rush", commandTime: 60 }], save: "Save timestamp" },
-    { name: "Lumber Gathering", faction: "light", commands: [{ type: "use-scroll", scrollId: "lumber-gathering", commandTime: 60 }], save: "Save timestamp" },
-    { name: "Whip", faction: "dark", commands: [{ type: "use-scroll", scrollId: "whip", commandTime: 60 }], save: "Save timestamp" },
+    { name: "Gold Rush", faction: "light", commands: [{ type: "use-scroll", scrollId: "gold-rush", commandTime: 60 }], save: "Save timestamp", savedTiming: "1:10 - 1:41" },
+    { name: "Lumber Gathering", faction: "light", commands: [{ type: "use-scroll", scrollId: "lumber-gathering", commandTime: 60 }], save: "Save timestamp", savedTiming: "1:10 - 1:41" },
+    { name: "Whip", faction: "dark", commands: [{ type: "use-scroll", scrollId: "whip", commandTime: 60 }], save: "Save timestamp", savedTiming: "1:10 - 1:41" },
     { name: "Legion's Call", faction: "dark", commands: [{ itemId: "barracks" },
-        { type: "use-scroll", scrollId: "legions-call", commandTime: 60, targetItemId: "barracks" }], save: "Save scroll" },
+        { type: "use-scroll", scrollId: "legions-call", commandTime: 60, targetItemId: "barracks" }], save: "Save scroll", savedTiming: "1:10 - 1:36" },
     { name: "Resources collected", faction: "light", commands: [{ type: "resources-collected", commandTime: 60, gold: 300, wood: 200 }], save: "Save event" },
     { name: "Mana well is captured", faction: "light", commands: [{ type: "mana-well-is-captured", commandTime: 60 }], save: "Save event" },
     { name: "Mana well is lost", faction: "dark", commands: [{ type: "mana-well-is-captured", commandTime: 30 },
@@ -123,7 +123,7 @@ for (const scenario of editableCases) {
         await expect(event).toBeFocused()
         const row = page.locator(".order li").filter({ has: page.getByRole("button", { name: `Remove ${scenario.name}`, exact: true }) })
         await expect(row).toHaveCount(1)
-        await expect(row).toContainText("Command 1:10")
+        await expect(row).toContainText(scenario.savedTiming ?? "Command 1:10")
         if (scenario.name === "Resources collected") await expect(row).toContainText("+700 gold · -50 wood")
         if (scenario.name === "Legion's Call") await expect(row).toContainText("Target: Citadel")
         await page.reload()
@@ -206,7 +206,7 @@ test("editing one repeated scroll follows it across chronological and lane chang
     await expect(page.getByText("Scrolls and events 2", { exact: true })).toHaveCount(0)
     await expectInTimeline(moved, page.locator(".timeline-scroll"))
     await expect(page.locator(".order li").filter({ has: page.getByRole("button", { name: "Remove Gold Rush", exact: true }) }).first())
-        .toContainText("Command 10:00")
+        .toContainText("10:00 - 10:31")
     await page.reload()
     await expect(scrolls).toHaveCount(2)
     await expect(moved).toHaveCount(1)

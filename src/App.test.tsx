@@ -327,6 +327,8 @@ test("Miriel appears in the heroes row, consumes food, and removing her releases
     expect(within(summary).getByText("20 / 40")).toBeTruthy()
     expect(Array.from(container.querySelectorAll(".queue-label")).some(label => label.textContent === "Altar of Heroes")).toBe(true)
     expect(container.querySelector(".event.hero")).toBeTruthy()
+    const heroRow = screen.getByRole("button", { name: "Remove Miriel" }).closest("li")!
+    expect(within(heroRow).getByText("2:19 - 3:03.6")).toBeTruthy()
     fireEvent.click(hero)
     expect(screen.getByRole("alert").textContent).toContain("Miriel limit reached")
     fireEvent.click(screen.getByRole("button", { name: "Remove Miriel" }))
@@ -416,13 +418,12 @@ test.each([
     fireEvent.click(addWorker)
     fireEvent.click(addWorker)
     const order = container.querySelector(".order") as HTMLElement
-    expect(within(order).getByText("Command 0:01")).toBeTruthy()
-    expect(within(order).getByText("Command 0:18.8")).toBeTruthy()
+    expect(within(order).getByText("0:01 - 0:18.8")).toBeTruthy()
+    expect(within(order).getByText("0:18.8 - 0:36.6")).toBeTruthy()
     const rows = Array.from(order.querySelectorAll("li"))
     const events = Array.from(container.querySelectorAll(".event.unit"))
     expect(rows.map(row => row.title)).toEqual(events.map(event => event.getAttribute("title")))
     expect(rows.every(row => !row.title.includes("worker returns"))).toBe(true)
-    expect(within(order).queryByText("Command 0:27")).toBeNull()
 })
 
 test("Barracks is added before its unit and its training slot is available only after construction", () => {
@@ -434,8 +435,8 @@ test("Barracks is added before its unit and its training slot is available only 
     fireEvent.click(within(action).getByRole("button", { name: /Swordsman/ }))
     expect(within(order).getByText("Barracks")).toBeTruthy()
     fireEvent.click(within(action).getByRole("button", { name: /Swordsman/ }))
-    expect(within(order).getByText("Command 0:35")).toBeTruthy()
-    expect(within(order).getByText("Command 0:55.8")).toBeTruthy()
+    expect(within(order).getByText("0:35 - 0:55.8")).toBeTruthy()
+    expect(within(order).getByText("0:55.8 - 1:16.6")).toBeTruthy()
 })
 
 test("two completed Barracks have independent training slots", () => {
@@ -447,8 +448,8 @@ test("two completed Barracks have independent training slots", () => {
         fireEvent.click(within(action).getByRole("button", { name }))
     }
     const order = container.querySelector(".order") as HTMLElement
-    expect(within(order).getByText("Command 0:35")).toBeTruthy()
-    expect(within(order).getByText("Command 0:36")).toBeTruthy()
+    expect(within(order).getByText("0:35 - 0:55.8")).toBeTruthy()
+    expect(within(order).getByText("0:36 - 0:56.8")).toBeTruthy()
 })
 
 test("initial allocations derive food, and hovering reads exact delivery boundaries", () => {
@@ -551,5 +552,6 @@ test("standard town hall upgrades show the same compact timing in both panels", 
         "Command 0:35 · Start 0:38 · Finish 1:23",
     )
     const upgradeRow = screen.getByRole("button", { name: "Remove Castle lvl 2" }).closest("li")!
+    expect(within(upgradeRow).getByText("0:35 - 1:23")).toBeTruthy()
     expect(upgradeRow.title).toBe(container.querySelector(".event.upgrade")?.getAttribute("title"))
 })

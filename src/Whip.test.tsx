@@ -25,7 +25,7 @@ test("Dark Whip supports automatic timing, level selection, editing and faction 
     const editor = within(screen.getByRole("dialog"))
     fireEvent.change(editor.getByLabelText("Command time (mm:ss)"), { target: { value: "01:40" } })
     fireEvent.click(editor.getByRole("button", { name: "Save timestamp" }))
-    expect(container.querySelector(".order li")?.textContent).toContain("Command 1:40")
+    expect(container.querySelector(".order li")?.textContent).toContain("1:40 - 2:14.5")
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(screen.queryByRole("button", { name: "Remove Whip" })).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))

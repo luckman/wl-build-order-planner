@@ -25,6 +25,12 @@ blocked actions. Left-click an editable row or its clock to open the editor dire
 either mouse button opens a scheduled command's menu. After saving a Timeline edit, the Timeline
 follows the command's new position.
 
+**Build order** rows show a range from command time to recruitment or construction completion,
+upgrade completion, or scroll expiry. Times show tenths only when needed, as in `0:56.7 - 1:24`.
+Single-timestamp events show `Command` and their time. Make active also shows its travel duration.
+Blocked rows show their reason. Hover over a row to see its timing phases, including builder return
+when shown for a customized order.
+
 Choose **Delete from here** in a Build order row's menu to remove that action and all rows below
 it. The confirmation shows how many actions will be deleted. **Clear** asks for confirmation before
 removing all actions and restoring the default initial worker allocation.
