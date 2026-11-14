@@ -146,3 +146,5 @@ and mechanics.
 Game names, logos, and artwork belong to their respective owners. Some icons are temporary assets
 inherited from the original planner; the source-code license does not grant rights to third-party
 game artwork.
+
+Performance measurements for contributors are described in [Performance benchmarks](docs/PERFORMANCE_BENCHMARKS.md).

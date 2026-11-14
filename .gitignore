@@ -41,3 +41,5 @@ temp.txt
 /CONTEXT-MAP.md
 __pycache__/
 *.pyc
+
+/benchmark-results/

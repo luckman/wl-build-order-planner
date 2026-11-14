@@ -17,7 +17,8 @@
         "lint:fix": "biome check . --write --error-on-warnings",
         "format": "biome format .",
         "eject": "react-scripts eject",
-        "typecheck": "cross-env NODE_OPTIONS=--openssl-legacy-provider npx tsc --noEmit"
+        "typecheck": "cross-env NODE_OPTIONS=--openssl-legacy-provider npx tsc --noEmit",
+        "benchmark": "node benchmarks/run.cjs"
     },
     "dependencies": {
         "@hello-pangea/dnd": "^18.0.1",
