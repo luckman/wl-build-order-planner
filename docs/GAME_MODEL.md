@@ -224,7 +224,7 @@ including blocked commands.
 | Resources collected (both factions) | Instantly adjusts gold and wood without mana, worker, or delay requirements. Negative amounts subtract resources, clamping each resulting balance to zero at that timestamp. |
 | Mana spent (both factions) | Immediately spends a chosen finite positive whole-number amount (default 75). Respects and starts shared scroll cooldown, with no order delay or other spell effect. |
 | Mana well is captured / Mana well is lost (both factions) | Instantly adds/removes one owned well. A loss requires ownership at that timestamp. |
-| Unit is killed (both factions) | Removes a living unit and releases its food. For worker losses, choose Gathering or Idle. |
+| Unit is killed (both factions) | Removes a living unit and releases its food. For worker losses, choose Gathering or Idle. Recalculation keeps unavailable casualties as blocked entries with no effect. |
 | Make idle / Make active (both factions) | Pauses gathering or restores the saved assignments for a chosen number of workers. |
 
 For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively.

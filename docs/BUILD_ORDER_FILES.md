@@ -516,13 +516,14 @@ Imports recalculate ownership validation.
 `{ "type": "unit-is-killed", "unitId": "worker", "commandTime": 30 }` removes a unit at the given
 timestamp. The `unitId` must identify a recruitable item in the chosen faction. Worker casualties
 accept an optional `workerGroup` of `"gathering"` or `"idle"`. Omit it to select gathering workers.
-Imports recalculate eligibility from completed recruitment, starting workers, earlier
-losses, and worker construction assignments. Successful losses release food and, for heroes, their
+The planner checks eligibility during build-order recalculation, including when you add, edit,
+or import a casualty. It uses completed recruitment, starting workers, earlier losses, and
+worker construction assignments. Successful losses release food and, for heroes, their
 recruitment cap and Altar tier reservation. Killed workers stop gathering and discard cargo. Workers
 assigned to construction, including travel, are ineligible. For gathering casualties, the planner
-selects wood workers before gold workers. Invalid losses remain editable and inactive. The UI uses
-whole-second timestamps;
-imports/API commands may retain fractional seconds.
+selects wood workers before gold workers. If the target is unavailable, the event stays at its
+command time, shows the reason in the build order, and has no effect while blocked. The UI uses
+whole-second timestamps. Imports and API commands may retain fractional seconds.
 
 ## Worker activity events
 

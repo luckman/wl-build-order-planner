@@ -53,31 +53,50 @@ test.each(["Light", "Dark"])("%s worker events add, edit, cancel and restore dra
     expect(screen.queryByRole("button", { name: `Remove ${activeName}` })).toBeNull()
 })
 
-test.each(["Light", "Dark"])("%s idle casualty selection follows event time and survives upstream invalidation", faction => {
-    render(<App />)
+test.each(["Light", "Dark"])("%s idle casualty persists while blocked and becomes active after an earlier Make idle", faction => {
+    let view = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
     const worker = faction === "Light" ? "Worker" : "Slave"
     const idleName = `Make ${worker} idle`
     fireEvent.click(screen.getByRole("button", { name: "Unit is killed", exact: true }))
     let dialog = within(screen.getByRole("dialog"))
     expect((dialog.getByLabelText("Worker group") as HTMLSelectElement).value).toBe("gathering")
-    expect((dialog.getByRole("option", { name: "Idle worker" }) as HTMLOptionElement).disabled).toBe(true)
-    fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
-    fireEvent.click(screen.getByRole("button", { name: idleName, exact: true }))
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add event" }))
-    fireEvent.click(screen.getByRole("button", { name: "Unit is killed", exact: true }))
-    dialog = within(screen.getByRole("dialog"))
+    expect((dialog.getByRole("option", { name: "Gathering worker" }) as HTMLOptionElement).disabled).toBe(false)
     expect((dialog.getByRole("option", { name: "Idle worker" }) as HTMLOptionElement).disabled).toBe(false)
     fireEvent.change(dialog.getByLabelText("Worker group"), { target: { value: "idle" } })
     fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
-    fireEvent.click(screen.getByRole("button", { name: `Remove ${idleName}` }))
+    const casualtyRow = () => screen.getByRole("button", { name: "Remove Unit is killed" }).closest("li")!
+    const summary = () => view.container.querySelector(".resource-summary")?.textContent
+    expect(casualtyRow().textContent).toContain(`no available idle ${worker}`)
+    expect(summary()).toContain("Total workers 5")
+    expect(summary()).toContain("Food 10 / 20")
+
+    view.unmount()
+    view = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
+    expect(casualtyRow().textContent).toContain(`no available idle ${worker}`)
     fireEvent.click(screen.getByRole("button", { name: /Change Unit is killed timestamp/ }))
     dialog = within(screen.getByRole("dialog"))
     expect((dialog.getByLabelText("Worker group") as HTMLSelectElement).value).toBe("idle")
-    expect(dialog.getByRole("alert").textContent).toContain("no available idle")
     fireEvent.change(dialog.getByLabelText("Worker group"), { target: { value: "gathering" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
+    expect(casualtyRow().textContent).toContain(`no available idle ${worker}`)
+
+    fireEvent.click(screen.getByRole("button", { name: idleName, exact: true }))
+    dialog = within(screen.getByRole("dialog"))
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0000" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
+    expect(casualtyRow().textContent).toContain("Command 0:01")
+    expect(summary()).toContain("Total workers 4")
+    expect(summary()).toContain("Food 8 / 20")
+
+    fireEvent.click(screen.getByRole("button", { name: /Change Unit is killed timestamp/ }))
+    dialog = within(screen.getByRole("dialog"))
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0000" } })
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
-    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(casualtyRow().textContent).toContain(`no available idle ${worker}`)
+    expect(summary()).toContain("Total workers 5")
+    expect(summary()).toContain("Food 10 / 20")
 })
 
 test("a blocked fixed-time worker event still extends the timeline to its command", () => {

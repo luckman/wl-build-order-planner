@@ -9,7 +9,7 @@ import { createManaSpentAction, manaSpentCollision, type ManaSpentCommand } from
 import Notification, { type NotificationMessage } from "./Notification"
 import { ACTION_LIMIT_MESSAGE, MAX_PLAN_ACTIONS, MAX_COMMAND_SECONDS, MAX_TIMELINE_SAMPLES } from "./game/plannerLimits"
 import UnitKilledDialog from "./UnitKilledDialog"
-import { createUnitKilledAction, foodUsedAt, type UnitKilledCommand } from "./game/unitsKilled"
+import { createUnitKilledAction, foodUsedAt } from "./game/unitsKilled"
 import { createManaWellAction, evaluateManaWells, MANA_WELL_EVENTS, type ManaWellEventType } from "./game/manaWells"
 import ResourcesCollectedDialog from "./ResourcesCollectedDialog"
 import { createResourcesCollectedAction, isTimedEvent } from "./game/resourcesCollected"
@@ -382,8 +382,6 @@ export default function App() {
             .plan.find(action => action.item === item)?.blockedReason ?? null
     }, [baseFoodLimit, buildOrder, economy, editingEvent, faction.startingTownHall, foodPerFarm, initialFoodUsed])
     const validateManaSpent = useCallback((command: ManaSpentCommand) => validateSimulatedEvent(createManaSpentAction(command, factionId)),
-        [factionId, validateSimulatedEvent])
-    const validateUnitKilled = useCallback((command: UnitKilledCommand) => validateSimulatedEvent(createUnitKilledAction(command, factionId)),
         [factionId, validateSimulatedEvent])
     const [hoverTime, setHoverTime] = useState<number | null>(null)
     const reorderActions = ({ source, destination }: DropResult) => {
@@ -983,7 +981,7 @@ export default function App() {
                 {(unitKilledDialogOpen || editingEvent?.kind === "unit-is-killed") && <UnitKilledDialog
                     key={editingEvent?.orderId ?? "new-unit-is-killed"} faction={factionId} defaultTime={defaultEventTime}
                     action={editingEvent?.kind === "unit-is-killed" ? editingEvent : undefined}
-                    validate={validateUnitKilled}
+                    validationError={editingEvent?.kind === "unit-is-killed" ? null : additionError}
                     onClose={() => { setUnitKilledDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {
                         const action = createUnitKilledAction(command, factionId)

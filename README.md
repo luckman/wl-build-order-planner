@@ -62,7 +62,9 @@ assignments, optionally after travel. The idle and activation cards follow **Uni
 and use matching pause and resume icons in the build order and timeline. Both events use fixed times
 and apply the full count or report an error. The build-order idle event title includes a count only
 for two or more workers. Latest order state lists idle workers separately. For worker losses,
-choose Gathering or Idle. If that group is unavailable, the planner reports an error.
+choose Gathering or Idle. The planner checks eligibility when you add or save the casualty.
+If the target is unavailable, the build order keeps the event at its command time and shows
+why it is blocked. A blocked casualty has no effect and can become valid after earlier changes.
 
 Plans support **100 actions** after the opening allocation and a **30-minute** simulation. The
 catalog is still expanding, and timings are estimates to check in-game. See the
