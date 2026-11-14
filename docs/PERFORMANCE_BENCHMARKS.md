@@ -17,3 +17,5 @@ Run `npm run benchmark -- --work-counts` for a separate Warg Rider diagnostic. I
 Successful runs are written to the gitignored `benchmark-results/` directory. JSON format version 1 includes the selected suites' fixture hashes (SHA-256), timestamp, Git revision and working-tree status (or null if unavailable), Node version, and machine details. Timing runs include raw samples and summaries. Work-count runs include setup and addition counts. Failed runs do not produce a result file. Older results are retained.
 
 Run `node --test benchmarks/runner.test.cjs` to verify the benchmark command and its result files. The Warg Rider scenario can take several minutes in full mode. The runner measures simulation in Node. Browser rendering and worker messaging are outside its timing boundaries.
+
+Before-and-after timings, work counts, and raw samples are available for Warg Rider and the existing suites. [Forecast checkpoint reuse comparison](FORECAST_CHECKPOINT_BENCHMARK.md)
