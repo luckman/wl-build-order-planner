@@ -21,8 +21,9 @@ test("Unit is killed saves an unrecruited unit as blocked and can edit it to a v
     expect((dialog.getByLabelText("Command time (mm:ss)") as HTMLInputElement).value).toBe("00:01")
     fireEvent.change(dialog.getByLabelText("Unit type"), { target: { value: "worker" } })
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
-    expect(screen.getAllByRole("button", { name: "Remove Unit is killed" })).toHaveLength(1)
-    expect(row.textContent).toContain("Command 0:01")
+    const savedRow = screen.getByRole("button", { name: "Remove Unit is killed" }).closest("li")!
+    expect(savedRow.textContent).toContain("Command 0:01")
+    expect(savedRow.textContent).not.toContain("requires a living Swordsman")
     expect(container.querySelector(".resource-summary")?.textContent).toContain("Food 8 / 20")
 })
 
@@ -34,6 +35,9 @@ test("Unit is killed offers faction choices, validates command time, releases fo
     expect(dialog.getByRole("option", { name: "Worker", exact: true })).toBeTruthy()
     expect(dialog.getByRole("option", { name: "Swordsman", exact: true })).toBeTruthy()
     expect(dialog.getByRole("option", { name: "Gilbert", exact: true })).toBeTruthy()
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "" } })
+    expect(dialog.getByRole("alert").textContent).toContain("00:00 to 29:59")
+    expect((dialog.getByRole("button", { name: "Add event" }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0060" } })
     expect(dialog.getByRole("alert").textContent).toContain("00:00 to 29:59")
     expect((dialog.getByRole("button", { name: "Add event" }) as HTMLButtonElement).disabled).toBe(true)

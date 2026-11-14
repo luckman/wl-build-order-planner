@@ -27,7 +27,8 @@ typed/pasted values at 29:59, and rejects seconds 60 or greater. It selects its 
 and maintains the cursor during editing.
 
 Standard input props such as disabled, id, name, required, aria-invalid, and aria-describedby can be
-supplied. Disabled calculated previews should be passed as formatted text. Domain rules such as mana
+supplied. A required field stays blank when cleared, so the dialog can explain the valid range.
+Disabled calculated previews should be passed as formatted text. Domain rules such as mana
 availability, cooldown, minimum command time, and warnings belong to the event dialog rather than
 the input. `src/EventTimeDialog.tsx` provides the shared manual timestamp editor for existing Gold
 Rush, Lumber Gathering, and Whip events. It also supports creating and editing mana-well and worker

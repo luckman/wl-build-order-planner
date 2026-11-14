@@ -255,10 +255,10 @@ adding order delay; exact-balance spending is valid. Scrolls following Mana spen
 normal order delay. Blocked Mana spent events consume no mana and start no cooldown.
 
 Automatic scroll insertion chooses an affordable timestamp once, respecting cooldown, mana, and
-order delay. Manual scroll insertion may retain a mana-blocked event. Invalid fixed-time events
-remain editable with warnings and have no effect; the mana-well and unit-is-killed dialogs also
-validate eligibility before saving. Mana spent also rejects unaffordable or cooldown-blocked saves;
-profile or earlier-command changes retain invalid saved expenditures with a blocked reason.
+order delay. Manual scroll insertion may retain a mana-blocked event. Blocked fixed-time events
+remain editable with warnings and have no effect. The mana-well dialog still validates eligibility
+before saving. Mana spent rejects unaffordable or cooldown-blocked saves. Profile or earlier-command
+changes retain invalid saved expenditures with a blocked reason.
 
 ## Worker activity and losses
 

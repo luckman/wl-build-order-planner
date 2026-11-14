@@ -41,7 +41,7 @@ export default function UnitKilledDialog({ faction, defaultTime, action, validat
                 if (!timeValid || error) return
                 onSave({ type: "unit-is-killed", commandTime, unitId, ...(unitId === workerId ? { workerGroup } : {}) })
             }}>
-                <DurationInput wholeSeconds label="Command time (mm:ss)" value={time} onChange={setTime} aria-invalid={!timeValid} />
+                <DurationInput required wholeSeconds label="Command time (mm:ss)" value={time} onChange={setTime} aria-invalid={!timeValid} />
                 <label>Unit type<select value={unitId} onChange={event => setUnitId(event.target.value)}>
                     <optgroup label="Workers">{units.filter(unit => unit.id === workerId).map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</optgroup>
                     <optgroup label="Units">{units.filter(unit => unit.kind === "unit" && unit.id !== workerId).map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</optgroup>

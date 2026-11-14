@@ -17,7 +17,8 @@ export default function DurationInput({ label, value, onChange, onFocus, onBlur,
             onChange={event => {
                 const input = event.target
                 const rightCharacters = input.value.slice(input.selectionStart ?? input.value.length).replace(/:/g, "").length
-                const masked = maskDuration(wholeSeconds ? input.value.split(".")[0] : input.value)
+                const rawTime = wholeSeconds ? input.value.split(".")[0] : input.value
+                const masked = inputProps.required && !/\d/.test(rawTime) ? "" : maskDuration(rawTime)
                 onChange(masked)
                 // Apply the mask and caret together before another input event.
                 // A deferred caret update can race with rapid typing or selection.
