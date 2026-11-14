@@ -53,3 +53,17 @@ test("changed scroll windows and producer targets preserve complete results acro
     for (const [index, action] of current.plan.entries()) expect(action.item).toBe(second[index])
     for (const [index, action] of previous.plan.entries()) expect(action.item).toBe(first[index])
 })
+
+test("preparation can depart when a miner leaves the mine before the next delivery", () => {
+    const singleMiner = { ...economy, goldWorkers: 1, woodWorkers: 0, workerCount: 1,
+        goldTravelTime: 2, goldGatherTime: 11, initialGoldTravelReduction: 0 }
+    // Keep the initial worker count fixed while the catalog advances through four orders.
+    const recruit = { ...item("goon"), seconds: 6 / 0.99, producer: "Citadel", producerBuildingId: "citadel", requirements: [], prerequisites: [] }
+    const pigsty = { ...item("pigsty"), construction: { preparationDuration: 8 } }
+    const rows = [recruit, recruit, recruit, recruit, pigsty, whip(40)]
+    const result = simulateBuildOrder(rows, singleMiner, 2, 200, 20, dark.startingTownHall, { until: 85 })
+
+    // The candidate pass must retain the mine exit at 13, before the delivery at 15.
+    expect(result.plan[4]).toMatchObject({ blocked: false, departureTime: 13, commandTime: 21 })
+    expect(result).toMatchSnapshot()
+})

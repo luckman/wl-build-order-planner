@@ -155,10 +155,12 @@ export function simulateBuildOrder(
         prior.orderKey === JSON.stringify(prior.buildOrder) ? prior : undefined
     const order = replayOrder(buildOrder)
     // These effects can change the finish or travel time of work started
-    // before the cast. Let the forecast convergence replay from the opening.
+    // before the cast, so checkpoints are only valid within one forecast.
     const forecasts = buildOrder.some(item => item.id === "whip" || item.id === "legions-call" ||
         (item.kind === "scroll" && (item.scrollId === "whip" || item.scrollId === "legions-call")))
-    const history = !forecasts && order.catalog.length >= CATALOG_CHECKPOINT_INTERVAL ? new ReplayHistory<Checkpoint>() : undefined
+    const hasEnoughCatalogRows = order.catalog.length >= CATALOG_CHECKPOINT_INTERVAL
+    const history = !forecasts && hasEnoughCatalogRows ? new ReplayHistory<Checkpoint>() : undefined
+    let forecastHistory: ReplayHistory<Checkpoint> | undefined
     const boundary = history && source?.history && replayBoundary(source.order, order)
     // A removed late event may also shrink the effective scheduling horizon.
     const fixedBoundary = boundary?.fixedTime === Infinity ? Infinity : Math.min(boundary?.fixedTime ?? Infinity, until)
@@ -168,13 +170,14 @@ export function simulateBuildOrder(
     let recruitmentWindows: RecruitmentWindow[] = []
     const run = (preparation?: PreparationSchedule, collectCandidatesThrough?: number,
         options?: Pick<PassOptions, "resume" | "capture"> & { speculative?: boolean }) => {
-        const signature = history && replayPreparation(buildOrder, order, preparation)
+        const activeHistory = forecastHistory ?? history
+        const signature = activeHistory && replayPreparation(buildOrder, order, preparation)
         const collecting = collectCandidatesThrough !== undefined
         // Capturing the dedicated final-removal checkpoint requires processing
         // the final row, even if a general checkpoint already includes it.
         const maxCount = order.catalog.length - Number(!!options?.capture)
         const local = signature && !options?.resume
-            ? history!.find(signature, collecting, maxCount, Infinity) : undefined
+            ? activeHistory!.find(signature, collecting, maxCount, Infinity) : undefined
         const reused = signature && !options?.resume && boundary
             ? source!.history!.find(signature, collecting, Math.min(maxCount, boundary.catalogCount), fixedBoundary, local?.count) : undefined
         const point = reused || local
@@ -184,7 +187,7 @@ export function simulateBuildOrder(
             const { simulation } = state
             const weight = simulation.deliveries.length + simulation.eventBoundaries.size + simulation.workers.length +
                 state.plan.length + state.unitInstances.length + state.timedEventsByIndex.size
-            history!.capture(state.plan.length, simulation.time, collecting, signature, weight, () => copyCheckpoint(state))
+            activeHistory!.capture(state.plan.length, simulation.time, collecting, signature, weight, () => copyCheckpoint(state))
         } : undefined
         return simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit, foodPerFarm,
             factionData, startingBuilding, until, windows, recruitmentWindows, preparation, collectCandidatesThrough,
@@ -200,7 +203,7 @@ export function simulateBuildOrder(
         return result
     }
 
-    const tail = source?.tail
+    const tail = forecasts ? undefined : source?.tail
     if (source && tail && Math.abs(buildOrder.length - source.buildOrder.length) === 1) {
         const removing = buildOrder.length < source.buildOrder.length
         const shorter = removing ? buildOrder : source.buildOrder
@@ -232,6 +235,7 @@ export function simulateBuildOrder(
     // travel/recruitment forecasts, keeping target and mana validation chronological.
     const hasPreparation = buildOrder.some(item => (item.construction?.preparationDuration ?? 0) > 0)
     for (let pass = 0; pass <= MAX_PLAN_ACTIONS + 1; pass++) {
+        if (forecasts && hasPreparation && hasEnoughCatalogRows) forecastHistory = new ReplayHistory<Checkpoint>()
         const prepared = hasPreparation ? schedulePreparation(buildOrder, economy, startingBuilding, run, reusablePreparation) : undefined
         const result = prepared ?? run()
         const next = result.orderedPlan.filter(action => action.item.id === "whip" && !action.blocked)
@@ -239,8 +243,7 @@ export function simulateBuildOrder(
         const nextRecruitment = result.orderedPlan.filter(action => action.item.id === "legions-call" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime!, buildingInstanceId: action.buildingInstanceId! }))
         if (JSON.stringify(next) === JSON.stringify(windows) && JSON.stringify(nextRecruitment) === JSON.stringify(recruitmentWindows)) {
-            // Whip and Legion's Call can change earlier work through forecasts.
-            if (prepared?.preparation.commands.size && !prepared.preparation.blocked.size &&
+            if (!forecasts && prepared?.preparation.commands.size && !prepared.preparation.blocked.size &&
                 !windows.length && !recruitmentWindows.length && prepared.reuse.minimumPrefixLength <= buildOrder.length &&
                 matchesPreparation(result, prepared.preparation)) {
                 const selected = run(prepared.preparation, undefined, { capture: true })
@@ -249,6 +252,7 @@ export function simulateBuildOrder(
             }
             return remember(result)
         }
+        forecastHistory = undefined
         windows = next
         recruitmentWindows = nextRecruitment
     }
