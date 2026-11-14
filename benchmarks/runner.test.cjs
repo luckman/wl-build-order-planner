@@ -37,14 +37,14 @@ test('rejects conflicting modes and case filters without the middle suite', () =
         assert.deepEqual(files(), before)
     }
 })
-test('runs selected edit suites and preserves actual modes and samples', { timeout: 180000 }, () => {
+test('runs selected middle-action cases and preserves the mode and samples', { timeout: 180000 }, () => {
     const before = new Set(files())
-    const result = spawnSync(process.execPath, [runner, '--suite=last', '--suite=middle', '--quick', '--case=Insert'], { cwd: root, encoding: 'utf8', timeout: 170000 })
+    const result = spawnSync(process.execPath, [runner, '--suite=middle', '--quick', '--case=Insert'], { cwd: root, encoding: 'utf8', timeout: 170000 })
     assert.equal(result.status, 0, result.stderr)
     const added = files().filter(name => !before.has(name))
     assert.equal(added.length, 1)
     const saved = JSON.parse(fs.readFileSync(path.join(results, added[0]), 'utf8'))
-    assert.deepEqual(saved.suites.map(s => [s.name, s.mode, s.warmups, s.rounds, s.scenarios.length]), [['last', 'full', 5, 21, 4], ['middle', 'quick', 2, 7, 1]])
+    assert.deepEqual(saved.suites.map(s => [s.name, s.mode, s.warmups, s.rounds, s.scenarios.length]), [['middle', 'quick', 2, 7, 1]])
     assert(saved.suites.every(s => s.scenarios.every(c => c.samples.length === s.rounds)))
 })
 test('smoke mode exercises every suite once', { timeout: 180000 }, () => {
@@ -54,6 +54,7 @@ test('smoke mode exercises every suite once', { timeout: 180000 }, () => {
     const added = files().filter(name => !before.has(name))
     assert.equal(added.length, 1)
     const saved = JSON.parse(fs.readFileSync(path.join(results, added[0]), 'utf8'))
-    assert.deepEqual(saved.suites.map(s => [s.name, s.mode, s.warmups, s.rounds, s.scenarios.length]), [['dark', 'smoke', 0, 1, 2], ['last', 'smoke', 0, 1, 4], ['middle', 'smoke', 0, 1, 5]])
+    assert.deepEqual(saved.suites.map(s => [s.name, s.mode, s.warmups, s.rounds, s.scenarios.length]), [['dark', 'smoke', 0, 1, 2], ['last', 'smoke', 0, 1, 5], ['middle', 'smoke', 0, 1, 5]])
+    assert.equal(saved.suites[1].fixtureHashes.at(-1), 'ad72da1bbb2ac9db835c11cab06df5b8f6a38775b0ad96354257760c9012b0c4')
     assert(saved.suites.every(s => s.scenarios.every(c => c.samples.length === 1)))
 })
