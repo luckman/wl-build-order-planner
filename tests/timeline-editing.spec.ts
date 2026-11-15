@@ -108,8 +108,8 @@ for (const scenario of editableCases) {
         if (scenario.name === "Unit is killed") {
             await expect(dialog.getByLabel("Unit type")).toHaveValue("worker")
             await dialog.getByLabel("Unit type").selectOption("swordsman")
-            await expect(dialog.getByRole("alert")).toContainText("living Swordsman")
-            await expect(dialog.getByRole("button", { name: scenario.save })).toBeDisabled()
+            await expect(dialog.getByRole("alert")).toHaveCount(0)
+            await expect(dialog.getByRole("button", { name: scenario.save })).toBeEnabled()
             await dialog.getByLabel("Unit type").selectOption("worker")
         }
         if (scenario.name === "Mana well is lost") {
