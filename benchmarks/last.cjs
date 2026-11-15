@@ -44,20 +44,18 @@ module.exports = { fixtures: [link, gilbertLink, towerLastLink, wargRider.link],
     return [...scenarios, wargRider].map(scenario => {
         const isWargRider = scenario === wargRider
         const { buildOrder, changedBuild, args } = isWargRider ? wargRider.prepare() : prepareScenario(scenario)
+        if (isWargRider) return measureWargRider(buildOrder, changedBuild, args, warmups, rounds)
         const previous = simulateBuildOrder(buildOrder, ...args)
         assert(previous.plan.every(action => !action.blocked), scenario.name)
-        const expected = isWargRider ? undefined : simulateBuildOrder(changedBuild, ...args)
-        if (expected) {
-            assert.equal(expected.plan.length, changedBuild.length, scenario.name)
-            assert(expected.plan.every(action => !action.blocked), scenario.name)
-        }
+        const expected = simulateBuildOrder(changedBuild, ...args)
+        assert.equal(expected.plan.length, changedBuild.length, scenario.name)
+        assert(expected.plan.every(action => !action.blocked), scenario.name)
         const samples = []
         for (let index = 0; index < warmups + rounds; index++) {
             const start = performance.now()
             const result = simulateBuildOrder(changedBuild, ...args, { previous })
             const elapsed = performance.now() - start
-            if (isWargRider) wargRider.assertResult(result)
-            else assert.deepEqual(result, expected, scenario.name)
+            assert.deepEqual(result, expected, scenario.name)
             if (index >= warmups) samples.push(elapsed)
         }
         return { name: scenario.name, samples, summary: summarize(samples) }
@@ -71,4 +69,39 @@ module.exports = { fixtures: [link, gilbertLink, towerLastLink, wargRider.link],
     wargRider.assertResult(result)
     return { name: wargRider.name, summary: { baselineSetup, addition } }
 } }
+
+function measureWargRider(buildOrder, changedBuild, args, warmups, rounds) {
+    const previous = simulateBuildOrder(buildOrder, ...args)
+    assert(previous.plan.every(action => !action.blocked), wargRider.name)
+    const expected = simulateBuildOrder(changedBuild, ...args)
+    wargRider.assertResult(expected)
+    const setupSamples = []
+    const samples = []
+    const combinedSamples = []
+    for (let index = 0; index < warmups + rounds; index++) {
+        const setupStart = performance.now()
+        const setup = simulateBuildOrder(buildOrder, ...args)
+        const setupMs = performance.now() - setupStart
+        const appendStart = performance.now()
+        const result = simulateBuildOrder(changedBuild, ...args, { previous })
+        const appendMs = performance.now() - appendStart
+
+        assert.deepEqual(setup, previous)
+        assert.deepEqual(result, expected)
+        wargRider.assertResult(result)
+        if (index >= warmups) {
+            setupSamples.push(setupMs)
+            samples.push(appendMs)
+            combinedSamples.push(setupMs + appendMs)
+        }
+    }
+    return {
+        name: wargRider.name,
+        samples,
+        summary: summarize(samples),
+        setup: { samples: setupSamples, summary: summarize(setupSamples) },
+        setupAndAppend: { samples: combinedSamples, summary: summarize(combinedSamples) },
+    }
+}
+
 function summarize(samples) { const sorted = [...samples].sort((a, b) => a - b); return { medianMs: sorted[Math.floor(sorted.length / 2)], minMs: sorted[0], maxMs: sorted.at(-1) } }

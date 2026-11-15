@@ -44,12 +44,16 @@ try {
             console.log(scenario.name)
             if (scenario.summary.actionMediansMs) console.table(scenario.summary.actionMediansMs)
             console.log(scenario.summary)
+            if (scenario.setup) {
+                console.log('Original-build setup', scenario.setup.summary)
+                console.log('Setup plus append', scenario.setupAndAppend.summary)
+            }
         }
         results.push({ name, mode, warmups, rounds, fixtureHashes: suite.fixtures.map(value => crypto.createHash('sha256').update(value).digest('hex')), scenarios })
     }
     const git = (...args) => { try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return null } }
     const status = git('status', '--porcelain')
-    const result = { formatVersion: 1, timestamp: new Date().toISOString(), revision: git('rev-parse', 'HEAD'), workingTree: status === null ? null : { dirty: Boolean(status), status }, node: process.version, machine: { platform: os.platform(), arch: os.arch(), release: os.release(), cpu: os.cpus()[0]?.model, cpus: os.cpus().length, memoryBytes: os.totalmem() }, suites: results }
+    const result = { formatVersion: 1, timestamp: new Date().toISOString(), revision: git('rev-parse', 'HEAD'), workingTree: status === null ? null : { dirty: Boolean(status), status }, node: process.version, typescript: ts.version, machine: { platform: os.platform(), arch: os.arch(), release: os.release(), cpu: os.cpus()[0]?.model, cpus: os.cpus().length, memoryBytes: os.totalmem() }, suites: results }
     const dir = path.join(root, 'benchmark-results')
     fs.mkdirSync(dir, { recursive: true })
     const file = path.join(dir, `${result.timestamp.replace(/[:.]/g, '-')}-${crypto.randomBytes(4).toString('hex')}.json`)
