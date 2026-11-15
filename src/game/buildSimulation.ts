@@ -17,6 +17,8 @@ import { replayBoundary, replayOrder, replayPreparation, ReplayHistory, type Rep
 
 const RESOURCE_PROJECTION_SECONDS = 5 * 60
 const CATALOG_CHECKPOINT_INTERVAL = 4
+const MAX_APPEND_FORECASTS = 8
+const MAX_APPEND_FORECAST_ENTRIES = 6000
 
 export type ScheduledAction = {
     item: PlannerItem
@@ -74,6 +76,12 @@ function copyCheckpoint(checkpoint: Checkpoint): Checkpoint {
     }
 }
 
+function checkpointWeight(state: Checkpoint) {
+    const { simulation } = state
+    return simulation.deliveries.length + simulation.eventBoundaries.size + simulation.workers.length +
+        state.plan.length + state.unitInstances.length + state.timedEventsByIndex.size
+}
+
 function restoreCheckpoint(checkpoint: Checkpoint, buildOrder: PlannerItem[], order: ReplayOrder, rowMap?: Map<number, number>) {
     const restored = copyCheckpoint(checkpoint)
     restored.nextIndex = order.catalog[restored.plan.length]?.index ?? buildOrder.length
@@ -98,13 +106,26 @@ function restoreCheckpoint(checkpoint: Checkpoint, buildOrder: PlannerItem[], or
 type PassOptions = {
     resume?: Checkpoint
     capture?: boolean
+    captureAppend?: boolean
     captureCheckpoint?: (state: Checkpoint) => void
 }
-type TailReplay = {
+type PreparedReplay = {
     preparation: PreparationSchedule
     reuse: PreparationReuse
+}
+type TailReplay = PreparedReplay & {
     beforeTail?: Checkpoint
     end?: Checkpoint
+}
+type ForecastAppendReplay = {
+    forecast: string
+    prepared?: PreparedReplay
+    end?: Checkpoint
+}
+
+function preparationEvidenceWeight({ preparation, reuse }: PreparedReplay) {
+    return preparation.commands.size + preparation.blocked.size + reuse.initialCommands.size +
+        reuse.acceptedBeforeFinal.reduce((weight, schedule) => weight + 1 + schedule.commands.size + schedule.blocked.size, 0)
 }
 
 // Results and their input items are public. Keep independent state and reject
@@ -117,6 +138,7 @@ const simulationSources = new WeakMap<BuildSimulation, {
     order: ReplayOrder
     history?: ReplayHistory<Checkpoint>
     tail?: TailReplay
+    forecastAppends?: Map<number, ForecastAppendReplay>
 }>()
 
 function projectSimulation(result: Pick<ReturnType<typeof simulateBuildOrderPass>, "plan" | "orderedPlan" | "projectDeliveries">): BuildSimulation {
@@ -155,12 +177,19 @@ export function simulateBuildOrder(
         prior.orderKey === JSON.stringify(prior.buildOrder) ? prior : undefined
     const order = replayOrder(buildOrder)
     // These effects can change the finish or travel time of work started
-    // before the cast, so checkpoints are only valid within one forecast.
+    // before the cast. Scroll replay must match the incoming forecast.
     const forecasts = buildOrder.some(item => item.id === "whip" || item.id === "legions-call" ||
         (item.kind === "scroll" && (item.scrollId === "whip" || item.scrollId === "legions-call")))
     const hasEnoughCatalogRows = order.catalog.length >= CATALOG_CHECKPOINT_INTERVAL
     const history = !forecasts && hasEnoughCatalogRows ? new ReplayHistory<Checkpoint>() : undefined
     let forecastHistory: ReplayHistory<Checkpoint> | undefined
+    const forecastAppends = forecasts ? new Map<number, ForecastAppendReplay>() : undefined
+    const lastItem = buildOrder[buildOrder.length - 1]
+    // An appended catalog name must not change diagnostics for earlier rows.
+    const priorForecasts = forecasts && source?.forecastAppends &&
+        buildOrder.length === source.buildOrder.length + 1 && isSupportedTail(lastItem, initialTownHall) &&
+        source.buildOrder.every((item, index) => item === buildOrder[index] && (item.id !== lastItem.id || item.name === lastItem.name))
+        ? source.forecastAppends : undefined
     const boundary = history && source?.history && replayBoundary(source.order, order)
     // A removed late event may also shrink the effective scheduling horizon.
     const fixedBoundary = boundary?.fixedTime === Infinity ? Infinity : Math.min(boundary?.fixedTime ?? Infinity, until)
@@ -169,7 +198,7 @@ export function simulateBuildOrder(
     let windows: WhipWindow[] = []
     let recruitmentWindows: RecruitmentWindow[] = []
     const run = (preparation?: PreparationSchedule, collectCandidatesThrough?: number,
-        options?: Pick<PassOptions, "resume" | "capture"> & { speculative?: boolean }) => {
+        options?: Omit<PassOptions, "captureCheckpoint"> & { speculative?: boolean }) => {
         const activeHistory = forecastHistory ?? history
         const signature = activeHistory && replayPreparation(buildOrder, order, preparation)
         const collecting = collectCandidatesThrough !== undefined
@@ -184,21 +213,18 @@ export function simulateBuildOrder(
         const resume = options?.resume ? copyCheckpoint(options.resume) : point &&
             restoreCheckpoint(point.state, buildOrder, order, reused && boundary ? boundary.rowMap : undefined)
         const captureCheckpoint = signature && !options?.speculative ? (state: Checkpoint) => {
-            const { simulation } = state
-            const weight = simulation.deliveries.length + simulation.eventBoundaries.size + simulation.workers.length +
-                state.plan.length + state.unitInstances.length + state.timedEventsByIndex.size
-            activeHistory!.capture(state.plan.length, simulation.time, collecting, signature, weight, () => copyCheckpoint(state))
+            activeHistory!.capture(state.plan.length, state.simulation.time, collecting, signature, checkpointWeight(state), () => copyCheckpoint(state))
         } : undefined
         return simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit, foodPerFarm,
             factionData, startingBuilding, until, windows, recruitmentWindows, preparation, collectCandidatesThrough,
-            { resume, capture: options?.capture, captureCheckpoint })
+            { resume, capture: options?.capture, captureAppend: options?.captureAppend, captureCheckpoint })
     }
     const verify = (preparation: PreparationSchedule) => run(preparation, undefined, { speculative: true })
     const remember = (pass: Parameters<typeof projectSimulation>[0], tail?: TailReplay) => {
         const result = projectSimulation(pass)
-        if (history || tail) {
+        if (history || tail || forecastAppends?.size) {
             simulationSources.set(result, { buildOrder: [...buildOrder], orderKey: JSON.stringify(buildOrder),
-                economy, inputs, order, history, tail })
+                economy, inputs, order, history, tail, forecastAppends })
         }
         return result
     }
@@ -236,8 +262,50 @@ export function simulateBuildOrder(
     const hasPreparation = buildOrder.some(item => (item.construction?.preparationDuration ?? 0) > 0)
     for (let pass = 0; pass <= MAX_PLAN_ACTIONS + 1; pass++) {
         if (forecasts && hasPreparation && hasEnoughCatalogRows) forecastHistory = new ReplayHistory<Checkpoint>()
-        const prepared = hasPreparation ? schedulePreparation(buildOrder, economy, startingBuilding, run, reusablePreparation) : undefined
-        const result = prepared ?? run()
+        const forecast = forecasts ? JSON.stringify([windows, recruitmentWindows]) : ""
+        const previousForecast = priorForecasts?.get(pass)
+        const replay = previousForecast?.forecast === forecast ? previousForecast : undefined
+        const captureAppend = forecasts && pass < MAX_APPEND_FORECASTS && buildOrder.length < MAX_PLAN_ACTIONS
+        let verifiedAppendEnd: Checkpoint | undefined
+        const proof = replay?.prepared
+        // With the incoming forecast and fixed events unchanged, the appended
+        // row cannot affect earlier catalog commands. The preparation proof
+        // bounds the prefix needed for candidate generation and rejection.
+        const reuseForecastPreparation = proof && buildOrder.length - 1 >= proof.reuse.minimumPrefixLength
+            ? { ...proof, verify: (preparation: PreparationSchedule) => {
+                if (preparation !== proof.preparation) return verify(preparation)
+                const selected = run(preparation, undefined, { resume: replay.end, captureAppend, speculative: true })
+                verifiedAppendEnd = selected.end
+                return selected
+            } } : undefined
+        const prepared = hasPreparation
+            ? schedulePreparation(buildOrder, economy, startingBuilding, run, reuseForecastPreparation ?? reusablePreparation)
+            : undefined
+        let unprepared: ReturnType<typeof run> | undefined
+        if (!prepared && replay?.end) {
+            try {
+                unprepared = run(undefined, undefined, { resume: replay.end, captureAppend })
+            } catch {
+                // A speculative replay must not suppress a fresh pass.
+            }
+        }
+        if (!prepared && !unprepared) unprepared = run(undefined, undefined, { captureAppend })
+        const result = prepared ?? unprepared!
+        if (captureAppend && forecastAppends) {
+            if (prepared && prepared.reuse.minimumPrefixLength <= buildOrder.length) {
+                const { preparation, reuse } = prepared
+                const evidence = { preparation, reuse }
+                // The selected full-catalog checkpoint is already private and
+                // pre-projection. Its forecast-local history is discarded below.
+                const catalogCount = order.catalog.length
+                const fullCatalog = forecastHistory?.find(replayPreparation(buildOrder, order, preparation),
+                    false, catalogCount, Infinity, catalogCount - 1)
+                const end = preparation === proof?.preparation ? verifiedAppendEnd :
+                    fullCatalog && { ...fullCatalog.state, nextIndex: buildOrder.length }
+                const weight = preparationEvidenceWeight(evidence) + (end ? checkpointWeight(end) : 0)
+                if (weight <= MAX_APPEND_FORECAST_ENTRIES) forecastAppends.set(pass, { forecast, prepared: evidence, end })
+            } else if (unprepared?.end) forecastAppends.set(pass, { forecast, end: unprepared.end })
+        }
         const next = result.orderedPlan.filter(action => action.item.id === "whip" && !action.blocked)
             .map(action => ({ startTime: action.startTime!, finishTime: action.finishTime! }))
         const nextRecruitment = result.orderedPlan.filter(action => action.item.id === "legions-call" && !action.blocked)
@@ -272,7 +340,7 @@ function simulateBuildOrderPass(
     recruitmentWindows: RecruitmentWindow[] = [],
     preparation?: PreparationSchedule,
     collectCandidatesThrough?: number,
-    { resume: restored, capture, captureCheckpoint }: PassOptions = {},
+    { resume: restored, capture, captureAppend, captureCheckpoint }: PassOptions = {},
 ) {
     validateActionCount(buildOrder.length)
     validatePlanTime(until, "Simulation horizon")
@@ -723,7 +791,11 @@ function simulateBuildOrderPass(
         }
     }
     if (canCapture && plan.length) canCapture(passState)
-    const end = capture ? captureAt(buildOrder.length) : undefined
+    // Pending timed events and worker completions are reconstructed from this
+    // state before the new catalog row is considered, just as in a fresh pass.
+    const end = capture ? captureAt(buildOrder.length) :
+        captureAppend && checkpointWeight(passState) <= MAX_APPEND_FORECAST_ENTRIES
+            ? copyCheckpoint({ ...passState, nextIndex: buildOrder.length }) : undefined
     const replayEnd = Math.min(MAX_PLAN_SECONDS, Math.max(
         until,
         simulation.time,
