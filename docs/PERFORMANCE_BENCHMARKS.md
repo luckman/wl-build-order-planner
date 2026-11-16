@@ -21,3 +21,5 @@ Run `node --test benchmarks/runner.test.cjs` to verify the benchmark command and
 Before-and-after timings, work counts, and raw samples are available for Warg Rider and the existing suites. [Forecast checkpoint reuse comparison](FORECAST_CHECKPOINT_BENCHMARK.md)
 
 The scroll append reuse comparison reports setup and append timings against the completed forecast checkpoint solver, along with reduced replay work and follow-up measurements of existing workloads. [Scroll append reuse benchmark](SCROLL_APPEND_REUSE_BENCHMARK.md)
+
+The preparation trial rejection comparison includes each Dark prefix, all edit timings, and Warg Rider setup, append, and replay work. [Preparation trial rejection benchmark](PREPARATION_TRIAL_EARLY_REJECTION_BENCHMARK.md)
