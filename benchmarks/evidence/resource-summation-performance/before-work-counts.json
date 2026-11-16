@@ -1,0 +1,52 @@
+{
+  "formatVersion": 1,
+  "timestamp": "2026-11-16T01:25:58.887Z",
+  "revision": "f1bf1041ab5c11de88a82948ceaf96b86e7d6fff",
+  "workingTree": {
+    "dirty": true,
+    "status": "?? benchmarks/evidence/resource-summation-performance/"
+  },
+  "node": "v24.21.0",
+  "typescript": "4.9.5",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "release": "10.0.26300",
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "cpus": 24,
+    "memoryBytes": 33752997888
+  },
+  "suites": [
+    {
+      "name": "last",
+      "mode": "work-counts",
+      "warmups": 0,
+      "rounds": 1,
+      "fixtureHashes": [
+        "94211f5de7bcf4585d8efbd109d6f8ac02a7b8332d499675c7eff8c6c9671744",
+        "9d492516b5986dc850b672fef2a745b3189bf1653fc4723304832355e76c8feb",
+        "0113dbe849d75ca10ecc41f88de81bb7dbbf4ffd87613a2ba4379843c48c32be",
+        "ad72da1bbb2ac9db835c11cab06df5b8f6a38775b0ad96354257760c9012b0c4"
+      ],
+      "scenarios": [
+        {
+          "name": "Append Warg Rider to Dark build with Whip and Legion’s Call",
+          "summary": {
+            "baselineSetup": {
+              "publicCalls": 1,
+              "internalPasses": 816,
+              "resumedPasses": 812,
+              "catalogRows": 2682
+            },
+            "addition": {
+              "publicCalls": 1,
+              "internalPasses": 6,
+              "resumedPasses": 4,
+              "catalogRows": 78
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

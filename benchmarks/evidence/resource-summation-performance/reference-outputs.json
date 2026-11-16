@@ -1,0 +1,586 @@
+{
+  "revision": "f1bf1041ab5c11de88a82948ceaf96b86e7d6fff",
+  "sourceDiff": "diff --git a/src/game/resourceOrderDelay.test.ts b/src/game/resourceOrderDelay.test.ts\nindex e1c9d2b..e070ac0 100644\n--- a/src/game/resourceOrderDelay.test.ts\n+++ b/src/game/resourceOrderDelay.test.ts\n@@ -23,6 +23,15 @@ test(\"earlier spending reserves resources without reusing their previous readine\n     expect(plan.slice(0, 2).map(action => action.commandTime)).toEqual([2.5, 12.5])\n })\n \n+test(\"fractional deliveries at the same time retain their addition order at the purchase boundary\", () => {\n+    const economy = { ...settings, startingGold: farm.gold - 0.3 }\n+    const rows = [farm, collected(10, 0.1, 0), collected(10, 0.2, 0), collected(12, 0.01, 0)]\n+    const { plan } = simulateBuildOrder(rows, economy, 0, 100, 20, \"Castle\")\n+\n+    // Adding each tenth to the existing balance falls just short of the cost.\n+    expect(plan[0]).toMatchObject({ blocked: false, commandTime: 14.5 })\n+})\n+\n test(\"food from a completed farm waits for order delay\", () => {\n     const { plan } = simulateBuildOrder([farm, worker], settings, 4, 4, 20, \"Castle\")\n     expect(plan[1].commandTime).toBe(plan[0].finishTime! + settings.orderDelay)",
+  "node": "v24.21.0",
+  "typescript": "4.9.5",
+  "outputs": {
+    "benchmark/dark": [
+      "f60f63abef132b013bf3bcecc1d9bd63c9cc5e7cc7796a91ed311ea8f04b25b3",
+      "1aae915c6dc755dfd52799e88e514ae098c1d430301df4ccbea6aee8fd27002a",
+      "cce353d898cf4ad86e1e4095130c2b26981016cded8cc80bdc46569c13251bd2",
+      "b324b984fda5fbdcac08874e2578419187144ba0ed9325125255e45ffa03f280",
+      "8c53573aef5dce641ce71f3dc183e2091166925b00f3fd1b56be82f0dc7d7886",
+      "eff30ce42e321b78c6c8ad323d278909581b360efcfab862d2e74560914fafee",
+      "da28a8421103ff7a261a17a1b22a2eaee9c15db8d05fbdc4c0173bfb7bfb6621",
+      "836f4a793d20c82230e249fe31ba956970809b9d146915caa882be30146a1482",
+      "b51418bb10e1ed6b085cd7d671a3700195f092a7dac74fa256984567b2ce3581",
+      "9c78f6c07efbaa415dbaf6edca6d189f50839af5f7972254bbd87c8006046e8e",
+      "b8b6c3422770d85c7ee9064a4b3a52c3ac05bc2476f0f61c638be0bfa1f9c741",
+      "9feb3f1776b9d8af71b8bf98f7a7883892e40962f8388823596b8700417a517f",
+      "f60f63abef132b013bf3bcecc1d9bd63c9cc5e7cc7796a91ed311ea8f04b25b3",
+      "1aae915c6dc755dfd52799e88e514ae098c1d430301df4ccbea6aee8fd27002a",
+      "ef5e8983cbcb9c2b0b20ec4a65233e0daca2693f7d66921bf4725c512b0e20ba",
+      "6d4cb8009df29a405c4bf6a313dad8fda14c8745940133a10ff7fe4a37756431",
+      "8a7c49e58e9eff9eb31d0aa7499ef4bf4fda5de5d769d41860be444d59bae86b",
+      "0acc287d9392e35583ba1c3a97c5288596569be5ea455ed99b93c764aab6609d",
+      "9e704f5ae1dafaa99e10b2e767d9f41e322b8036caaa0117b2989f2a86d09066",
+      "2fc0f76700112dc1a6a87f8f1c1bf2b217b7f76c9068b2f2243c13692dd40de6",
+      "df166f6ac12f65902f61deda365d32423ef7561eb387d3ac1bd22f6768cbf9b1",
+      "c532e48cad2332e5c842dcf2764fc280ba24d064aa3fa11dda83cb9070304979",
+      "28989b603a867bfc667af4f5a98f95f5e836474092a06abfa5776f7e34cd9ff4",
+      "e89929a8cb6204f762a536fae3140bb505c6e6b02e6ab224620009c9e95c450c"
+    ],
+    "benchmark/last": [
+      "105128c1791a0d351a21d0c740d510f42c50ddc5c03e2313fd3749da16edcc1d",
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "662bf91a6be89667a3eadbddf40623df92850eeab80126553b414e54621fb2ed",
+      "eaac6b948e0715c9f16beb54492c5ba3b728564e20c404f2f7350301c4ff7c12",
+      "eaac6b948e0715c9f16beb54492c5ba3b728564e20c404f2f7350301c4ff7c12",
+      "662bf91a6be89667a3eadbddf40623df92850eeab80126553b414e54621fb2ed",
+      "105128c1791a0d351a21d0c740d510f42c50ddc5c03e2313fd3749da16edcc1d",
+      "105128c1791a0d351a21d0c740d510f42c50ddc5c03e2313fd3749da16edcc1d",
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "105128c1791a0d351a21d0c740d510f42c50ddc5c03e2313fd3749da16edcc1d",
+      "105128c1791a0d351a21d0c740d510f42c50ddc5c03e2313fd3749da16edcc1d",
+      "991d719ef3896cdc3ca9d21d1b015a92007e322e784a85b1fad3442f7eec4ef1",
+      "4557f6c354fad630df72b688cf6f2c16d2f94171c039f247f6aa3e4859670b0c",
+      "991d719ef3896cdc3ca9d21d1b015a92007e322e784a85b1fad3442f7eec4ef1",
+      "4557f6c354fad630df72b688cf6f2c16d2f94171c039f247f6aa3e4859670b0c"
+    ],
+    "benchmark/middle": [
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "29e390b113d2ddbd17a86d78884e070c9c12d5b06da255ba95b81e5a04a0756b",
+      "29e390b113d2ddbd17a86d78884e070c9c12d5b06da255ba95b81e5a04a0756b",
+      "198cbebf82abb0f04c33f06d536dc989a8ee976f716f58a984c161fa91ac2604",
+      "198cbebf82abb0f04c33f06d536dc989a8ee976f716f58a984c161fa91ac2604",
+      "66ec9cef2c9e25784826b80aee9d63f980f9e2696d7bbed34cd51ea64813a998",
+      "66ec9cef2c9e25784826b80aee9d63f980f9e2696d7bbed34cd51ea64813a998",
+      "68a6253366c3a8be43d1cee14ceca77c3ee641d242ead080a2c9166329c9e1f8",
+      "68a6253366c3a8be43d1cee14ceca77c3ee641d242ead080a2c9166329c9e1f8",
+      "367d6b4eaa84bbe01a9ffffc2339c7ba2cbebc264eee4627cad2f2ff25ebd772",
+      "367d6b4eaa84bbe01a9ffffc2339c7ba2cbebc264eee4627cad2f2ff25ebd772"
+    ],
+    "test/%s full preparation fits after zero and reserves the worker before purchase [0]": [
+      "3787a57ba43d1f63854c30f37122a5e9130ec2b805011643c302ea1f00d59d47"
+    ],
+    "test/%s full preparation fits after zero and reserves the worker before purchase [1]": [
+      "0c731ec6f57a0b209f26dbc2803e020cd72c8319ed16f5c1a7e8ef7d9750f1cf"
+    ],
+    "test/resource-driven command shifts replay departure and retain the delivery that funds construction": [
+      "99d64074c7288b8572b292effaef0a7e3cfd815e812aa7fcfddbfe1f1736723e"
+    ],
+    "test/a later row can depart before an earlier command without taking the same worker": [
+      "9462475182348598552696ea79101061ad0f8fff927b529434f5a2aad3cf84df"
+    ],
+    "test/prepared commands can share a command time with zero order delay": [
+      "d835b9197270238b8e757f1bf12706a6a7782e3a720de798e2a5a62121145cce"
+    ],
+    "test/the earliest prepared command after a fractional order delay preserves the funding delivery": [
+      "eab83616db5ca0c9dc5f94151212597715f1ffc6bb6663a74b0623298b9aab44"
+    ],
+    "test/a prepared command with order delay %s can use any two ready instances [0]": [
+      "ceacceb1f0effd62b0ad77281b0aed0a6b6dcbe84e5693daaddedc9aaf92bfd7",
+      "7ffdfa87572cfc1f58148bcb6739890ef5133e8def963c172b13f7e98418e7bf",
+      "7ffdfa87572cfc1f58148bcb6739890ef5133e8def963c172b13f7e98418e7bf"
+    ],
+    "test/a prepared command with order delay %s can use any two ready instances [1]": [
+      "9434aa33c26c809ef4d9971bda0857b8f2ac4fcfd7080eadc233823801785d9f",
+      "e4549d38e4ff7cfbc970596da71717c0d2fb2cc3f2749d50b1b3fc96d6703a35",
+      "e4549d38e4ff7cfbc970596da71717c0d2fb2cc3f2749d50b1b3fc96d6703a35"
+    ],
+    "test/the starting Castle counts alongside an earlier Castle construction": [
+      "19f192ab1776c1e74ca6d8d630d5dc9b6d19d02d76d087f8219dea3b0fb022a7"
+    ],
+    "test/moving a fixed delivery earlier advances the prerequisite and prepared command": [
+      "97f113dab798a6cd8639fae6fd0282ef9dbfecb3ddddf684966fc02eb5857649",
+      "91f5ebb0e764589ed2fe5d066d436e2cf3c555c6d21333b2b39fc1d696f319b7",
+      "91f5ebb0e764589ed2fe5d066d436e2cf3c555c6d21333b2b39fc1d696f319b7"
+    ],
+    "test/a lone builder completes its earlier job before starting a later preparation": [
+      "4122acfe0d4566b32698521304b368fe114312d0d2f48a5c3b7f655d5d2452a9"
+    ],
+    "test/idle preparation requires an idle worker at departure and ignores future idle events": [
+      "264c018a8344049fea276feb6b4a67e34a347284ea33a1c0b427dea246b3b128",
+      "3a732e76e6d8f46ac5dd864a7e498983e34f33b2ae32bf6494689134ea77dd12",
+      "22445fe9af66b5367c79d42b2ee0acd7cc51b05e518abc49c8fda85f9e1cd647"
+    ],
+    "test/preparation captures the reactivation remainder at departure rather than purchase": [
+      "4cf50473b0e0e3dd082c62dfaf0b1aa14f844d2ec5c399298b637c00d2efde09"
+    ],
+    "test/Whip speeds outward travel but leaves the preparation offset exact": [
+      "510c3dad0560dbd0b4a12b5a8f9aba039850da0f877fc8362d5d30fe0d4a1a30"
+    ],
+    "test/preparation at the same time as a prerequisite command can change its builder and finish": [
+      "ed8adb051756f5af85c13245a2863650b497d8d18e8b361693e36a919c44be5d",
+      "fd046fce738441ffcc8846191c9ab92a9eaabf0f31496d8a868f7ea53422883c"
+    ],
+    "test/%s upgrade preparation can precede purchase prerequisites and survives file round-trip [0]": [
+      "cb2054979b61f5627218569f0024c3458abe4349ad13ac62234a6194b03da4e9",
+      "cb2054979b61f5627218569f0024c3458abe4349ad13ac62234a6194b03da4e9"
+    ],
+    "test/%s upgrade preparation can precede purchase prerequisites and survives file round-trip [1]": [
+      "c4c8285ea695aab7a633130f28edb6a84686421641067d5ad242be2b918907de",
+      "c4c8285ea695aab7a633130f28edb6a84686421641067d5ad242be2b918907de"
+    ],
+    "test/a rejected preparation leaves neither a reservation nor lost income and does not block a later valid order": [
+      "d316c1b7effaf284553271c1ef71de955a67e043eff14f308371537c15d37da7",
+      "aa4cc7521c739cce3d6dd3aa471c6b363bc051810f78cff2f6c89893296b90c3"
+    ],
+    "test/a long later preparation cannot starve an earlier valid command": [
+      "f906286f6746edaaf3bdfa07327b5725194a2efef1aa640801f18f2b964c8c91"
+    ],
+    "test/rolling back an impossible idle reservation rechecks later idle departures": [
+      "bc0b9dd489546d795a896c779bb1f27263e8f75cc48941660c9822be789bf006"
+    ],
+    "test/multiple later preparations cannot invalidate an earlier prepared command": [
+      "232a0a426964d1d7bac3b7f8386c7f165ab9b2db543e169bf1aa2ae75d750c9f"
+    ],
+    "test/fixed-time worker eligibility is independent of the event's source row position": [
+      "bb27d2ba5ac9875b9b7f6ec3e0b704345404c8fa0fc505b831348ac9481e6875",
+      "9af0bef1f736c396d2f747933758502057fecb0f8e0ac5e6f1e0098034c5978c"
+    ],
+    "test/a prepared build waits for late resources and resolves a worker event after the final command": [
+      "b6959b35cf210b986e86a4bd03246ce5f2d4cc64b3b2f286df29d41b90c206a2"
+    ],
+    "test/the earliest later departure moves when preparations are [0,%s,100] [0]": [
+      "b107307e9fb5a8f1bb716c04b5c2ec72fe63e3a300fb996435478001b5dd93e7"
+    ],
+    "test/the earliest later departure moves when preparations are [0,%s,100] [1]": [
+      "7dbdb2720553c69bcddbafbef453bce254de95270b7eb138d5c5555da334a097"
+    ],
+    "test/adding and removing the second Tower of Mana preserves the Light build": [
+      "105128c1791a0d351a21d0c740d510f42c50ddc5c03e2313fd3749da16edcc1d",
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "105128c1791a0d351a21d0c740d510f42c50ddc5c03e2313fd3749da16edcc1d",
+      "105128c1791a0d351a21d0c740d510f42c50ddc5c03e2313fd3749da16edcc1d"
+    ],
+    "test/changing the simulation inputs recalculates prior preparation on append": [
+      "5206f29a07ea8eb906c096e4cb488866b0b46b0b22027e23bb65a4c8ad0b01f4",
+      "ca761b0ec663e1ccb6a18aee07ccc437ba1f65a5a8cd196888ac1f46fe8b35d1",
+      "ca761b0ec663e1ccb6a18aee07ccc437ba1f65a5a8cd196888ac1f46fe8b35d1"
+    ],
+    "test/editing prior preparation recalculates the build even when the edit also appends one building": [
+      "5206f29a07ea8eb906c096e4cb488866b0b46b0b22027e23bb65a4c8ad0b01f4",
+      "d003bd2571e6920ba291ef073f4b6fcb873c683bd9144554b09d09bdfdbfd399",
+      "d003bd2571e6920ba291ef073f4b6fcb873c683bd9144554b09d09bdfdbfd399"
+    ],
+    "test/an append that interrupts a previous builder's return agrees with a fresh solve": [
+      "c4a5cb625da533ebd025cc39e68a11c446e73ef15ae7f26c5e0d75ddab6c630b",
+      "9c41ba8ac5ebc340ce0fadd9b3f0de504250ec011ea807b4445b4ba0fcf58c27",
+      "9c41ba8ac5ebc340ce0fadd9b3f0de504250ec011ea807b4445b4ba0fcf58c27"
+    ],
+    "test/the full solver can move preparation to fund an append within the search horizon": [
+      "49c4f08ec9905c63e1d75afe633540cf584700e668630da93429741a57eedf11",
+      "3d5b4d462b78424cd46a68a3a65d2ba27d5afbdd9487158699431e5f48bf3b6f",
+      "3d5b4d462b78424cd46a68a3a65d2ba27d5afbdd9487158699431e5f48bf3b6f",
+      "49c4f08ec9905c63e1d75afe633540cf584700e668630da93429741a57eedf11"
+    ],
+    "test/the tower after Gilbert interrupts the returning Altar builder": [
+      "662bf91a6be89667a3eadbddf40623df92850eeab80126553b414e54621fb2ed",
+      "42a7d37e3b963d1bbca2cdaee82c7db0fd344b50fcd4fc614afd487c56cff541",
+      "42a7d37e3b963d1bbca2cdaee82c7db0fd344b50fcd4fc614afd487c56cff541"
+    ],
+    "test/a previous result without verified simulator state does not change the solve": [
+      "5206f29a07ea8eb906c096e4cb488866b0b46b0b22027e23bb65a4c8ad0b01f4",
+      "ada70388ab57b5a7de4caafb8fcb6783b859d11889d5b2bdb45f52828dc62945",
+      "ada70388ab57b5a7de4caafb8fcb6783b859d11889d5b2bdb45f52828dc62945"
+    ],
+    "test/recruiting Fox Rider after Gilbert preserves all earlier actions": [
+      "662bf91a6be89667a3eadbddf40623df92850eeab80126553b414e54621fb2ed",
+      "ef3c5877d035cb798a949145a44115950bb5182c31141aec2dc36c25a0739b9d",
+      "ef3c5877d035cb798a949145a44115950bb5182c31141aec2dc36c25a0739b9d"
+    ],
+    "test/a unit append reports the fresh result when the prior preparation cannot supply it": [
+      "5206f29a07ea8eb906c096e4cb488866b0b46b0b22027e23bb65a4c8ad0b01f4",
+      "e986692771bc5e484582b8c861b938bca547897444d9e4bfb316e26c32f80c01",
+      "e986692771bc5e484582b8c861b938bca547897444d9e4bfb316e26c32f80c01"
+    ],
+    "test/an appended worker starts gathering after recruitment completes": [
+      "5206f29a07ea8eb906c096e4cb488866b0b46b0b22027e23bb65a4c8ad0b01f4",
+      "06860009a9ca715ebb0137506b3063b0fbbbbbbe313b62b407f954d0479f5db8",
+      "06860009a9ca715ebb0137506b3063b0fbbbbbbe313b62b407f954d0479f5db8"
+    ],
+    "test/removing a prepared final action restores gathering from before its departure": [
+      "2c373a12930c738a9d27ec9d8b0f11c204101f486df06bfab0c63e09ee5a1150",
+      "5206f29a07ea8eb906c096e4cb488866b0b46b0b22027e23bb65a4c8ad0b01f4",
+      "5206f29a07ea8eb906c096e4cb488866b0b46b0b22027e23bb65a4c8ad0b01f4"
+    ],
+    "test/inserting a Worker or removing Knight preserves the full Light build result": [
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "29e390b113d2ddbd17a86d78884e070c9c12d5b06da255ba95b81e5a04a0756b",
+      "29e390b113d2ddbd17a86d78884e070c9c12d5b06da255ba95b81e5a04a0756b",
+      "198cbebf82abb0f04c33f06d536dc989a8ee976f716f58a984c161fa91ac2604",
+      "198cbebf82abb0f04c33f06d536dc989a8ee976f716f58a984c161fa91ac2604"
+    ],
+    "test/removing a row can advance the next command before the removed command time": [
+      "c6a94c622ff2805839403aaf194a793a25dabe006e300a81ac9a4e63653037f0",
+      "e71e560fe9d2b3c4668ce4271adb35d6d571f8595eac6f064c35c39bad5a7d26",
+      "e71e560fe9d2b3c4668ce4271adb35d6d571f8595eac6f064c35c39bad5a7d26"
+    ],
+    "test/swapping the Altar and Sanctuary upgrades preserves the complete Light timeline": [
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "66ec9cef2c9e25784826b80aee9d63f980f9e2696d7bbed34cd51ea64813a998",
+      "66ec9cef2c9e25784826b80aee9d63f980f9e2696d7bbed34cd51ea64813a998"
+    ],
+    "test/moving a building across several simultaneous orders preserves source tie order": [
+      "14a480306b4fb3390710c0522e8b51867654ae459965a76b5772a0bfbbc7b860",
+      "528214500612df5c5a2286809fa7dd2aa688e1b66888ff09e074087f25d15b65",
+      "528214500612df5c5a2286809fa7dd2aa688e1b66888ff09e074087f25d15b65"
+    ],
+    "test/changing an earlier catalog row recalculates the blocked reason for its dependent command": [
+      "cb027623ce92f2955c112735db00d7f0cd2bde94513bdbb57d3265e0849c7471",
+      "3951d348ca86bea1dfe378428653d2259ad21bcf8c93b807bfd6d16ea370599b",
+      "3951d348ca86bea1dfe378428653d2259ad21bcf8c93b807bfd6d16ea370599b"
+    ],
+    "test/editing Elven Tree preparation preserves the Light worker schedule and deliveries": [
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "68a6253366c3a8be43d1cee14ceca77c3ee641d242ead080a2c9166329c9e1f8",
+      "68a6253366c3a8be43d1cee14ceca77c3ee641d242ead080a2c9166329c9e1f8"
+    ],
+    "test/editing a later preparation can invalidate an earlier construction candidate decision": [
+      "3d5b4d462b78424cd46a68a3a65d2ba27d5afbdd9487158699431e5f48bf3b6f",
+      "4bdebf73364568de40892f11e0e1d28b29358f2a32be17f55e4bd244dce712bd",
+      "4bdebf73364568de40892f11e0e1d28b29358f2a32be17f55e4bd244dce712bd"
+    ],
+    "test/moving Resources collected earlier preserves the complete Light timeline": [
+      "8d73b073e432e7f22bf65156d81b63e2d57f6c78a6b61213b9e892448390e25b",
+      "367d6b4eaa84bbe01a9ffffc2339c7ba2cbebc264eee4627cad2f2ff25ebd772",
+      "367d6b4eaa84bbe01a9ffffc2339c7ba2cbebc264eee4627cad2f2ff25ebd772"
+    ],
+    "test/inserting and removing a fixed event remaps earlier events and resolves ties in row order": [
+      "83bd25c6df054f25b3ca2a3dba01054fad0b6cf3c808540121df8cdcd4723723",
+      "77605774f23da0d1cfab5e8afcc0482e6119e2fd5635200a747071234cbeba50",
+      "77605774f23da0d1cfab5e8afcc0482e6119e2fd5635200a747071234cbeba50",
+      "83bd25c6df054f25b3ca2a3dba01054fad0b6cf3c808540121df8cdcd4723723"
+    ],
+    "test/inserting a delivery at a catalog command time replays the purchase decision": [
+      "33f40cae77bac5fbb99cda847968ea733e98bad9c44a58e602418c48ec4bf909",
+      "1bdbdebee98c769b1fa7c06cdbdf4b750b3deeb1fce2932260583b23ecb3fabf",
+      "03f0c6135060869a46ebc255997762cb658120bf6129f78e48e27dc019f8cbaa",
+      "03f0c6135060869a46ebc255997762cb658120bf6129f78e48e27dc019f8cbaa"
+    ],
+    "test/adding a future Whip cast can change travel already in progress": [
+      "0de0e0172786116ff3aef2227692e52928e1e542dc839cb574d236f3397849cd",
+      "e4e3e0f255070b23788b4301a68b164f03e3489214150f9d75aef73516ad7d0b",
+      "e4e3e0f255070b23788b4301a68b164f03e3489214150f9d75aef73516ad7d0b"
+    ],
+    "test/removing a late event can shorten an explicitly limited schedule": [
+      "dd2d592b9ef4e3f1d12bf862e2cdab05ad678ad18342bc1fb6a5d28b5f7d6e91",
+      "4853973e3389e1eb0c72e8e3366c7af1f01fff86f2b47cf8e89461a9e9000903",
+      "4853973e3389e1eb0c72e8e3366c7af1f01fff86f2b47cf8e89461a9e9000903"
+    ],
+    "test/mixed and repeated edits can branch from the same result without changing it": [
+      "4082324fbd7d589b790a8daf357ae6122eaf1c6a182c725ecdb96018ee23fae3",
+      "fbd036df45e1f17cb60e81e7d3ddbb06d2b58aca3720ed2330754477761fb12c",
+      "fbd036df45e1f17cb60e81e7d3ddbb06d2b58aca3720ed2330754477761fb12c",
+      "4e5347819633e516cbc7e8bd1082cbc88df14a701cab7e5c60c2a6786ddcb8df",
+      "4e5347819633e516cbc7e8bd1082cbc88df14a701cab7e5c60c2a6786ddcb8df",
+      "4e5347819633e516cbc7e8bd1082cbc88df14a701cab7e5c60c2a6786ddcb8df",
+      "4e5347819633e516cbc7e8bd1082cbc88df14a701cab7e5c60c2a6786ddcb8df",
+      "fbd036df45e1f17cb60e81e7d3ddbb06d2b58aca3720ed2330754477761fb12c",
+      "fbd036df45e1f17cb60e81e7d3ddbb06d2b58aca3720ed2330754477761fb12c",
+      "4082324fbd7d589b790a8daf357ae6122eaf1c6a182c725ecdb96018ee23fae3"
+    ],
+    "test/missing history and incompatible inputs produce the fresh edited result": [
+      "3ec58b251651d41ebd1f8a0daf4cb64a15575e1f73ccd1a4e2676fbf027150ab",
+      "6128189f9e5933befc868ad47d075ffb4b460c7c817aa6f62f455018824a4574",
+      "6128189f9e5933befc868ad47d075ffb4b460c7c817aa6f62f455018824a4574",
+      "6396946751d62cb5126dd8c3477546b8a661c5d839bd1ea98460bb597dec9b9a",
+      "6396946751d62cb5126dd8c3477546b8a661c5d839bd1ea98460bb597dec9b9a"
+    ],
+    "test/prepared construction and fixed events preserve same-time ordering and blocked actions": [
+      "c91c0a0e4a543198002501707b2541d18a61fc5e52c102c9e932358c22176bf0",
+      "1f0ece4a2d6a2515314f573732e38d71fa2c3d44443c5833897477697960dd1f",
+      "1f0ece4a2d6a2515314f573732e38d71fa2c3d44443c5833897477697960dd1f"
+    ],
+    "test/changed scroll windows and producer targets preserve complete results across calls": [
+      "c585f0918dab4464683f4302e50d1af5dbe7ddcf69e4380d87fa1cb4c400a05a",
+      "edf39ca9874e90e6daa8735500f535957b16d61cd7cf514b47c499d951eb04ab"
+    ],
+    "test/preparation can depart when a miner leaves the mine before the next delivery": [
+      "dd0823f714760038ffa0eddcd648069494363689be693ae05a7f9c2cba0e7480"
+    ],
+    "test/prepared builds using %s preserve complete results through consecutive and branching appends [0]": [
+      "3a06507779182dcb17dd2176cdd2107a3c25556327060e54ffc4d1c662495a1f",
+      "634ee9badd84637a22bc499388770d0106f44bbfccf7e3ca8148a0741a70fe00",
+      "634ee9badd84637a22bc499388770d0106f44bbfccf7e3ca8148a0741a70fe00",
+      "d661c94bce732e1262fc6ba07adc839fbfb7226202578d03224c4cb25d9bdb98",
+      "d661c94bce732e1262fc6ba07adc839fbfb7226202578d03224c4cb25d9bdb98",
+      "62adc4e6beb9b5ec87e390dba0bd6a17fcfde305c1b5bcf224e863b3dce30ea8",
+      "62adc4e6beb9b5ec87e390dba0bd6a17fcfde305c1b5bcf224e863b3dce30ea8"
+    ],
+    "test/prepared builds using %s preserve complete results through consecutive and branching appends [1]": [
+      "ea8ac4bd954cc9d88733d96974a5477ba7b6bb0d7f9e457f1a55091c7abb4230",
+      "52fbb6f8bfd6f452202ed7ba7ade76fae5289cdb16d5dc82574dd65525f2e871",
+      "52fbb6f8bfd6f452202ed7ba7ade76fae5289cdb16d5dc82574dd65525f2e871",
+      "45f052d09171afccae869d6d636d674de296d9ba348e42abca6623f5fe9452a7",
+      "45f052d09171afccae869d6d636d674de296d9ba348e42abca6623f5fe9452a7",
+      "51fc6392f84ee41b91ba25318c63f2734ea21a4c4ce026aacc225b1973c0f1af",
+      "51fc6392f84ee41b91ba25318c63f2734ea21a4c4ce026aacc225b1973c0f1af"
+    ],
+    "test/prepared builds using %s preserve complete results through consecutive and branching appends [2]": [
+      "ab1202255cdaedc36edae09c7868259df016a1593e1c3a2a207b95ef0bcc560c",
+      "c6c3646565d5b7db47bb096bb69b45ba94e373baf4465e6d19e486891fed29eb",
+      "c6c3646565d5b7db47bb096bb69b45ba94e373baf4465e6d19e486891fed29eb",
+      "8ce1d7b7007f90d8390f05d349fb575329f38c2d03673716337dfc15f31209d5",
+      "8ce1d7b7007f90d8390f05d349fb575329f38c2d03673716337dfc15f31209d5",
+      "30fc79f1a549992c4ee0c66ea60a632e1b48c54517210d377291cce5065321e2",
+      "30fc79f1a549992c4ee0c66ea60a632e1b48c54517210d377291cce5065321e2"
+    ],
+    "test/an appended producer can make a later Legion's Call valid and change the forecast": [
+      "50365db7e3e7fa6aa431e5915f83f08b7646f6b445261f3b50892cbafea8ed6e",
+      "827fe73798d027de385af8717fa8cf3846664db1c11b8d1d0a72f9383261eaec",
+      "827fe73798d027de385af8717fa8cf3846664db1c11b8d1d0a72f9383261eaec"
+    ],
+    "test/appending a catalog row refreshes earlier blocked reasons that use its name": [
+      "4f4296faa6924f6a1b97c971064ab0a378a1dbb24a08ac4e5cd09535285a8432",
+      "4873514f78fe725a081b4200c956cafa6dce98d74078c33b43e77afee3d68e7f",
+      "4873514f78fe725a081b4200c956cafa6dce98d74078c33b43e77afee3d68e7f"
+    ],
+    "test/pending effects preserve a blocked append and the results of unsupported changes": [
+      "d496426c16f43673ce2b4c11177ca082ea25edc21e82d8e84490d0a08f966caf",
+      "0361364552e6cff6b56e10e7c0049e24486691c576e87865a9486758c9312d5d",
+      "0361364552e6cff6b56e10e7c0049e24486691c576e87865a9486758c9312d5d",
+      "1290daac37167efb39ec7c2cb74c104327824f3885843735f2531bad7766dd3c",
+      "67210acab7be999b9da7c50855275f2cc29ac0ce8f8cd69b4ee54c58d01241c0",
+      "67210acab7be999b9da7c50855275f2cc29ac0ce8f8cd69b4ee54c58d01241c0",
+      "30bbce838415b257c26a0829eb733dd214ce19bb5aae69025d0d3b33f43fc06d",
+      "30bbce838415b257c26a0829eb733dd214ce19bb5aae69025d0d3b33f43fc06d",
+      "660969836604b04d026bd78bf60abdc609d1495d872958154ef69f592aebb130",
+      "660969836604b04d026bd78bf60abdc609d1495d872958154ef69f592aebb130",
+      "d89006bbf56e0aa3286d505bb8c2d6be3b6112449898d61282bd7161609029b0",
+      "d89006bbf56e0aa3286d505bb8c2d6be3b6112449898d61282bd7161609029b0",
+      "c32cbfbf6c74c182f0b44518f32ebf51de9c56ea33c1314902a8bfef46c106a5",
+      "c32cbfbf6c74c182f0b44518f32ebf51de9c56ea33c1314902a8bfef46c106a5",
+      "12b66dd9136f3e53502e6faec97f4aafa538ade5b84910d1e7ebe2dd2a448140",
+      "12b66dd9136f3e53502e6faec97f4aafa538ade5b84910d1e7ebe2dd2a448140",
+      "efff81a9e6de369e7c129770fc9d17da4a8fdebac5fcfc8b289d58cc3c110e55",
+      "efff81a9e6de369e7c129770fc9d17da4a8fdebac5fcfc8b289d58cc3c110e55"
+    ],
+    "test/changed settings and edited rows invalidate scroll append evidence": [
+      "d496426c16f43673ce2b4c11177ca082ea25edc21e82d8e84490d0a08f966caf",
+      "e18c773b23bdfe943d964b5dab097e21b2b5c50bfed2ca11a07e7340e42ad38e",
+      "e18c773b23bdfe943d964b5dab097e21b2b5c50bfed2ca11a07e7340e42ad38e",
+      "e9077d585ecf4d8301342f17edd745bf76d8cb0242382b1a8c4ffc717450612f",
+      "e9077d585ecf4d8301342f17edd745bf76d8cb0242382b1a8c4ffc717450612f",
+      "7850a38223426bf2a4333e880d54878848dfb89ba6bea1b26de77a83bb749133",
+      "7850a38223426bf2a4333e880d54878848dfb89ba6bea1b26de77a83bb749133",
+      "83c1976a0923db1ff65065dcdbb00ed8ee46bce64e4d68ece07884c66c4769d5",
+      "83c1976a0923db1ff65065dcdbb00ed8ee46bce64e4d68ece07884c66c4769d5"
+    ],
+    "test/copied and mutated public results cannot contaminate an appended result": [
+      "eac1e6745ef9202a46779ea355ae77693afca87b684c287bb06f8b506d4088b1",
+      "6c0c42c1973946e81e652c7758a6c256958f296adbf9a836bd15fc051bac9a00",
+      "6c0c42c1973946e81e652c7758a6c256958f296adbf9a836bd15fc051bac9a00",
+      "6c0c42c1973946e81e652c7758a6c256958f296adbf9a836bd15fc051bac9a00"
+    ],
+    "test/Citadel completion spaces Goblin Lab and Altar commands by %ss [0]": [
+      "3a2169844c0b754a518891234a78c1485d1755e9c219b890cb8ea9c6485b3ef4"
+    ],
+    "test/Citadel completion spaces Goblin Lab and Altar commands by %ss [1]": [
+      "dcb074f4958d84b1912afe26302d7023d62c1fd39677e2c794433d1612ddc6a9"
+    ],
+    "test/Citadel completion spaces Goblin Lab and Altar commands by %ss [2]": [
+      "787abba0667034548e075a3d6c9d8aae9c27df82d38ce65eb7304dd7a03854fa"
+    ],
+    "test/Citadel completion spaces Goblin Lab and Altar commands by %ss [3]": [
+      "478e442034cc3d7f9b8dfdc176333537c2549a1366e9ceb51e1ee3e8f6067b0c"
+    ],
+    "test/%s construction and upgrades share spacing, while recruitment does not wait [0]": [
+      "8ae59fd4135e707f48b6032471a09bef87cd6b46ae19f71738d0271935301284",
+      "f63a98dded378f746f953dd275c3fbf3060503d2309c31f0a074e4af3318cb4e",
+      "c64dadf7aa123b9e41a18bebfaa7035fd86ba64426ca3a461bc3051fae8d4889",
+      "b6686f7d1ce583774470710a798703bd8e8f4e7350901da199b81e6d094d9d25"
+    ],
+    "test/%s construction and upgrades share spacing, while recruitment does not wait [1]": [
+      "8afa4456e89118eb4a538f196af9688ecde4519f22af99666686795af235c4db",
+      "4feb83bcc4df90d35ca46171c85e0709ae59224c3b3685e1353f53216e80793c",
+      "b0647ae2cebb17edf9091bd5abdb7503dc5eaff5614a6bdf90be7f2d07f33b6c",
+      "4219da505a61bed3027d31aaae1e4fbf31222917e3237fda54aeddfa9a178dac"
+    ],
+    "test/%s consecutive building upgrades keep command spacing [0]": [
+      "11b014455efc49c9a77de26982d1fbccd3316e4ec8e9eb203bac41bb6c1db8c8"
+    ],
+    "test/%s consecutive building upgrades keep command spacing [1]": [
+      "2c6d1e55270860898b1db0efde8c23e2616e9aeb638c525ee8ac2fc7ecb54dab"
+    ],
+    "test/a successful scroll spaces construction; a blocked scroll does not": [
+      "3180d942dbcff511e7c908a5fb9e267e32ca4bb2dc368de61bf2cf11c816b94d",
+      "4d2c7081d7b99035694be04abe3b49676262ed3e6416eedd99dc6b4a918c2bd5"
+    ],
+    "test/resource events do not reset command spacing": [
+      "58d4c8515727a1737d041a39a87dcb8a15bce7e2ff2d7051624a0170fe73025b"
+    ],
+    "test/commands wait after collected %s becomes sufficient [0]": [
+      "5a79791837d902fb8f773b3c2037932793b04f16ec98b0a504a066909da68939"
+    ],
+    "test/commands wait after collected %s becomes sufficient [1]": [
+      "5a79791837d902fb8f773b3c2037932793b04f16ec98b0a504a066909da68939"
+    ],
+    "test/earlier spending reserves resources without reusing their previous readiness": [
+      "090f4780b1576faeb5db60329d486e2e0bff9b49ad0250c219224076c797fb9b"
+    ],
+    "test/fractional deliveries at the same time retain their addition order at the purchase boundary": [
+      "3375f0ac234da4a4bbefb1fd73aae07c928641bd8060673ecac141dbfa992843"
+    ],
+    "test/food from a completed farm waits for order delay": [
+      "4d7fe2066795f4ca5907ca1f49e193060067806635fc91461f65d9f05e6354e8"
+    ],
+    "test/food released by a kill waits for order delay": [
+      "e13c9df552fdcc4ccb2bd43a4e996a3628f724ac865806ccc584d9994c5cf6e9"
+    ],
+    "test/a completed builder can accept another construction without waiting for return": [
+      "2a72b658f70e821e4836dcabac686d1597eb329166969f67283d905d92804009"
+    ],
+    "test/natural gathering waits and resource waits overlap rather than stack": [
+      "b43aefebbeb766b020fee1bd93f56108717420354c60ca677cd65732ecab49ae"
+    ],
+    "test/zero order delay permits commands at resource availability": [
+      "9815efcad32c24e9cab05504bf598d72c1c95c9a1c00283157f3d0f51aa02fef"
+    ],
+    "test/fractional resource availability respects the exact %ss delay [0]": [
+      "58764dfa0d87cd63a72b37fe73f832c96e4405e7068eb3c19eedebf74b6956a6"
+    ],
+    "test/fractional resource availability respects the exact %ss delay [1]": [
+      "5a180d1402baa08525cfc6e2455f07d295fb8a7aa36657d3a1cbcd9f5f0a3d78"
+    ],
+    "test/fractional resource availability respects the exact %ss delay [2]": [
+      "e257d9e419f1c710dfccbc4a9e7a381ac344eec1dff85ba1e0ea4da269f61cb6"
+    ],
+    "test/fractional resource availability respects the exact %ss delay [3]": [
+      "17ada92f16d6214f6ee50c324304495b44c77fe2e7d761a34e7bcf0b737f9ee7"
+    ],
+    "test/food released once cannot unlock multiple recruits using the same food": [
+      "c86b40257c218ba31c59932b861086de30ef1789c646a8a4eca0b65256944463"
+    ],
+    "test/an empty build projects five minutes of deliveries including the boundary": [
+      "161fa5ac0f3445555b08423492646297de8c65f0262770b7a478657d0f96a2f5"
+    ],
+    "test/a long builder return keeps deliveries available through the timeline margin": [
+      "80d3baf1b7933cc94600632fc9b5d7fc86cf6bbeebf57698e3fab0bc8831c318"
+    ],
+    "test/the projection follows the latest finish even when the last row finishes first": [
+      "ba56a1dcad3ec0a472313a9d744ffc975200221dce47d128ba70967bd86367af"
+    ],
+    "test/the projection covers the timeline margin after a blocked fixed-time event": [
+      "30d5a0c102d7f28e6856c58946dd3a8c550ad40202c8f7a5cfe0828f85247a09"
+    ],
+    "test/the projection includes a successful scroll's effect duration": [
+      "555495ebe4e2980102b78ea591f24e16f019e89ffd878d7a38a6dcdb15c292ea"
+    ],
+    "test/a late successful event projects through the 30-minute cap": [
+      "0906e4b36a6ce17bdb49ccb2413727c775eed942b08eb46e24e36215a8f4e1b7"
+    ],
+    "test/a late delivery can fund construction within the search limit": [
+      "8db5b6e3d3da2132283f2f9558e81618e69c7952768de1283de5bc3749cb1e83",
+      "8e066e59b5f223d443e1b659bcb24300df9f88f85601c785e8358e3ee6096cd2"
+    ],
+    "test/resources arrive at the exact timestamp, including zero, without any delays": [
+      "e9ec5b01aeef06bcd2c9ce446d9168e743fce7db07b2daa492cb6438a98f21fc"
+    ],
+    "test/%s resource events unblock earlier rows and survive JSON round trips [0]": [
+      "e0908b0e74d620fdb03ea5b244018278998a5b90e043b7ed1e2bf3553b44fb2c"
+    ],
+    "test/%s resource events unblock earlier rows and survive JSON round trips [1]": [
+      "02a9fb02a176ff1403bf74f4f7b358803ddf2c8a069f810c10ebe32904e225c2"
+    ],
+    "test/negative adjustments clamp each balance at the event time and later income has no debt": [
+      "4a811eb298296397e9bb5ff45b2feeb52d41a69a96d46cc4d12b5c61b13c3471"
+    ],
+    "test/negative adjustments use the balance after earlier command costs": [
+      "b77208b617a83a95205c9862e786eea29f79c5c971d732508be9582a46dcc97a"
+    ],
+    "test/%s worker batches are atomic, fixed-time and exclude idle workers from construction [0]": [
+      "db3c24723936e2fc931b62ad2e4fdacc2c329cc3ec289426dfc9d42aaf7f0335",
+      "ef3bab316f6c5fe43c698625ed57b5bfd68e30153f4357a70b92eba3eb377b39"
+    ],
+    "test/%s worker batches are atomic, fixed-time and exclude idle workers from construction [1]": [
+      "fdde42f1d96e0cd6e99257fffa4d9c0dc88801d6387062c789a2141dde530d02",
+      "ef3bab316f6c5fe43c698625ed57b5bfd68e30153f4357a70b92eba3eb377b39"
+    ],
+    "test/reactivation travel is paid once, preserves wood progress, and construction retains its remainder": [
+      "06a01ec46e58451c7bc9f063be754108d233958449e98be3fce5dd00bf05c5d0",
+      "ce3ce4adfe7da0743a1ae07e32954f52d73f4bf02df7b9fef7fee30f06e4a76b"
+    ],
+    "test/worker events round-trip through files and sharing": [
+      "6946cc8307603c31a0274f66a2d9a153ba560024e0f4ad2af902e840b8ed263c"
+    ],
+    "test/reactivation resumes retained wood without an extra journey and Whip preserves movement progress": [
+      "4862b4602e7a205917783875853c4b38cbfd3aa6d65fa0354f04a758af7b0333",
+      "93816b513d48ab3d4449e5085de49d759a4e9c0cfff2e376e7668c3de03507dd"
+    ],
+    "test/delayed initial gatherers are counted once and can be made idle before activation": [
+      "2dca73f1b8b570afa78feb41ff9dd8227288b877ecd9d5dc8ba6bc396e8fc1b5"
+    ],
+    "test/a future hero death can release the level-one Altar tier for a different hero": [
+      "93782e409213972bd7fb7cf20a47bfeb2b51993e938987a22b25ca522cd2afa0",
+      "76dfcb9882f8f5ea65126f9b2582ca6771cc8c90c49e22361cc143685ac0b35d"
+    ],
+    "test/idle selection excludes in-mine workers and gold reactivation discards interrupted cargo": [
+      "42952582a6fb43137cc4e1cd435f73b16f44bec4935b9c9aaa9774214e0d4a56",
+      "3be77563ce4e5fecd6510edaa6b23f031f7a94a068a3eeb2d257e665a41d81f4"
+    ],
+    "test/reactivation retains a completed wood load instead of gathering another": [
+      "677958514c2440a8d600c9f42f0f52067acd89fb0678035c359e1fe623e73095"
+    ],
+    "test/%s worker losses strictly select their group in displayed event order [0]": [
+      "bab6658c1a0c0d202146de91bc5396a0044bf46182b6cccbf246313a164ccacb",
+      "f8206038340c358233bc729a637757ac46ee87b6bc3b1047ebd31da74bf81be7",
+      "05c0ba51cd6e4f493238d97bec78e90d36dfe7ed701082016ea4d52ad460be4c",
+      "852afdbcbcf2f3b60212646c68d22ce9e832d762bb8f17c39be4b139decf6b85",
+      "bab6658c1a0c0d202146de91bc5396a0044bf46182b6cccbf246313a164ccacb"
+    ],
+    "test/%s worker losses strictly select their group in displayed event order [1]": [
+      "e2910ffd148dd7aa9376de1339cf2196313a3f2749621cc9e8cd318c120c0975",
+      "2a1bd426c97c798ec38d189d8540ebd86ff7a5e503c55f56bcc5e09d435b84b2",
+      "4ad6c1ba7186040aaa177e1bb0d94e87c53a887fd34ebd0f61c7f139cc7c810e",
+      "7f8a52d92ece076a0e4f26a3d65770b5cd5bc93d1c552f2c6cf1e4bd72031488",
+      "e2910ffd148dd7aa9376de1339cf2196313a3f2749621cc9e8cd318c120c0975"
+    ],
+    "test/reactivation cannot invent a resource assignment for an unallocated initial worker": [
+      "7a86185906cf3ce0c4901b9a8f8049fcb17bb577732e727b10722f97d0f61af0"
+    ],
+    "test/%s kills validate initial workers, release food instantly and cannot kill more than exist [0]": [
+      "6a6b235534dde5fc0dee739048147269acbbc7290ae2a1ac08114bac1b9991d7"
+    ],
+    "test/%s kills validate initial workers, release food instantly and cannot kill more than exist [1]": [
+      "37e02e1d145d3fbf0b0f271ddd93e40d0f555f55de7784877454b0763157aa4d"
+    ],
+    "test/only fully recruited units can be killed, regardless of kill source-row position": [
+      "0b64ae023d4f1fb834a990e84bdb5c2b13927bd6f411067b24e3731def655854",
+      "a5fc0a70908fc7345e22e59e84e1ad169a4661deccb8ce5c3567245b76aae788"
+    ],
+    "test/a future kill releases food and unblocks recruitment after order delay": [
+      "d45a3d921d3bf5165095314496595b7767d2e8677288a47744ec1186785bcec1"
+    ],
+    "test/construction workers cannot be killed, including travel, and other wood gatherers precede miners": [
+      "05f13cb2f8a376bb2cdbc7e0691f33b49f338b24b9494da524c723da6a647856",
+      "a444b4b7a99e2a9d87abcc40bb3d213c8363e980b41af60c20ce3a10f4ddd712",
+      "c735e53a1835de35fdfc488d9f79c03ddf9a11f9980e17ea6380c0d72dc5c8ea"
+    ],
+    "test/killed workers stop income, do not return or resurrect, and preview allocation matches scheduling": [
+      "1528df80138779f8886581157b3a9dd73fe3a2a5efe9376886776fc9b7a252c9",
+      "0c249e2d6c952f5f6b244e7d819ce2a712c1d8e044f3abfff6aa07bcf79998b3"
+    ],
+    "test/%s can be recruited, killed and recruited again with only a level-1 altar [0]": [
+      "3f313a667fb35089ef4f898b2c1ec622ec3aadd2e15907826762d3479a482583",
+      "648230b28f0cf5b442b8f258240a539ac6fcfa5a0bb681fdc4945ff1059e6106"
+    ],
+    "test/%s can be recruited, killed and recruited again with only a level-1 altar [1]": [
+      "6758c3f918cbdd9b8d574137ed9119476b75cef86b96fb02fb47b033c2e965f0",
+      "3bd34a699208f2f38b3d414da9eb26555a31a58e5b6e709d2217e52971b56970"
+    ],
+    "test/%s kills survive JSON and revalidate when recruitment is removed [0]": [
+      "ee5beac97c11fcf5e00ba4cbe107a3470b343c3825d0bc2f595366eb35cce654"
+    ],
+    "test/%s kills survive JSON and revalidate when recruitment is removed [1]": [
+      "b30f682870653ac2e9b61657c43affc7510a80e82aa3ae82ac56a2671739deb4"
+    ],
+    "test/new workers keep distinct IDs after earlier kills and can be killed at completion": [
+      "7c51fa01468da87c2b6bd456f5d9b5672c3786c4b98661d204cadaccc1cfbcbc",
+      "d01f6ee47dc8de03177ccf9ae888c4a663337721b59993003a9139ade6860f1b"
+    ]
+  }
+}

@@ -23,6 +23,15 @@ test("earlier spending reserves resources without reusing their previous readine
     expect(plan.slice(0, 2).map(action => action.commandTime)).toEqual([2.5, 12.5])
 })
 
+test("fractional deliveries at the same time retain their addition order at the purchase boundary", () => {
+    const economy = { ...settings, startingGold: farm.gold - 0.3 }
+    const rows = [farm, collected(10, 0.1, 0), collected(10, 0.2, 0), collected(12, 0.01, 0)]
+    const { plan } = simulateBuildOrder(rows, economy, 0, 100, 20, "Castle")
+
+    // Adding each tenth to the existing balance falls just short of the cost.
+    expect(plan[0]).toMatchObject({ blocked: false, commandTime: 14.5 })
+})
+
 test("food from a completed farm waits for order delay", () => {
     const { plan } = simulateBuildOrder([farm, worker], settings, 4, 4, 20, "Castle")
     expect(plan[1].commandTime).toBe(plan[0].finishTime! + settings.orderDelay)

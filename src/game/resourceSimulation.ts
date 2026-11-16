@@ -550,13 +550,22 @@ export function resourceAt(
     spending: Array<{ time: number; gold: number; wood: number }>,
     time: number,
 ): ResourcePoint {
-    const resources = [...deliveries, ...spending]
-        .filter((event) => event.time <= time)
-        .reduce<{ gold: number; wood: number }>(
-            (resources, event) => ({ gold: resources.gold + event.gold, wood: resources.wood + event.wood }),
-            { gold: settings.startingGold, wood: settings.startingWood },
-        )
-    return { time, ...resources }
+    let gold = settings.startingGold
+    let wood = settings.startingWood
+    // Affordability depends on the exact floating-point addition order.
+    for (const delivery of deliveries) {
+        if (delivery.time <= time) {
+            gold += delivery.gold
+            wood += delivery.wood
+        }
+    }
+    for (const event of spending) {
+        if (event.time <= time) {
+            gold += event.gold
+            wood += event.wood
+        }
+    }
+    return { time, gold, wood }
 }
 
 /** Returns the worker allocation at a command timestamp, including builders in transit. */
