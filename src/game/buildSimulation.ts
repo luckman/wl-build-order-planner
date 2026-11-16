@@ -218,6 +218,20 @@ export function simulateBuildOrder(
         const point = reused || local
         const resume = options?.resume ? copyCheckpoint(options.resume) : point &&
             restoreCheckpoint(point.state, buildOrder, order, reused && boundary ? boundary.rowMap : undefined)
+        if (options?.requiredSuccess && resume && preparation) {
+            // Ordinary passes can capture a prepared command that moved past
+            // its reservation. Candidate validation must check that prefix too.
+            for (const [index, requiredCommand] of preparation.commands) {
+                const position = order.catalogPositions.get(index)
+                const action = position === undefined ? undefined : resume.plan[position]
+                if (action && action.commandTime !== requiredCommand) {
+                    throw new RejectedPreparationCandidate(index + 1)
+                }
+                if (resume.preparationFailures.has(index)) {
+                    throw new RejectedPreparationCandidate(Math.max(index + 1, resume.nextIndex))
+                }
+            }
+        }
         const captureCheckpoint = signature && !options?.speculative ? (state: Checkpoint) => {
             activeHistory!.capture(state.plan.length, state.simulation.time, collecting, signature, checkpointWeight(state), () => copyCheckpoint(state))
         } : undefined
@@ -444,7 +458,7 @@ function simulateBuildOrderPass(
         ),
     )
 
-    let catalogPrefixLength = nextIndex
+    let buildOrderPrefixLength = nextIndex
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
         while (Math.min(pendingDepartures[0]?.time ?? Infinity, workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity) <= time) {
@@ -566,7 +580,7 @@ function simulateBuildOrderPass(
                     if (requiredSuccess) {
                         // Keep both the reservation and the catalog prefix that
                         // determined worker availability at its departure.
-                        throw new RejectedPreparationCandidate(Math.max(index + 1, catalogPrefixLength))
+                        throw new RejectedPreparationCandidate(Math.max(index + 1, buildOrderPrefixLength))
                     }
                     preparationFailures.set(index, item.construction?.useIdleWorker
                         ? "No available idle worker at preparation departure." : "No eligible gathering worker at preparation departure.")
@@ -614,10 +628,10 @@ function simulateBuildOrderPass(
         if (capture && itemIndex === buildOrder.length - 1 && !preparation?.commands.has(itemIndex)) {
             beforeTail = captureAt(itemIndex)
         }
-        catalogPrefixLength = itemIndex + 1
+        buildOrderPrefixLength = itemIndex + 1
         const requiredCommand = requiredSuccess && preparation?.commands.get(itemIndex)
         if (requiredCommand !== undefined && (simulation.time > requiredCommand || preparationFailures.has(itemIndex))) {
-            throw new RejectedPreparationCandidate(catalogPrefixLength)
+            throw new RejectedPreparationCandidate(buildOrderPrefixLength)
         }
         if (item.construction) parseConstructionSettings(item, item.construction)
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)
@@ -803,13 +817,13 @@ function simulateBuildOrderPass(
             // All events through the required instant still get their normal
             // ordering and readiness checks.
             if (requiredCommand !== undefined && nextTime > requiredCommand) {
-                throw new RejectedPreparationCandidate(catalogPrefixLength)
+                throw new RejectedPreparationCandidate(buildOrderPrefixLength)
             }
             advanceTo(nextTime)
         }
         if (!scheduled) {
             if (requiredCommand !== undefined || requiredSuccess?.[itemIndex]) {
-                throw new RejectedPreparationCandidate(catalogPrefixLength)
+                throw new RejectedPreparationCandidate(buildOrderPrefixLength)
             }
             canCapture = undefined
             plan.push({
