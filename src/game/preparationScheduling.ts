@@ -21,6 +21,8 @@ type Result = {
     projectDeliveries: (horizon: number) => ResourceDelivery[]
 }
 type Replay = (schedule: PreparationSchedule, collectCandidatesThrough?: number) => Result
+type ValidateCandidate = (schedule: PreparationSchedule, requiredSuccess: readonly boolean[]) =>
+    Result | { minimumPrefixLength: number }
 
 export function matchesPreparation(result: Pick<Result, "plan" | "preparationFailures">, schedule: PreparationSchedule) {
     return !result.preparationFailures.size && result.plan.every(action => !action.blocked) &&
@@ -35,7 +37,7 @@ export function matchesPreparationReuse(run: Replay, selected: Result, previous:
 /** Replays discard obsolete reservations. The engine remains responsible for all
  * purchase readiness, worker selection, fixed events and movement rules. */
 export function schedulePreparation(items: PlannerItem[], economy: EconomySettings, startingBuilding: PlannerItem, run: Replay,
-    previous?: { preparation: PreparationSchedule; reuse: PreparationReuse; verify: Replay }) {
+    validateCandidate: ValidateCandidate, previous?: { preparation: PreparationSchedule; reuse: PreparationReuse; verify: Replay }) {
     const prepared = items.flatMap((item, index) => (item.construction?.preparationDuration ?? 0) > 0 ? [index] : [])
     const schedule: PreparationSchedule = { commands: new Map(), blocked: new Map() }
     let result = run(schedule)
@@ -111,7 +113,7 @@ export function schedulePreparation(items: PlannerItem[], economy: EconomySettin
                     // A speculative replay can exceed a limit that the fresh search avoids.
                 }
             }
-            return { ...refinePreparation(items, economy, startingBuilding, schedule, result, run), preparation: schedule }
+            return { ...refinePreparation(items, economy, startingBuilding, schedule, result, run, validateCandidate), preparation: schedule }
         }
     }
     throw new Error("Construction preparation scheduling did not converge.")
@@ -169,7 +171,7 @@ function cannotMeetPrerequisites(prerequisites: ConstructionPrerequisite[], time
 /** A later departure can restore an earlier delivery. Refine against observable
  * event boundaries so a conservative replay does not impose an unnecessary wait. */
 function refinePreparation(items: PlannerItem[], economy: EconomySettings, startingBuilding: PlannerItem,
-    schedule: PreparationSchedule, result: Result, run: Replay) {
+    schedule: PreparationSchedule, result: Result, run: Replay, validateCandidate: ValidateCandidate) {
     // A default tail cannot change earlier catalog commands. Remember how much
     // of the prefix the search needed to generate candidates and reject trials.
     const reuse: PreparationReuse = { initialCommands: new Map(schedule.commands), minimumPrefixLength: 0, acceptedBeforeFinal: [] }
@@ -207,7 +209,11 @@ function refinePreparation(items: PlannerItem[], economy: EconomySettings, start
         const evaluate = (time: number) => {
             const candidate = new Map(schedule.commands)
             candidate.set(index, time)
-            const trial = run({ commands: candidate, blocked: schedule.blocked })
+            const trial = validateCandidate({ commands: candidate, blocked: schedule.blocked }, wasSuccessful)
+            if ("minimumPrefixLength" in trial) {
+                reuse.minimumPrefixLength = Math.max(reuse.minimumPrefixLength, trial.minimumPrefixLength)
+                return null
+            }
             const blocked = trial.plan.findIndex((action, i) => wasSuccessful[i] && action.blocked)
             const invalidPreparation = [...candidate].find(([i, expected]) =>
                 trial.preparationFailures.has(i) || trial.plan[i].commandTime !== expected)

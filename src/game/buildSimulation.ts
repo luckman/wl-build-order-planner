@@ -108,7 +108,13 @@ type PassOptions = {
     capture?: boolean
     captureAppend?: boolean
     captureCheckpoint?: (state: Checkpoint) => void
+    requiredSuccess?: readonly boolean[]
 }
+
+class RejectedPreparationCandidate {
+    constructor(readonly minimumPrefixLength: number) {}
+}
+
 type PreparedReplay = {
     preparation: PreparationSchedule
     reuse: PreparationReuse
@@ -217,7 +223,16 @@ export function simulateBuildOrder(
         } : undefined
         return simulateBuildOrderPass(buildOrder, economy, initialFoodUsed, baseFoodLimit, foodPerFarm,
             factionData, startingBuilding, until, windows, recruitmentWindows, preparation, collectCandidatesThrough,
-            { resume, capture: options?.capture, captureAppend: options?.captureAppend, captureCheckpoint })
+            { resume, capture: options?.capture, captureAppend: options?.captureAppend, captureCheckpoint,
+                requiredSuccess: options?.requiredSuccess })
+    }
+    const validateCandidate = (preparation: PreparationSchedule, requiredSuccess: readonly boolean[]) => {
+        try {
+            return run(preparation, undefined, { requiredSuccess })
+        } catch (error) {
+            if (!(error instanceof RejectedPreparationCandidate)) throw error
+            return error
+        }
     }
     const verify = (preparation: PreparationSchedule) => run(preparation, undefined, { speculative: true })
     const remember = (pass: Parameters<typeof projectSimulation>[0], tail?: TailReplay) => {
@@ -279,7 +294,7 @@ export function simulateBuildOrder(
                 return selected
             } } : undefined
         const prepared = hasPreparation
-            ? schedulePreparation(buildOrder, economy, startingBuilding, run, reuseForecastPreparation ?? reusablePreparation)
+            ? schedulePreparation(buildOrder, economy, startingBuilding, run, validateCandidate, reuseForecastPreparation ?? reusablePreparation)
             : undefined
         let unprepared: ReturnType<typeof run> | undefined
         if (!prepared && replay?.end) {
@@ -340,7 +355,7 @@ function simulateBuildOrderPass(
     recruitmentWindows: RecruitmentWindow[] = [],
     preparation?: PreparationSchedule,
     collectCandidatesThrough?: number,
-    { resume: restored, capture, captureAppend, captureCheckpoint }: PassOptions = {},
+    { resume: restored, capture, captureAppend, captureCheckpoint, requiredSuccess }: PassOptions = {},
 ) {
     validateActionCount(buildOrder.length)
     validatePlanTime(until, "Simulation horizon")
@@ -429,6 +444,7 @@ function simulateBuildOrderPass(
         ),
     )
 
+    let catalogPrefixLength = nextIndex
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
         while (Math.min(pendingDepartures[0]?.time ?? Infinity, workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity) <= time) {
@@ -546,9 +562,15 @@ function simulateBuildOrderPass(
                 const { index } = pendingDepartures.shift()!
                 const item = buildOrder[index]
                 const worker = simulation.selectBuilder(item.construction?.useIdleWorker)
-                if (!worker) preparationFailures.set(index, item.construction?.useIdleWorker
-                    ? "No available idle worker at preparation departure." : "No eligible gathering worker at preparation departure.")
-                else {
+                if (!worker) {
+                    if (requiredSuccess) {
+                        // Keep both the reservation and the catalog prefix that
+                        // determined worker availability at its departure.
+                        throw new RejectedPreparationCandidate(Math.max(index + 1, catalogPrefixLength))
+                    }
+                    preparationFailures.set(index, item.construction?.useIdleWorker
+                        ? "No available idle worker at preparation departure." : "No eligible gathering worker at preparation departure.")
+                } else {
                     interruptReturn(worker.id, eventTime)
                     preparedWorkers.set(index, { workerId: worker.id, departureTime: eventTime })
                     simulation.prepareConstruction(worker)
@@ -591,6 +613,11 @@ function simulateBuildOrderPass(
         if (canCapture && plan.length && plan.length % CATALOG_CHECKPOINT_INTERVAL === 0) canCapture(passState)
         if (capture && itemIndex === buildOrder.length - 1 && !preparation?.commands.has(itemIndex)) {
             beforeTail = captureAt(itemIndex)
+        }
+        catalogPrefixLength = itemIndex + 1
+        const requiredCommand = requiredSuccess && preparation?.commands.get(itemIndex)
+        if (requiredCommand !== undefined && (simulation.time > requiredCommand || preparationFailures.has(itemIndex))) {
+            throw new RejectedPreparationCandidate(catalogPrefixLength)
         }
         if (item.construction) parseConstructionSettings(item, item.construction)
         const cost = itemCost(item, plan.map((action) => action.item), initialTownHall)
@@ -773,9 +800,17 @@ function simulateBuildOrderPass(
             if (!Number.isFinite(nextTime) || nextTime > until) {
                 break
             }
+            // All events through the required instant still get their normal
+            // ordering and readiness checks.
+            if (requiredCommand !== undefined && nextTime > requiredCommand) {
+                throw new RejectedPreparationCandidate(catalogPrefixLength)
+            }
             advanceTo(nextTime)
         }
         if (!scheduled) {
+            if (requiredCommand !== undefined || requiredSuccess?.[itemIndex]) {
+                throw new RejectedPreparationCandidate(catalogPrefixLength)
+            }
             canCapture = undefined
             plan.push({
                 item,
