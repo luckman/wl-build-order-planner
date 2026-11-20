@@ -10,65 +10,46 @@ timeline.
 
 - Buildings, units, heroes, upgrades, and faction scrolls, with automatic prerequisite insertion.
 - Gold, wood, food, and mana simulation, including gathering, construction, and production queues.
-- Editable account and map settings, plus timed events for resources, mana spending, mana wells, unit losses, and worker idle/reactivation events.
+- Timed events for resources, mana, unit losses, and worker events.
+- Editable account and map settings
 - Reorderable build orders, starter templates, and warnings for blocked actions.
-- Top-right notifications for rejected upgrades and newly added blocked actions, with blocked reasons also shown in the build order and below the timeline.
-- Planner controls pause while committed build-order changes recalculate. Updates still pending after 100 ms show a centered spinner.
 - Shareable links, JSON import/export, and separate browser-saved drafts for each faction.
 
 ## Getting started
 
-Choose a faction, set your opening workers and **Resource collection** settings, then add
-**Actions** or load a template from **Share / Import**. Reorder actions and review the **Timeline**
-to refine your opening. In **Timeline**, either mouse button opens a scheduled command's menu.
-After saving a Timeline edit, the Timeline follows the command's new position.
+Choose **Light** or **Dark** at the top of the planner. Each faction has its own browser-saved draft.
 
-The **Build order** panel lists your planned actions. Timing ranges run from command to completion
-or scroll expiry, with tenths on both ends (`0:56.0 - 1:24.0`). Hover over a row for timing details.
-Right-click a row for the action menu, or left-click an editable row or its clock to edit it
-directly. **Clear** also resets the initial worker allocation to its default.
+### Build order
 
-In **Share / Import**, use the primary **Copy link** action to share a build, choose a starter
-template, or expand **JSON files** to import or export a `.wl-build-order.json` file.
-Drafts save automatically in your browser; export important builds for backup. **Save profile**
-stores personal resource settings separately from your build.
+- Use **Initial worker allocation** to split your starting workers between gold and wood.
+- Drag rows to reorder your actions. Click an editable row to edit it, or right-click for its menu.
+- Check **Latest order state** for resources and workers at the latest command.
 
-**Mana spent** records immediate mana expenditure for an unmodeled spell. Choose a positive whole
-number (default 75) and fixed command time. It respects and starts shared scroll cooldown without
-an order delay or spell effect; edit or delete it like other timed events.
+### Resource collection
 
-Right-click a building or an upgrade target level to configure its outward and return travel
-before adding. Click construction rows, or choose **Edit** on their timeline items, to change
-settings. **Construction time modifier** sets each eligible building to normal time, +50%, or
-+100% after worker-level bonuses. Quick adds and inserted prerequisites use normal time.
-Castles, Citadels, and upgrades use their usual timing rules.
-**Preparation** reserves the worker before the purchase command, stopping gathering
-for the entered interval; its departure moves when the command is rescheduled. Timeline items
-separate preparation, outward travel, work and return travel with vertical dividers.
-Hover for command, start and finish times and additional details on customized orders.
-**Use idle worker** selects only an available idle builder; it becomes idle at completion
-without return travel. A returning gatherer can start another construction at completion; its
-unfinished return journey is retained as a minimum after the next job. The construction and
-upgrade dialogs show seconds in the field labels and step by 0.1 seconds. Each travel
-setting is marked **Global** or **Custom**. The reset link beside **Custom** shows the
-current profile delay and restores live inheritance. Idle mode dims the return settings
-and keeps the saved duration. The **(?)** beside the dialog title explains preparation,
-builder travel, and when you need resources.
+Adjust your account and map settings to match the game you want to simulate. Use **Save profile**
+to reuse those settings in other builds for the same faction.
 
-**Make Worker idle** (Light) and **Make Slave idle** (Dark) remove a chosen count of gatherers
-from income and ordinary builder selection. The **Activate worker** and **Activate slave**
-buttons open the **Make Worker active** and **Make Slave active** events, which restore previous
-assignments, optionally after travel. The idle and activation cards follow **Unit is killed**
-and use matching pause and resume icons in the build order and timeline. Both events use fixed times
-and apply the full count or report an error. The build-order idle event title includes a count only
-for two or more workers. Latest order state lists idle workers separately. For worker losses,
-choose Gathering or Idle. The planner checks eligibility when you add or save the casualty.
-If the target is unavailable, the build order keeps the event at its command time and shows
-why it is blocked. A blocked casualty has no effect and can become valid after earlier changes.
+### Actions
 
-Plans support **100 actions** after the opening allocation and a **30-minute** simulation. The
-catalog is still expanding, and timings are estimates to check in-game. See the
-[game model](docs/GAME_MODEL.md) and [file-format guide](docs/BUILD_ORDER_FILES.md) for details.
+Add buildings, units, heroes, upgrades, scrolls, and timed events. The planner adds missing
+prerequisites automatically. Right-click a building or upgrade level to configure construction.
+See the [construction guide](docs/CONSTRUCTION.md) for timing and worker options.
+
+### Timeline
+
+- Review when actions are scheduled and how gold, wood, food, and mana change over time.
+- Hover for timing details. Click or right-click a scheduled action to open its menu.
+
+### Share / Import
+
+- Load a starter template to try an opening with your current **Resource collection** settings.
+- Use **Copy link** to share your build and its settings.
+- Expand **JSON files** to import a build or export a backup. See the
+  [file-format guide](docs/BUILD_ORDER_FILES.md) for details.
+
+Plans support up to **100 actions** after the opening allocation and a **30-minute** simulation.
+Timings are estimates you can check in-game. See the [game model](docs/GAME_MODEL.md).
 
 ## Run locally
 
@@ -106,9 +87,14 @@ your Node.js environment reports an OpenSSL compatibility error during the build
 | `npm run testAll -- --runInBand` | Run the Jest suite without watch mode. |
 | `npm run teste2e` | Run the Playwright browser tests. |
 | `npm run lint` | Check formatting and lint rules with Biome. |
+| `npm run benchmark` | Run all simulation benchmark suites. |
+| `npm run benchmark -- --work-counts` | Count simulation work for the Dark Warg Rider scenario. |
 
 Playwright tests require its Chromium browser to be installed (`npx playwright install chromium`).
 The test configuration builds and serves the app automatically.
+
+Benchmark results are saved in `benchmark-results/`. See the
+[benchmark guide](docs/PERFORMANCE_BENCHMARKS.md) for modes and past results.
 
 ## Contributing
 
@@ -123,30 +109,22 @@ check, and relevant tests before submitting a pull request.
 
 ## Storage and analytics
 
-Build drafts and personal profiles are stored locally in your browser. Shared URLs contain the build
-and profile, so anyone with the link can open those settings.
+Your browser saves your drafts and profiles. Anyone with a shared link can open the build and its
+profile settings.
 
-The site serves a bundled copy of GoatCounter's script and sends visitor analytics to
-`luckman.goatcounter.com`. It also counts successful **Copy link** actions and openings of
-URLs containing a build parameter, including
-invalid build links. These custom events send fixed event names and titles, without the shared URL
-or build contents. The integration is defined in `public/index.html` and `src/analytics.ts`.
+GoatCounter tracks visits, successful **Copy link** actions, and opened build links, including
+invalid ones. Copy and open events send only a fixed event name and title.
 
-To update the bundled script, replace `public/count.js` with a reviewed copy of the
-[official GoatCounter script](https://gc.zgo.at/count.js) and retain its license notice.
-
-To disable analytics in your own deployment, remove the GoatCounter `<script>` tag from
-`public/index.html` and rebuild the app. The existing event hooks safely do nothing without that
-script.
+To disable analytics on your deployment, remove the GoatCounter script tag from
+`public/index.html` and rebuild. To update the bundled copy, keep its license notice and replace `public/count.js` with
+the [official GoatCounter script](https://gc.zgo.at/count.js).
 
 ## License and credits
 
 The source code is available under the [MIT License](LICENSE), retaining the original BurnySc2
-copyright notice. The project was adapted from SC2 Planner and now implements War Legends factions
-and mechanics.
+copyright notice. The project was adapted from [SC2 Planner](https://github.com/BurnySc2/sc2-planner)
+and now implements War Legends factions and mechanics.
 
 Game names, logos, and artwork belong to their respective owners. Some icons are temporary assets
 inherited from the original planner; the source-code license does not grant rights to third-party
 game artwork.
-
-Run `npm run benchmark` to measure simulation workloads and `npm run benchmark -- --work-counts` to count the work of adding Warg Rider to the shared Dark build. See [Performance benchmarks](docs/PERFORMANCE_BENCHMARKS.md) for modes and results.
