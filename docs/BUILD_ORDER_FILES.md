@@ -537,7 +537,8 @@ resource assignments and travel progress are derived by simulation, never stored
 ## Manual worker moves
 
 `{ "type": "move-gold-miner-to-wood", "commandTime": 20, "count": 2 }` requests that two
-current gold miners switch to wood. Count is a positive whole number. The command time uses the
+current gold miners switch to wood. `{ "type": "move-wood-gatherer-to-gold", "commandTime": 20, "count": 2 }`
+requests the reverse move, subject to the current gold limit. Count is a positive whole number. The command time uses the
 same fractional seconds and range as other worker events. Multiple manual moves and other worker
 commands can share a time. Their order in the build order is preserved. The planner recalculates
 progress and any shortfall when reopening a draft, JSON file or share link.

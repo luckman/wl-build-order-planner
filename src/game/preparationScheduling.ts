@@ -18,6 +18,7 @@ type Result = {
     orderedPlan: ScheduledAction[]
     preparationFailures: Map<number, string>
     candidateEventTimes: number[]
+    projectManualMoves?: () => void
     projectDeliveries: (horizon: number) => ResourceDelivery[]
 }
 type Replay = (schedule: PreparationSchedule, collectCandidatesThrough?: number) => Result

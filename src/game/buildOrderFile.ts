@@ -17,7 +17,7 @@ import { createScrollAction, scrollCommand, type ScrollCommand } from "./scrolls
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-11-21"
+export const GAME_RULES_VERSION = "2026-11-21.2"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"

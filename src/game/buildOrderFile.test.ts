@@ -74,7 +74,7 @@ test("manual worker moves round-trip with same-time row order and recalculate pr
     const doc = JSON.parse(sample())
     const first = { type: "move-gold-miner-to-wood", commandTime: 1.5, count: 2 }
     const idle = { type: "make-idle", commandTime: 1.5, count: 1 }
-    const second = { ...first, count: 1 }
+    const second = { type: "move-wood-gatherer-to-gold", commandTime: 1.5, count: 1 }
     doc.buildOrder.splice(1, Infinity, first, idle, second)
     const parsed = parseBuildOrder(JSON.stringify(doc))
     const settings = economyFromProfile(parsed.gameProfile, parsed.opening)
@@ -82,7 +82,7 @@ test("manual worker moves round-trip with same-time row order and recalculate pr
     const saved = JSON.parse(serializeBuildOrder("light", parsed.gameProfile, plan))
     expect(saved.buildOrder.slice(1)).toEqual([first, idle, second])
     expect(parseBuildOrder(JSON.stringify(saved)).buildOrder).toEqual(parsed.buildOrder)
-    doc.buildOrder[1].count = 1.25
+    doc.buildOrder[3].count = 1.25
     expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(/count/)
 })
 

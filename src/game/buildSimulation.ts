@@ -1,7 +1,7 @@
 import { matchesPreparation, matchesPreparationReuse, schedulePreparation, type PreparationReuse, type PreparationSchedule } from "./preparationScheduling"
 import { isConstruction, parseConstructionSettings } from "./constructionSettings"
 import { parseWorkerEvent, workerEventCommand } from "./workerEvents"
-import { createManualWorkerMove, manualWorkerMoveCommand, type ManualWorkerMoveResult } from "./manualWorkerMoves"
+import { createManualWorkerMove, manualWorkerMoveCommand, recordManualWorkerMoveBoundary, type ManualWorkerMoveResult, type ManualWorkerMoveSource } from "./manualWorkerMoves"
 import { alignTimeWithGoldMinerLimit, createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, goldMinerLimitTimeKey, timestampRoundoff } from "./goldMinerLimit"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
@@ -150,9 +150,12 @@ const simulationSources = new WeakMap<BuildSimulation, {
     forecastAppends?: Map<number, ForecastAppendReplay>
 }>()
 
-function projectSimulation(result: Pick<ReturnType<typeof simulateBuildOrderPass>, "plan" | "orderedPlan" | "projectDeliveries">): BuildSimulation {
+function projectSimulation(result: Pick<ReturnType<typeof simulateBuildOrderPass>, "plan" | "orderedPlan" | "projectDeliveries"> & {
+    projectManualMoves?: () => void
+}): BuildSimulation {
+    result.projectManualMoves?.()
     const buildEnd = Math.max(0, ...result.orderedPlan.map(action => action.item.kind === "manual-worker-move"
-        ? action.finishTime ?? action.commandTime ?? 0 : action.blocked ? 0 : action.finishTime!))
+        ? action.manualMove?.endTime ?? action.commandTime ?? 0 : action.blocked ? 0 : action.finishTime!))
     const horizon = Math.min(MAX_PLAN_SECONDS, Math.max(buildEnd + RESOURCE_PROJECTION_SECONDS, timelineEnd(result.plan)))
     return { plan: result.plan, orderedPlan: result.orderedPlan, deliveries: result.projectDeliveries(horizon) }
 }
@@ -418,14 +421,13 @@ function simulateBuildOrderPass(
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime)
     const goldLimitTimes = new Map(pendingGoldLimits.map(({ item }) => [goldMinerLimitTimeKey(item.commandTime), item.commandTime]))
-    const manualMoveTimes = new Set<number>()
+    const manualMoveSourcesByTime = new Map<number, Set<ManualWorkerMoveSource>>()
     for (const item of buildOrder) {
         if (item.kind === "manual-worker-move") {
-            goldLimitTimes.set(goldMinerLimitTimeKey(item.commandTime), item.commandTime)
-            manualMoveTimes.add(item.commandTime)
+            recordManualWorkerMoveBoundary(item, item.commandTime, goldLimitTimes, manualMoveSourcesByTime)
         }
     }
-    const hasManualMoves = manualMoveTimes.size > 0
+    const hasManualMoves = manualMoveSourcesByTime.size > 0
     const pendingWorkerAndLossEvents = buildOrder.flatMap((item, index) => {
         if (item.kind !== "unit-is-killed" && item.kind !== "worker-event" && item.kind !== "manual-worker-move") return []
         if (item.kind === "worker-event") parseWorkerEvent(workerEventCommand(item))
@@ -537,7 +539,7 @@ function simulateBuildOrderPass(
             const pendingLimit = pendingGoldLimits[0]?.item
             const limitAtTime = pendingLimit?.commandTime === eventTime ? pendingLimit : undefined
             const workerCommandAtTime = nextRecruitTime() === eventTime || pendingWorkerAndLossEvents[0]?.time === eventTime
-            const manualMoveAtTime = manualMoveTimes.has(eventTime)
+            const manualMoveAtTime = manualMoveSourcesByTime.get(eventTime)
             if (limitAtTime || ((simulation.hasExplicitGoldMinerLimit || simulation.hasPendingManualMoves || manualMoveAtTime) && workerCommandAtTime)) {
                 simulation.advanceTo(eventTime, () => applyWorkerCommandsAt(eventTime), limitAtTime, manualMoveAtTime)
             } else {
@@ -914,21 +916,26 @@ function simulateBuildOrderPass(
     const orderedPlan = inputPlan.map((action, index) => ({ action, index }))
         .sort((a, b) => (a.action.commandTime ?? Infinity) - (b.action.commandTime ?? Infinity) || a.index - b.index)
         .map(({ action }) => action)
+    const projectManualMoves = hasManualMoves ? () => {
+        while (simulation.hasPendingManualMoves && simulation.time < MAX_PLAN_SECONDS) {
+            const alignedTransition = nextWorkerTransitionTime()
+            const transition = alignedTransition <= simulation.time ? simulation.nextEventTime : alignedTransition
+            advanceTo(Math.min(nextQueuedEventTime(), transition, MAX_PLAN_SECONDS))
+        }
+        let moveIndex = 0
+        for (const action of orderedPlan) {
+            if (action.item.kind !== "manual-worker-move") continue
+            const result = simulation.manualWorkerMoveResult(moveIndex++)
+            action.manualMove = result
+            if (!result.reason) action.finishTime = result.endTime
+        }
+    } : undefined
     const projectDeliveries = (horizon: number) => {
         if (simulation.time < horizon) advanceTo(horizon)
-        if (hasManualMoves) {
-            let moveIndex = 0
-            for (const action of orderedPlan) {
-                if (action.item.kind !== "manual-worker-move") continue
-                const result = simulation.manualWorkerMoveResult(moveIndex++)
-                action.manualMove = result
-                if (!result.reason) action.finishTime = result.endTime
-            }
-        }
         // Scheduling may have searched beyond the output horizon for a blocked action.
         return simulation.time > horizon ? simulation.deliveries.filter(({ time }) => time <= horizon) : simulation.deliveries
     }
     const candidateEventTimes = collectCandidatesThrough === undefined ? []
         : [...simulation.eventBoundaries, ...simulation.deliveries.map(({ time }) => time)]
-    return { plan: inputPlan, orderedPlan, preparationFailures, candidateEventTimes, projectDeliveries, beforeTail, end }
+    return { plan: inputPlan, orderedPlan, preparationFailures, candidateEventTimes, projectManualMoves, projectDeliveries, beforeTail, end }
 }

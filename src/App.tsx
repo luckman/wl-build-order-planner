@@ -70,6 +70,7 @@ const iconSources: Record<string, string> = {
     resourcesCollected: require("./icons/events/resources-collected.png"),
     limitGoldMiners: require("./icons/events/limit-gold-miners.png"),
     moveGoldMinerToWood: require("./icons/events/move-gold-miner-to-wood.png"),
+    moveWoodGathererToGold: require("./icons/events/move-wood-gatherer-to-gold.png"),
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     darkWhip: require("./icons/scrolls/dark-whip.png"),

@@ -26,7 +26,7 @@ export type IconId =
     | "lightWorkerIdle" | "lightWorkerActive" | "darkSlaveIdle" | "darkSlaveActive"
     | "manaWellIsCaptured" | "manaWellIsLost"
     | "lightManaSpent" | "darkManaSpent"
-    | "resourcesCollected" | "limitGoldMiners" | "moveGoldMinerToWood"
+    | "resourcesCollected" | "limitGoldMiners" | "moveGoldMinerToWood" | "moveWoodGathererToGold"
     | "lightGoldRush" | "lightLumberGathering" | "darkWhip" | "darkLegionsCall"
     | "lightCastle"
     | "lightSawmill"

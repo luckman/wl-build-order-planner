@@ -4,9 +4,11 @@ import { validateCommandTime } from "./plannerLimits"
 
 export const manualWorkerMoveIdentities = {
     "move-gold-miner-to-wood": { name: "Move gold miner to wood", icon: "moveGoldMinerToWood", source: "gold", destination: "wood" },
+    "move-wood-gatherer-to-gold": { name: "Move wood gatherer to gold", icon: "moveWoodGathererToGold", source: "wood", destination: "gold" },
 } as const
 
 export type ManualWorkerMoveType = keyof typeof manualWorkerMoveIdentities
+export type ManualWorkerMoveSource = typeof manualWorkerMoveIdentities[ManualWorkerMoveType]["source"]
 export type ManualWorkerMoveCommand = { type: ManualWorkerMoveType; commandTime: number; count: number }
 export type ManualWorkerMoveAction = Extract<PlannerItem, { kind: "manual-worker-move" }>
 export type ManualWorkerMoveResult = { completed: number; endTime: number | null; reason?: string }
@@ -21,4 +23,14 @@ export function createManualWorkerMove({ type, commandTime, count }: ManualWorke
 
 export function manualWorkerMoveCommand(item: ManualWorkerMoveAction): ManualWorkerMoveCommand {
     return { type: item.move, commandTime: item.commandTime, count: item.count }
+}
+
+export function recordManualWorkerMoveBoundary(
+    action: ManualWorkerMoveAction, commandTime: number, alignmentTimes: Map<number, number>,
+    sourcesByTime: Map<number, Set<ManualWorkerMoveSource>>,
+) {
+    alignmentTimes.set(goldMinerLimitTimeKey(commandTime), commandTime)
+    const sources = sourcesByTime.get(commandTime) ?? new Set<ManualWorkerMoveSource>()
+    sources.add(manualWorkerMoveIdentities[action.move].source)
+    sourcesByTime.set(commandTime, sources)
 }
