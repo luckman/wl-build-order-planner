@@ -699,6 +699,11 @@ export default function App() {
                                                     <span className="action-name">Mana spent</span>
                                                     <img src={iconSources[factionId === "light" ? "lightManaSpent" : "darkManaSpent"]} alt="" />
                                                 </button>
+                                                <button className="action resource-card" aria-label="Unit is killed" title="Record a worker, unit or hero being killed at a chosen timestamp"
+                                                    onClick={() => setUnitKilledDialogOpen(true)}>
+                                                    <span className="action-name">Unit is killed</span>
+                                                    <img src={iconSources[factionId === "light" ? "lightUnitIsKilled" : "darkUnitIsKilled"]} alt="" />
+                                                </button>
                                                 <EventDropdown key={`point-${factionId}`} name="Control point events"
                                                     icon={pointCapturedLost} portalContainer={shell}
                                                     options={(["mana-well-is-captured", "mana-well-is-lost"] as const).map(type => ({
@@ -706,11 +711,6 @@ export default function App() {
                                                         icon: iconSources[MANA_WELL_EVENTS[type].icon],
                                                         select: () => setWellDialogOpen(type),
                                                     }))} />
-                                                <button className="action resource-card" aria-label="Unit is killed" title="Record a worker, unit or hero being killed at a chosen timestamp"
-                                                    onClick={() => setUnitKilledDialogOpen(true)}>
-                                                    <span className="action-name">Unit is killed</span>
-                                                    <img src={iconSources[factionId === "light" ? "lightUnitIsKilled" : "darkUnitIsKilled"]} alt="" />
-                                                </button>
                                                 <EventDropdown key={`worker-events-${factionId}`} name={`${faction.workerName} events`}
                                                     icon={iconSources[factionId === "light" ? "lightWorker" : "darkSlave"]}
                                                     portalContainer={shell} options={[

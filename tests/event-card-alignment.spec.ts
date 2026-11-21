@@ -6,7 +6,7 @@ test.use({ hasTouch: true })
 for (const faction of ["Light", "Dark"]) {
     const worker = faction === "Light" ? "Worker" : "Slave"
     const workerEvents = `${worker} events`
-    const eventNames = ["Resources collected", "Mana spent", "Control point events", "Unit is killed", workerEvents]
+    const eventNames = ["Resources collected", "Mana spent", "Unit is killed", "Control point events", workerEvents]
     for (const width of [1440, 390]) {
         test(`${faction} event names reserve equal space and icons align at ${width}px`, async ({ page }) => {
             await page.setViewportSize({ width, height: 900 })

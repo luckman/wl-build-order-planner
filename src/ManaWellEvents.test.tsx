@@ -4,6 +4,17 @@ import App from "./App"
 
 const pointCard = () => screen.getByRole("button", { name: "Control point events", exact: true })
 
+test.each([["Light", "Worker events"], ["Dark", "Slave events"]])("event cards are ordered for %s", (faction, workerEvents) => {
+    window.localStorage.clear()
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
+    const panel = within(screen.getByRole("region", { name: "Actions" }))
+    const names = ["Resources collected", "Mana spent", "Unit is killed", "Control point events", workerEvents]
+    const buttons = panel.getAllByRole("button")
+    const eventButtons = names.map(name => panel.getByRole("button", { name, exact: true }))
+    expect(buttons.filter(button => eventButtons.includes(button))).toEqual(eventButtons)
+})
+
 function chooseWellEvent(name: string) {
     fireEvent.click(pointCard())
     fireEvent.click(screen.getByRole("menuitem", { name, exact: true }))

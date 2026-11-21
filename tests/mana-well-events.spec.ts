@@ -65,14 +65,12 @@ test("the point menu dismisses without changing the build order", async ({ page 
     const heroes = page.getByRole("region", { name: "heroes", exact: true })
     const point = heroes.getByRole("button", { name: "Control point events" })
     const menu = page.getByRole("menu", { name: "Control point events" })
-    const unitKilled = heroes.getByRole("button", { name: "Unit is killed" })
-
     await point.scrollIntoViewIfNeeded()
     await point.press("Space")
     await expect(menu.getByRole("menuitem").first()).toBeFocused()
     await page.keyboard.press("Tab")
     await expect(menu).toHaveCount(0)
-    await expect(unitKilled).toBeFocused()
+    await expect(page.getByRole("button", { name: "Worker events", exact: true })).toBeFocused()
 
     await point.click()
     await point.click()
