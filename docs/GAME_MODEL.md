@@ -127,11 +127,13 @@ Each outbound or return travel leg keeps the duration chosen when it began. Sawm
 growth boundaries do not change travel already underway. Chopping durations and gold travel are
 unchanged. The rule applies to both factions.
 
+### Gold miner limits
+
 Until the first **Limit gold miners** event, newly recruited workers join gold until assigned gold workers reach
 `ceil((2 * goldTravelTime + effectiveGoldGatherTime) / effectiveGoldGatherTime)`, then join wood.
-The timed event sets an explicit limit of 0–5 that applies to recruits finishing at that time or later.
-The next event replaces the limit. The opening allocation takes effect as entered. Recruitment also
-counts gold-assigned builders and reactivating gold miners when checking for an open slot.
+The timed event sets an explicit limit of 0–5 for completed recruits and workers returning to gold
+through **Make active**. The next event replaces the limit. The opening allocation takes effect as
+entered. Gold-assigned builders and reactivating gold miners count when checking for an open slot.
 When the assignment is above the active limit, gold miners finish and deliver a load before switching
 to wood. Each deposit checks whether miners still need to switch. The first forest trip uses the
 current wood travel time until a Sawmill completes, then uses **Maximum wood travel time**.
@@ -144,6 +146,13 @@ remaining forest travel and configured gold travel. Chopping workers and workers
 first deliver a full load, including any bonus, then use the normal gold travel time if a slot is
 still open. Recruits finishing at the same time have first pick. The permission to reassign wood
 gatherers ends once gold fills or a later limit event replaces it.
+
+At construction completion, an empty-handed wood builder can go directly to gold if reassignment
+is active and a slot is open. An empty-handed gold builder can go directly to wood while gold is
+above the limit. In either direction, the worker takes one trip using the longer of the normal
+construction return leg and the destination travel. The first forest trip follows the Sawmill rule
+above. A wood builder with saved progress or cargo returns as usual and finishes delivering the
+load before switching. Builders drawn from idle workers become idle at the site.
 
 Decreases require reassignment, as does applying the same threshold when too many workers are
 assigned to gold. If the first action at 00:00 sets a limit below the opening allocation, the planner
@@ -281,7 +290,8 @@ changes retain invalid saved expenditures with a blocked reason.
 ## Worker activity and losses
 
 Make idle pauses the requested number of available gatherers, using the same wood-first ranking as
-builder selection. Make active restores their saved resource assignments immediately. Workers resume
+builder selection. Make active restores their saved resource assignments immediately. With an explicit
+gold miner limit in effect, former miners resume on wood if all gold slots are occupied. Workers resume
 gathering after the specified reactivation travel. The planner blocks the event if fewer workers
 are available than requested. Workers retain wood progress and cargo. Interrupted gold cargo is
 discarded. Whip affects reactivation travel, and construction can interrupt that trip.

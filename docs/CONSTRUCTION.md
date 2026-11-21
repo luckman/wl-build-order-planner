@@ -44,8 +44,9 @@ For a command accepted at time `t`, the worker goes through these phases.
   `1 - floor((workerLevel - 1) / 4) / 100` and any
   [per-order construction time factor](#construction-time-modifier), using the base duration
   from `src/game/data.json`.
-- At completion, a gathering worker starts the return trip. A worker assigned with **Use idle
-  worker** becomes idle at the site.
+- At completion, a gathering worker starts the return trip. An eligible empty-handed builder can
+  travel directly to a different resource under [Limit gold miners](GAME_MODEL.md#gold-miner-limits).
+  A worker assigned with **Use idle worker** becomes idle at the site.
 
 At worker level 1–4, a 30-second Barracks ordered at 1s therefore starts at 4s, completes at 34s,
 and releases its worker back to gathering at 37s. The Barracks can train units at 35s with the
@@ -76,8 +77,8 @@ for a worker to become eligible.
 
 The planner assigns all five starting workers to gold or wood; the UI permits 1–4 gold miners, while
 JSON/API opening allocations permit 0–5. Use Make idle during the build to pause gathering. Newly
-trained workers join gold up to mine saturation, then wood. Workers temporarily constructing still
-count toward their saved resource assignment.
+trained workers join gold up to mine saturation or the active gold miner limit, then wood. Workers
+temporarily constructing still count toward their saved resource assignment.
 
 ## Interrupted gathering
 

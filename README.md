@@ -22,7 +22,7 @@ Choose **Light** or **Dark** at the top of the planner. Each faction has its own
 ### Build order
 
 - Use **Initial worker allocation** to split your starting workers between gold and wood.
-- Add **Limit gold miners** to control gold assignments from a chosen time. Excess miners deliver their gold and then switch to wood. Raising the limit can put existing wood gatherers on gold.
+- Add **Limit gold miners** to control gold assignments from a chosen time. Gatherers can switch after delivering a load, and empty-handed builders can switch when construction finishes.
 - Drag rows to reorder your actions. Click an editable row to edit it, or right-click for its menu.
 - Check **Latest order state** for resources and workers at the latest command.
 

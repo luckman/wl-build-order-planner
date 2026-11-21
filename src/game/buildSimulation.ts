@@ -514,10 +514,11 @@ function simulateBuildOrderPass(
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
         for (let eventTime = nextQueuedEventTime(); eventTime <= time; eventTime = nextQueuedEventTime()) {
-            const limitAtTime = pendingGoldLimits[0]?.item.commandTime === eventTime
+            const pendingLimit = pendingGoldLimits[0]?.item
+            const limitAtTime = pendingLimit?.commandTime === eventTime ? pendingLimit : undefined
             const workerCommandAtTime = nextRecruitTime() === eventTime || pendingWorkerAndLossEvents[0]?.time === eventTime
             if (limitAtTime || (simulation.hasExplicitGoldMinerLimit && workerCommandAtTime)) {
-                simulation.advanceTo(eventTime, () => applyWorkerCommandsAt(eventTime))
+                simulation.advanceTo(eventTime, () => applyWorkerCommandsAt(eventTime), limitAtTime)
             } else {
                 simulation.advanceTo(eventTime)
                 applyWorkerCommandsAt(eventTime)

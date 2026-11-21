@@ -537,11 +537,14 @@ resource assignments and travel progress are derived by simulation, never stored
 ## Gold miner limit events
 
 `{ "type": "limit-gold-miners", "commandTime": 30, "limit": 3, "reassign": true }` sets the
-maximum number of workers assigned to gold for routing completed recruits. The limit is a whole
-number from zero through five. The optional `reassign` boolean defaults to true. Set it to false
-on an increase to leave the new slots for recruits. Miners above the
-explicit limit switch to wood after a deposit regardless of this flag. Command times are
-seconds from 0 through 1799 and can include fractions. Two limit events must have different command
+maximum number of workers assigned to gold for completed recruits and **Make active**. The limit
+is a whole number from zero through five. The optional `reassign` boolean defaults to true. Set it
+to false on an increase to leave the new slots for recruits. Excess gold miners switch to wood
+after a deposit or as empty-handed builders at construction completion. Checked increases can
+also redirect empty-handed wood builders from the construction site. Assignments, deliveries, and
+travel are recalculated from the saved commands. See the [game model](GAME_MODEL.md#gold-miner-limits)
+for switching and travel rules. Command times are seconds from 0 through 1799 and can include
+fractions. Two limit events must have different command
 times. Other event types may share the time. JSON files, share links, and browser drafts retain the
 same command fields. Builds without this event continue using the profile-derived limit.
 
