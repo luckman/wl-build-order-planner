@@ -6,11 +6,11 @@ beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
 test.each([
-    ["Light", "Move gold miner to wood", "move-gold-miner-to-wood"],
-    ["Dark", "Move gold miner to wood", "move-gold-miner-to-wood"],
-    ["Light", "Move wood gatherer to gold", "move-wood-gatherer-to-gold"],
-    ["Dark", "Move wood gatherer to gold", "move-wood-gatherer-to-gold"],
-])("%s can add, reopen and edit %s with its icon and feedback", (faction, name, iconFile) => {
+    ["Light", "Move gold miner to wood", "Move from gold to wood", "move-gold-miner-to-wood"],
+    ["Dark", "Move gold miner to wood", "Move from gold to wood", "move-gold-miner-to-wood"],
+    ["Light", "Move wood gatherer to gold", "Move from wood to gold", "move-wood-gatherer-to-gold"],
+    ["Dark", "Move wood gatherer to gold", "Move from wood to gold", "move-wood-gatherer-to-gold"],
+])("%s can add, reopen and edit %s with its icon and feedback", (faction, name, menuLabel, iconFile) => {
     const planner = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "2" } })
@@ -21,7 +21,7 @@ test.each([
     expect(menu.getAllByRole("menuitem").slice(0, 2).map(option => option.textContent)).toEqual([
         "Move from gold to wood", "Move from wood to gold",
     ])
-    const picker = menu.getByRole("menuitem", { name: iconFile === "move-gold-miner-to-wood" ? "Move from gold to wood" : "Move from wood to gold" })
+    const picker = menu.getByRole("menuitem", { name: menuLabel })
     const icon = picker.querySelector("img")!
     const factionIcon = `${faction.toLowerCase()}-${iconFile}.png`
     expect(icon).toHaveAttribute("src", expect.stringContaining(factionIcon))

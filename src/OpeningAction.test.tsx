@@ -30,6 +30,7 @@ test("opening belongs to the order, persists with actions, and resource reset pr
     expect(within(darkOpening).getByText("Initial slave allocation (5 slaves)")).toBeTruthy()
     change("Initial gold miners", "3")
     fireEvent.click(actions.getByRole("button", { name: /^Slave \d/ }))
+    expect(screen.getByText("Total slaves")).toBeTruthy()
     first.unmount()
     render(<App />)
     fireEvent.click(screen.getByRole("button", { name: "Light" }))

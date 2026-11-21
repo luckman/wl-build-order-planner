@@ -1,7 +1,5 @@
 import { expect, test } from "@playwright/test"
 
-const eventNames = ["Resources collected", "Mana spent", "Control point events", "Unit is killed", "Worker events"]
-
 test.use({ hasTouch: true })
 
 for (const faction of ["Light", "Dark"]) {
@@ -16,7 +14,6 @@ for (const faction of ["Light", "Dark"]) {
             const heroes = page.getByRole("region", { name: "heroes", exact: true })
             const cards = heroes.getByRole("button").and(heroes.locator(".resource-card"))
             expect(await cards.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(eventNames)
-            const worker = faction === "Light" ? "Worker" : "Slave"
             const workerPortrait = page.getByRole("region", { name: "units", exact: true })
                 .getByRole("button", { name: new RegExp(`^${worker} `) }).locator("img")
             const workerOptions = [
