@@ -11,10 +11,10 @@ for (const width of [1440, 1024, 390]) {
         await expect(lumber).toHaveCount(1)
         const boxes = await heroes.locator(".action").evaluateAll(elements => elements.map(element => {
             const { y, width } = element.getBoundingClientRect()
-            return { y, width }
+            return { y, width, dropdown: element.classList.contains("action-dropdown-card") }
         }))
         expect(new Set(boxes.map(box => box.y)).size).toBe(1)
-        expect(boxes.every(box => box.width === 70)).toBe(true)
+        expect(boxes.map(box => box.width)).toEqual(boxes.map(box => box.dropdown ? 84 : 70))
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
         await lumber.click()
         const dialog = page.getByRole("dialog", { name: "Use Lumber Gathering" })

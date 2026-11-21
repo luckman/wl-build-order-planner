@@ -79,10 +79,10 @@ for (const width of [1440, 1024, 390]) {
                 const cards = groups.nth(index).locator(".action")
                 const boxes = await cards.evaluateAll(elements => elements.map(el => {
                     const box = el.getBoundingClientRect()
-                    return { y: box.y, width: box.width, label: el.getAttribute("aria-label") }
+                    return { y: box.y, width: box.width, dropdown: el.classList.contains("action-dropdown-card") }
                 }))
                 expect(new Set(boxes.map(box => box.y)).size).toBe(boxes.length ? 1 : 0)
-                const expectedWidths = boxes.map(box => box.label === "Control point events" ? 88 : index === 3 ? 84 : 70)
+                const expectedWidths = boxes.map(box => box.dropdown ? 84 : 70)
                 expect(boxes.map(box => box.width)).toEqual(expectedWidths)
                 if (index !== 3) await expect(groups.nth(index).locator(".action:not(.resource-card) .action-name")).toHaveCount(0)
                 else expect(await cards.locator(".action-name").allTextContents())

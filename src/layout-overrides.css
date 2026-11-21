@@ -86,6 +86,7 @@
 .action-groups > [role="alert"] { margin: .8rem 0 0; }
 .action-grid {
     --action-card-width: 70px;
+    --dropdown-card-width: 84px;
     grid-auto-flow: column;
     grid-template-columns: none;
     grid-template-rows: auto;
@@ -99,7 +100,7 @@
 
 .time-scale span:first-child { transform: none; }
 
-.upgrade-grid { --action-card-width: 84px; }
+.upgrade-grid { --action-card-width: var(--dropdown-card-width); }
 .action-dropdown-card { position: relative; padding-right: 16px; }
 .action-dropdown-card .action-dropdown-arrow { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
 .action-dropdown-card:focus-within { outline: 2px solid #e4bd68; outline-offset: -2px; }

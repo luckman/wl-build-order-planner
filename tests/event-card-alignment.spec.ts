@@ -33,6 +33,7 @@ for (const faction of ["Light", "Dark"]) {
                 const labelBox = (await label.boundingBox())!
                 const iconBox = (await card.locator("img").boundingBox())!
                 const cardBox = (await card.boundingBox())!
+                expect(cardBox.width).toBe(name === "Control point events" || name === workerEvents ? 84 : 70)
                 positions.push({ labelHeight: labelBox.height, iconTop: iconBox.y - cardBox.y })
                 expect(iconBox.width).toBe(28)
                 expect(iconBox.height).toBe(28)
