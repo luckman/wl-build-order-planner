@@ -12,6 +12,7 @@
 .scroll-dialog label { display: grid; gap: 6px; font-size: .85rem; }
 .scroll-dialog .scroll-automatic { display: flex; gap: 9px; align-items: flex-start; line-height: 1.4; }
 .scroll-automatic input { margin-top: 3px; accent-color: #e1b55f; flex-shrink: 0; }
+.wood-return-options { display: grid; gap: 6px; }
 .scroll-dialog input[type="number"], .scroll-dialog select { padding: 8px; color: #e4eef8; background: #091520; border: 1px solid #49667e; width: 100%; }
 .scroll-dialog input:disabled { opacity: .6; }
 .scroll-dialog .scroll-time-hint { margin: -6px 0 0; }

@@ -929,6 +929,7 @@ export default function App() {
                                             {item.kind === "limit-gold-miners" && <small>Limit {item.goldLimit}</small>}
                                             {item.kind === "manual-worker-move" && manualMove &&
                                                 <small>{manualMove.completed} of {item.count} moved{manualMove.endTime === null ? " · Waiting" : ""}</small>}
+                                            {item.kind === "wood-return" && item.mode === "target" && <small>Target {item.target} wood</small>}
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}{item.workerGroup ? ` · ${item.workerGroup} worker` : ""}</small>}
                                             {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
@@ -1054,7 +1055,7 @@ export default function App() {
                         })
                     }} />}
                 {(woodReturnDialogOpen || editingEvent?.kind === "wood-return") && <WoodReturnDialog
-                    key={editingEvent?.orderId ?? "new-wood-return"} defaultTime={defaultEventTime}
+                    key={editingEvent?.orderId ?? "new-wood-return"} defaultTime={defaultEventTime} woodCapacity={economy.woodPerTrip}
                     action={editingEvent?.kind === "wood-return" ? editingEvent : undefined}
                     validationError={editingEvent ? null : additionError}
                     onClose={() => { setWoodReturnDialogOpen(false); setEditingEventId(null) }}

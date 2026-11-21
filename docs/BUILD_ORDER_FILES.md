@@ -598,5 +598,7 @@ apply to editing, import/export, links and draft restore/save.
 ### Bring wood back to base
 
 An immediate return is stored as `{ "type": "bring-wood-back-to-base", "commandTime": 8, "mode": "immediate" }`.
+To wait for a target, use `"mode": "target"` and a positive whole-number `"target"`, for example 20.
 Drafts, JSON files, and share links store the command. The planner recalculates the selected
-worker, deposit, and any interruption from the current build order and profile.
+worker, deposit, and any interruption from the current build order and profile. An imported target
+above the current profile's maximum stays visible as a blocked event so it can be edited.

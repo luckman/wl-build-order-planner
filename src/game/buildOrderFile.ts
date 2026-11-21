@@ -18,7 +18,7 @@ import { createScrollAction, scrollCommand, type ScrollCommand } from "./scrolls
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-11-21.3"
+export const GAME_RULES_VERSION = "2026-11-21.4"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -156,11 +156,13 @@ export function parseBuildOrder(text: string): {
                 travelDuration: action.travelDuration === undefined ? 0 : number(action.travelDuration, `Action ${index + 1}.travelDuration`) }, faction)
         }
         if (action.type === "bring-wood-back-to-base") {
-            if (action.mode !== "immediate" || action.target !== undefined) {
-                throw new Error(`Action ${index + 1} must specify immediate wood return without a target.`)
+            const commandTime = number(action.commandTime, `Action ${index + 1}.commandTime`)
+            if (action.mode === "target") return createWoodReturn({ type: action.type, commandTime, mode: action.mode,
+                target: number(action.target, `Action ${index + 1}.target`, true, true) })
+            if (action.mode === "immediate" && action.target === undefined) {
+                return createWoodReturn({ type: action.type, commandTime, mode: action.mode })
             }
-            return createWoodReturn({ type: action.type, mode: action.mode,
-                commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`) })
+            throw new Error(`Action ${index + 1} must specify a valid wood return mode and target.`)
         }
         if (typeof action.type === "string" && Object.prototype.hasOwnProperty.call(manualWorkerMoveIdentities, action.type)) {
             return createManualWorkerMove({ type: action.type as ManualWorkerMoveType,

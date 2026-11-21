@@ -33,6 +33,40 @@ test.each(["Light", "Dark"])("%s can add, edit, reopen, and remove a partial woo
     expect(screen.queryByRole("button", { name: `Remove ${name}` })).toBeNull()
 })
 
+test.each(["Light", "Dark"])("%s can edit a saved target after the wood capacity shrinks", faction => {
+    const name = "Bring wood back to base"
+    const { unmount } = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction }))
+    fireEvent.change(screen.getByLabelText("Sawmill level"), { target: { value: "5" } })
+    fireEvent.click(screen.getByRole("button", { name: faction === "Light" ? "Worker events" : "Slave events" }))
+    fireEvent.click(screen.getByRole("menuitem", { name }))
+    const dialog = within(screen.getByRole("dialog", { name }))
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "00:04" } })
+    fireEvent.click(dialog.getByRole("radio", { name: "Wait until X" }))
+    const input = dialog.getByRole("spinbutton", { name: /^Wood target/ }) as HTMLInputElement
+    expect(input.max).toBe("50")
+    fireEvent.change(input, { target: { value: "50.5" } })
+    expect((dialog.getByRole("button", { name: "Add event" }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(input, { target: { value: "50" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
+    const row = () => screen.getByRole("button", { name: `Remove ${name}` }).closest("li")!
+    expect(row().textContent).toMatch(/Target 50 wood.*Deposited 50 wood/)
+    fireEvent.change(screen.getByLabelText("Sawmill level"), { target: { value: "1" } })
+    expect(row().textContent).toMatch(/Target 50 wood.*whole number from 1 to 49/)
+    unmount()
+    render(<App />)
+    expect(row().textContent).toMatch(/Target 50 wood.*whole number from 1 to 49/)
+    fireEvent.click(row())
+    const edit = within(screen.getByRole("dialog", { name: `Edit ${name}` }))
+    const saved = edit.getByRole("spinbutton", { name: /^Wood target/ }) as HTMLInputElement
+    expect(saved.value).toBe("50")
+    expect(saved.max).toBe("49")
+    expect((edit.getByRole("button", { name: "Save event" }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(saved, { target: { value: "15" } })
+    fireEvent.click(edit.getByRole("button", { name: "Save event" }))
+    expect(row().textContent).toMatch(/Target 15 wood.*Deposited 15 wood/)
+})
+
 function chooseUpgrade(name: string) {
     const trigger = screen.getByRole("button", { name: `${name.split(" lvl ")[0]} upgrade` })
     if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger)

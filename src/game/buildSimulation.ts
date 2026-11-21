@@ -508,7 +508,7 @@ function simulateBuildOrderPass(
         while (pendingWorkerAndLossEvents[0]?.time === eventTime) {
             const { item, index } = pendingWorkerAndLossEvents.shift()!
             if (item.kind === "wood-return") {
-                simulation.startWoodReturn()
+                simulation.startWoodReturn(item)
                 timedEventsByIndex.set(index, { item, blocked: false, cost: { gold: 0, wood: 0 },
                     commandTime: eventTime, startTime: null, finishTime: null, workerReturnTime: null, workerId: null })
                 continue

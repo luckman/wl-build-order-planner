@@ -1,6 +1,6 @@
 import type { PlannerItem, WorkerCasualtyGroup } from "./gameData"
 import type { WorkerEventAction } from "./workerEvents"
-import type { WoodReturnResult } from "./woodReturn"
+import { woodReturnTargetError, type WoodReturnAction, type WoodReturnResult } from "./woodReturn"
 import { alignTimeWithGoldMinerLimit, goldMinerLimitTimeKey, profileGoldMinerLimit, timestampRoundoff, type GoldMinerLimitAction } from "./goldMinerLimit"
 import { manualWorkerMoveIdentities, recordManualWorkerMoveBoundary, type ManualWorkerMoveAction, type ManualWorkerMoveResult, type ManualWorkerMoveSource } from "./manualWorkerMoves"
 import { growingWoodTravelTime } from "./gatheringRules"
@@ -90,6 +90,7 @@ export type GatheringWorker = {
     whipUntil: number
     lastManualMoveAt?: number
     woodReturnIndex?: number
+    woodReturnTarget?: number
     constructionDuration?: number
     constructionReturnDuration?: number
 }
@@ -395,7 +396,7 @@ export class WorkerEconomy {
 
     get nextEventTime() {
         return Math.min(
-            ...this.workers.map((worker) => worker.nextAt),
+            ...this.workers.map(worker => worker.woodReturnTarget === undefined ? worker.nextAt : this.woodDepartureTime(worker)),
             this.delayedInitialWoodWorkerIds.length ? this.settings.orderDelay : Infinity,
             ...this.sawmillCompletions.filter(time => time > this.time),
             ...this.whipStarts.map(window => window.startTime),
@@ -412,6 +413,10 @@ export class WorkerEconomy {
                     if (Math.abs(worker.nextAt - time) <= roundoff) worker.nextAt = time
                 }
                 next = this.nextEventTime
+                if (next > time && this.pendingWoodReturns &&
+                    this.workers.some(worker => Math.abs(this.woodDepartureTime(worker) - time) <= roundoff)) {
+                    next = time
+                }
             }
             if (next > time) break
             this.time = next
@@ -419,7 +424,8 @@ export class WorkerEconomy {
             const transitions: HeldTransition[] | undefined = !this.applyingWorkerCommands &&
                 (atCommand || this.hasExplicitGoldMinerLimit || this.hasPendingManualMoves) ? [] : undefined
             do {
-                this.advanceWorkerEvents(transitions, atCommand ? incomingGoldLimit : undefined, atCommand ? incomingManualMoveSources : undefined)
+                this.advanceWorkerEvents(transitions, atCommand ? incomingGoldLimit : undefined,
+                    atCommand ? incomingManualMoveSources : undefined, atCommand ? roundoff : 0)
             } while (transitions && this.nextEventTime === next)
 
             if (atCommand) {
@@ -471,38 +477,60 @@ export class WorkerEconomy {
             : { ...result }
     }
 
-    startWoodReturn() {
+    startWoodReturn(action: WoodReturnAction) {
+        const result: WoodReturnResult = { workerId: null, departedAt: null, endTime: this.time, delivered: 0 }
+        const index = this.woodReturnResults.push(result) - 1
+        if (action.mode === "target") {
+            const error = woodReturnTargetError(action.target, this.settings.woodPerTrip)
+            if (error) {
+                result.reason = error
+                return
+            }
+        }
         let selected: GatheringWorker | undefined
         let cargo = 0
+        let reserved = false
         // Workers are stored in ascending ID order. Keep the first on an exact tie.
         for (const worker of this.workers) {
             if (worker.assignment !== "wood" || worker.state !== "gathering") continue
+            if (worker.woodReturnIndex !== undefined) {
+                reserved = true
+                continue
+            }
             const amount = this.gatheredWood(worker)
             if (!selected || amount > cargo) {
                 selected = worker
                 cargo = amount
             }
         }
-        const result: WoodReturnResult = { workerId: null, departedAt: null, endTime: this.time, delivered: 0 }
-        const index = this.woodReturnResults.push(result) - 1
         if (!selected) {
-            result.reason = "No wood gatherer is actively chopping."
+            result.reason = reserved ? "No eligible wood gatherer is available. Chopping workers already have a wood return order."
+                : "No wood gatherer is actively chopping."
             return
         }
         const nextWhole = Math.ceil(cargo)
         const wholeWood = nextWhole > 0 && this.woodTargetTime(selected, nextWhole) <= this.time ? nextWhole : Math.floor(cargo)
-        if (wholeWood < 1) {
+        if (action.mode === "immediate" && wholeWood < 1) {
             result.reason = "No eligible gatherer has at least one whole wood."
             return
         }
         result.workerId = selected.id
-        result.departedAt = this.time
         result.endTime = null
         selected.woodReturnIndex = index
         this.pendingWoodReturns++
-        selected.cargoWood = wholeWood
-        this.transition(selected, "deposit", this.travel("wood"))
-        if (selected.nextAt === this.time) this.advanceTo(this.time)
+        if (action.mode === "target" && wholeWood < action.target) {
+            selected.woodReturnTarget = action.target
+        } else {
+            this.departWithWood(selected, wholeWood)
+            if (selected.nextAt === this.time) this.advanceTo(this.time)
+        }
+    }
+
+    private departWithWood(worker: GatheringWorker, wood: number) {
+        this.woodReturnResults[worker.woodReturnIndex!].departedAt = this.time
+        delete worker.woodReturnTarget
+        worker.cargoWood = wood
+        this.transition(worker, "deposit", this.travel("wood"))
     }
 
     private finishWoodReturn(worker: GatheringWorker, reason?: string) {
@@ -512,6 +540,7 @@ export class WorkerEconomy {
         if (reason) result.reason = reason
         else result.delivered = worker.cargoWood
         delete worker.woodReturnIndex
+        delete worker.woodReturnTarget
         this.pendingWoodReturns--
     }
 
@@ -519,6 +548,10 @@ export class WorkerEconomy {
         const remainingFraction = (this.settings.woodPerTrip - amount) / this.settings.woodPerTrip
         const remainingSeconds = Math.max(0.001, this.settings.woodGatherTime) * remainingFraction / this.rate(worker)
         return goldMinerLimitTimeKey(worker.nextAt - remainingSeconds)
+    }
+
+    private woodDepartureTime(worker: GatheringWorker) {
+        return worker.woodReturnTarget === undefined ? Infinity : Math.max(this.time, this.woodTargetTime(worker, worker.woodReturnTarget))
     }
 
     manualWorkerMoveResult(index: number) {
@@ -670,7 +703,7 @@ export class WorkerEconomy {
     }
 
     private advanceWorkerEvents(transitions: HeldTransition[] | undefined, incomingGoldLimit: GoldMinerLimitAction | undefined,
-        incomingManualMoveSources: ReadonlySet<ManualWorkerMoveSource> | undefined) {
+        incomingManualMoveSources: ReadonlySet<ManualWorkerMoveSource> | undefined, roundoff: number) {
         if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
         if (this.recordBoundaries) this.eventBoundaries.add(this.time)
         // A construction finishing exactly at activation is already returning
@@ -701,6 +734,15 @@ export class WorkerEconomy {
                 this.transition(worker, "outbound", this.travel("wood"))
             }
             this.delayedInitialWoodWorkerIds = []
+        }
+        if (this.pendingWoodReturns) {
+            // Whip changes gathering and travel rates at the boundary. A due
+            // departure uses the movement rate in effect once the worker leaves.
+            for (const worker of this.workers) {
+                if (worker.woodReturnTarget !== undefined && this.woodDepartureTime(worker) <= this.time + roundoff) {
+                    this.departWithWood(worker, worker.woodReturnTarget)
+                }
+            }
         }
         // Process simultaneous arrivals/departures before assigning the mine slot.
         for (const worker of this.workers.filter((candidate) => candidate.nextAt === this.time)) {
@@ -947,6 +989,7 @@ function replayWorkerEconomy(
                 type: keyof typeof eventPriority
                 action?: WorkerEventAction
                 manualMove?: ManualWorkerMoveAction
+                woodReturn?: WoodReturnAction
                 goldMinerLimit?: GoldMinerLimitAction
                 workerId?: number
                 duration?: number
@@ -962,7 +1005,7 @@ function replayWorkerEconomy(
                     manualMove: action.item })
             }
             if (action.item.kind === "wood-return" && action.commandTime !== null) {
-                events.push({ time: alignTimeWithGoldMinerLimit(action.commandTime, goldLimitTimes), type: "wood-return" })
+                events.push({ time: alignTimeWithGoldMinerLimit(action.commandTime, goldLimitTimes), type: "wood-return", woodReturn: action.item })
             }
             if (action.item.kind === "limit-gold-miners" && !action.blocked && action.commandTime !== null) {
                 events.push({ time: action.commandTime, type: "limit-gold-miners", goldMinerLimit: action.item })
@@ -1013,7 +1056,7 @@ function replayWorkerEconomy(
         } else if (event.type === "manual-worker-move") {
             simulation.startManualWorkerMove(event.manualMove!)
         } else if (event.type === "wood-return") {
-            simulation.startWoodReturn()
+            simulation.startWoodReturn(event.woodReturn!)
         } else if (event.type === "kill") {
             if (event.workerId !== undefined) simulation.killWorker(event.workerId)
         } else if (event.type === "player-whip-preparation") {

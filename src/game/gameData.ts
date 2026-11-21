@@ -1,3 +1,4 @@
+import type { WoodReturnMode } from "./woodReturn"
 import type { ManualWorkerMoveType } from "./manualWorkerMoves"
 import type { ConstructionSettings } from "./constructionSettings"
 import rawData from "./data.json"
@@ -137,7 +138,7 @@ export type PlannerItem = {
     level?: number
     upgradeFrom?: string
     producerBuildingId?: string
-} & ({ kind: ItemKind } | { kind: "wood-return"; commandTime: number; mode: "immediate" } | { kind: "worker-event"; workerEvent: "make-idle" | "make-active"; commandTime: number; count: number; travelDuration: number } | { kind: "manual-worker-move"; move: ManualWorkerMoveType; commandTime: number; count: number } | { kind: "limit-gold-miners"; commandTime: number; goldLimit: number; reassign: boolean } | { kind: "mana-spent"; commandTime: number; mana: number } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering" | "whip" | "legions-call"; commandTime: number; targetItemId?: string } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string; workerGroup?: WorkerCasualtyGroup })
+} & ({ kind: ItemKind } | ({ kind: "wood-return"; commandTime: number } & WoodReturnMode) | { kind: "worker-event"; workerEvent: "make-idle" | "make-active"; commandTime: number; count: number; travelDuration: number } | { kind: "manual-worker-move"; move: ManualWorkerMoveType; commandTime: number; count: number } | { kind: "limit-gold-miners"; commandTime: number; goldLimit: number; reassign: boolean } | { kind: "mana-spent"; commandTime: number; mana: number } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering" | "whip" | "legions-call"; commandTime: number; targetItemId?: string } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string; workerGroup?: WorkerCasualtyGroup })
 
 export type Faction = {
     id: FactionId

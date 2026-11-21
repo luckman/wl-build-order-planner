@@ -332,10 +332,17 @@ the whole portion of their load. Ordinary wood travel, Sawmill routing, and Whip
 Wood becomes available on deposit, and the worker then resumes gathering. Lumber Gathering adds
 its bonus only to full loads.
 
+Choose **Wait until X** to reserve the selected worker until they have gathered the requested
+amount. Set a whole target from one through one less than the profile's wood per trip. A worker
+already carrying enough wood leaves immediately with their whole load. Other wood return commands
+can use workers who are still chopping and have no pending return.
+
 Build order shows the deposit time and amount, or the reason the order failed. Construction,
-Make idle, or worker death can interrupt the return. Due deposits happen before worker commands
+Make idle, or worker death can interrupt the wait or return. Due departures and deposits happen before worker commands
 at the same time. Drag a wood return to reorder it among timed rows at the same timestamp.
-Edit the timestamp to move it to a different time.
+Edit the timestamp to move it to a different time. If the profile's capacity falls below a saved
+target's required capacity, Build order shows the original target and an error. Edit the target
+or increase the capacity to restore the order.
 
 Select a construction or timed-event row in Build order to edit it. Right-click a row to open
 its action menu. **Delete from here** asks for confirmation before removing the selected row and
