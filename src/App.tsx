@@ -24,6 +24,8 @@ import { type parseBuildOrder } from "./game/buildOrderFile"
 import BuildOrderFiles from "./BuildOrderFiles"
 import ScrollDialog from "./ScrollDialog"
 import UpgradeCards from "./UpgradeCards"
+import EventDropdown from "./EventDropdown"
+import pointCapturedLost from "./icons/events/point-captured-lost.png"
 import ActionMenu from "./ActionMenu"
 import ConfirmActionDialog from "./ConfirmActionDialog"
 import { orderedBuildings } from "./buildingDisplayOrder"
@@ -694,12 +696,13 @@ export default function App() {
                                                     <span className="action-name">Mana spent</span>
                                                     <img src={iconSources[factionId === "light" ? "lightManaSpent" : "darkManaSpent"]} alt="" />
                                                 </button>
-                                                {(Object.keys(MANA_WELL_EVENTS) as ManaWellEventType[]).map(type => <button key={type}
-                                                    className="action resource-card" aria-label={MANA_WELL_EVENTS[type].name}
-                                                    title={MANA_WELL_EVENTS[type].name} onClick={() => setWellDialogOpen(type)}>
-                                                    <span className="action-name">{MANA_WELL_EVENTS[type].name}</span>
-                                                    <img src={iconSources[MANA_WELL_EVENTS[type].icon]} alt="" />
-                                                </button>)}
+                                                <EventDropdown key={`point-${factionId}`} name="The point is Captured/Lost"
+                                                    icon={pointCapturedLost} portalContainer={shell}
+                                                    options={(["mana-well-is-captured", "mana-well-is-lost"] as const).map(type => ({
+                                                        name: MANA_WELL_EVENTS[type].name,
+                                                        icon: iconSources[MANA_WELL_EVENTS[type].icon],
+                                                        select: () => setWellDialogOpen(type),
+                                                    }))} />
                                                 <button className="action resource-card" aria-label="Unit is killed" title="Record a worker, unit or hero being killed at a chosen timestamp"
                                                     onClick={() => setUnitKilledDialogOpen(true)}>
                                                     <span className="action-name">Unit is killed</span>

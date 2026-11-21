@@ -115,3 +115,6 @@
 .event.worker-event span { white-space: normal; line-height: 1.05; }
 
 .event.mana-spent { background: linear-gradient(#74539a, #42305f); border-color: #b49bd1; }
+
+.action.event-dropdown .action-name { overflow-wrap: anywhere; }
+.action.event-dropdown .upgrade-arrow { top: auto; bottom: 10px; transform: none; }

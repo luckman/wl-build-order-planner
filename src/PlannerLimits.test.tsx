@@ -44,7 +44,12 @@ test.each(["Resources collected", "Mana well is captured", "Mana well is lost", 
         fullDraft()
         render(<App />)
         const panel = within(screen.getByRole("region", { name: "Actions" }))
-        fireEvent.click(panel.getByRole("button", { name: new RegExp(`^${name}( |$)`) }))
+        if (name.startsWith("Mana well")) {
+            fireEvent.click(panel.getByRole("button", { name: "The point is Captured/Lost" }))
+            fireEvent.click(screen.getByRole("menuitem", { name, exact: true }))
+        } else {
+            fireEvent.click(panel.getByRole("button", { name: new RegExp(`^${name}( |$)`) }))
+        }
         const element = screen.getByRole("dialog")
         const dialog = within(element)
         expect(dialog.getByRole("alert").textContent).toContain("100 actions")

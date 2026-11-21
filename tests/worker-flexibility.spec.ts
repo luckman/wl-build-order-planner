@@ -17,8 +17,8 @@ for (const faction of ["Light", "Dark"] as const) {
         ]
         const actions = page.getByRole("region", { name: "Actions", exact: true })
         const cards = actions.getByRole("region", { name: "heroes", exact: true }).getByRole("button")
-        const finalCards = await cards.evaluateAll(buttons => buttons.slice(-7).map(button => button.getAttribute("aria-label")))
-        expect(finalCards).toEqual(["Resources collected", "Mana spent", "Mana well is captured", "Mana well is lost", "Unit is killed", ...events.map(event => event.label)])
+        const finalCards = await cards.evaluateAll(buttons => buttons.slice(-9).map(button => button.getAttribute("aria-label")))
+        expect(finalCards).toEqual(["Resources collected", "Mana spent", "The point is Captured/Lost", "Unit is killed", ...events.map(event => event.label), "Limit gold miners", "Move gold miner to wood", "Move wood gatherer to gold"])
         await expect(cards.filter({ hasText: /^Make (idle|active)$/ })).toHaveCount(0)
         const sources: string[] = []
         for (const [index, { name, label, lines }] of events.entries()) {

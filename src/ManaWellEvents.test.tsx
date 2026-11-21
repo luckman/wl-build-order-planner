@@ -1,23 +1,63 @@
+import "@testing-library/jest-dom"
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
+
+const pointCard = () => screen.getByRole("button", { name: "The point is Captured/Lost", exact: true })
+
+function chooseWellEvent(name: string) {
+    fireEvent.click(pointCard())
+    fireEvent.click(screen.getByRole("menuitem", { name, exact: true }))
+}
+
+test("the point dropdown supports keyboard navigation and switches with the faction", () => {
+    render(<App />)
+    const card = pointCard()
+    card.focus()
+    fireEvent.keyDown(card, { key: "ArrowUp" })
+    const menu = within(screen.getByRole("menu"))
+    const capture = menu.getByRole("menuitem", { name: "Mana well is captured" })
+    const loss = menu.getByRole("menuitem", { name: "Mana well is lost" })
+    expect(menu.getAllByRole("menuitem")).toEqual([capture, loss])
+    expect(loss).toHaveFocus()
+    fireEvent.keyDown(loss, { key: "ArrowDown" })
+    expect(capture).toHaveFocus()
+    fireEvent.keyDown(capture, { key: "End" })
+    expect(loss).toHaveFocus()
+    fireEvent.keyDown(loss, { key: "Home" })
+    expect(capture).toHaveFocus()
+    fireEvent.keyDown(capture, { key: "Escape" })
+    expect(card).toHaveFocus()
+    expect(card).toHaveAttribute("aria-expanded", "false")
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^Remove Mana well/ })).not.toBeInTheDocument()
+
+    fireEvent.click(card)
+    fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument()
+    fireEvent.click(pointCard())
+    expect(screen.getAllByRole("menuitem").map(option => option.textContent))
+        .toEqual(["Mana well is captured", "Mana well is lost"])
+})
 
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
 test("well dialogs select only whole-second timestamps, validate ownership, edit and persist per faction", () => {
     const view = render(<App />)
-    fireEvent.click(screen.getByRole("button", { name: "Mana well is lost", exact: true }))
+    chooseWellEvent("Mana well is lost")
     let dialog = within(screen.getByRole("dialog"))
     expect(dialog.getAllByRole("textbox")).toHaveLength(1)
     expect(dialog.getByRole("alert").textContent).toContain("at least one owned mana well")
     expect((dialog.getByRole("button", { name: "Add event" }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
-    fireEvent.click(screen.getByRole("button", { name: "Mana well is captured", exact: true }))
+    expect(pointCard()).toHaveFocus()
+    chooseWellEvent("Mana well is captured")
     dialog = within(screen.getByRole("dialog"))
     expect((dialog.getByLabelText("Command time (mm:ss)") as HTMLInputElement).value).toBe("00:01")
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0000" } })
     fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
-    fireEvent.click(screen.getByRole("button", { name: "Mana well is lost", exact: true }))
+    expect(pointCard()).toHaveFocus()
+    chooseWellEvent("Mana well is lost")
     dialog = within(screen.getByRole("dialog"))
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0010.5" } })
     expect((dialog.getByLabelText("Command time (mm:ss)") as HTMLInputElement).value).toBe("00:10")
@@ -43,5 +83,5 @@ test("well dialogs select only whole-second timestamps, validate ownership, edit
     expect(screen.getAllByText(/Mana well is lost requires at least one/)).toHaveLength(2)
     fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
     expect(screen.queryByRole("button", { name: "Remove Mana well is lost" })).toBeNull()
-    expect(screen.getByRole("button", { name: "Mana well is captured", exact: true })).toBeTruthy()
+    expect(pointCard()).toBeVisible()
 })

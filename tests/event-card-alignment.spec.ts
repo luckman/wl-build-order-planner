@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-const eventNames = ["Resources collected", "Mana spent", "Mana well is captured", "Mana well is lost", "Unit is killed"]
+const eventNames = ["Resources collected", "Mana spent", "The point is Captured/Lost", "Unit is killed"]
 
 for (const faction of ["Light", "Dark"]) {
     for (const width of [1440, 390]) {
@@ -27,6 +27,21 @@ for (const faction of ["Light", "Dark"]) {
                 expect(await label.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true)
                 await card.focus()
                 await page.keyboard.press("Enter")
+                if (name === "The point is Captured/Lost") {
+                    const menu = page.getByRole("menu", { name })
+                    const options = menu.getByRole("menuitem")
+                    await expect(options).toHaveText(["Mana well is captured", "Mana well is lost"])
+                    await expect(options.first()).toBeFocused()
+                    const box = (await menu.boundingBox())!
+                    expect(box.x).toBeGreaterThanOrEqual(8)
+                    expect(box.x + box.width).toBeLessThanOrEqual(width - 8)
+                    expect(box.y).toBeGreaterThanOrEqual(8)
+                    expect(box.y + box.height).toBeLessThanOrEqual(892)
+                    await card.screenshot({ path: `test-results/point-card-${faction}-${width}.png` })
+                    await page.keyboard.press("Escape")
+                    await expect(card).toBeFocused()
+                    continue
+                }
                 await expect(page.getByRole("dialog")).toBeVisible()
                 await page.keyboard.press("Escape")
                 await expect(card).toBeFocused()

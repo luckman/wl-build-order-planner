@@ -1,16 +1,18 @@
 import { expect, test } from "@playwright/test"
 
-test("mana well cards, ownership validation and timestamp-only dialogs work on desktop and mobile", async ({ page }) => {
+test("mana well dropdown, ownership validation and timestamp-only dialogs work on desktop and mobile", async ({ page }) => {
     for (const width of [1280, 390]) {
         await page.setViewportSize({ width, height: 900 })
         await page.goto("http://localhost:2987")
         await page.evaluate(() => localStorage.clear())
         await page.reload()
         const heroes = page.getByRole("region", { name: "heroes", exact: true })
-        const capture = heroes.getByRole("button", { name: "Mana well is captured", exact: true })
-        const lose = heroes.getByRole("button", { name: "Mana well is lost", exact: true })
-        await lose.scrollIntoViewIfNeeded()
-        await heroes.screenshot({ path: `test-results/mana-well-cards-${width}.png` })
+        const point = heroes.getByRole("button", { name: "The point is Captured/Lost", exact: true })
+        const menu = page.getByRole("menu", { name: "The point is Captured/Lost" })
+        const capture = menu.getByRole("menuitem", { name: "Mana well is captured", exact: true })
+        const lose = menu.getByRole("menuitem", { name: "Mana well is lost", exact: true })
+        await point.scrollIntoViewIfNeeded()
+        await point.click()
         await lose.click()
         let dialog = page.getByRole("dialog", { name: "Mana well is lost" })
         await expect(dialog.getByRole("textbox")).toHaveCount(1)
@@ -21,6 +23,8 @@ test("mana well cards, ownership validation and timestamp-only dialogs work on d
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(width)
         await dialog.screenshot({ path: `test-results/mana-well-is-lost-dialog-${width}.png` })
         await dialog.getByRole("button", { name: "Cancel" }).click()
+        await expect(point).toBeFocused()
+        await point.click()
         await capture.click()
         dialog = page.getByRole("dialog", { name: "Mana well is captured" })
         await expect(dialog.getByRole("textbox")).toHaveCount(1)
@@ -29,6 +33,8 @@ test("mana well cards, ownership validation and timestamp-only dialogs work on d
         await dialog.getByRole("button", { name: "Add event" }).click()
         await expect(page.getByRole("button", { name: "Remove Mana well is captured", exact: true })).toBeVisible()
         await expect(page.locator(".resource-summary")).not.toContainText("Mana wells")
+        await expect(point).toBeFocused()
+        await point.click()
         await lose.click()
         dialog = page.getByRole("dialog", { name: "Mana well is lost" })
         await dialog.getByRole("textbox").fill("0010")
@@ -41,7 +47,7 @@ test("mana well cards, ownership validation and timestamp-only dialogs work on d
         await page.getByRole("button", { name: "Remove Mana well is captured", exact: true }).click()
         await expect(page.locator(".order-blocked")).toContainText("Mana well is lost requires at least one")
         await page.getByRole("button", { name: "Dark", exact: true }).click()
-        await capture.scrollIntoViewIfNeeded()
+        await point.click()
         await expect(capture).toBeVisible()
         await expect(lose).toBeVisible()
     }
