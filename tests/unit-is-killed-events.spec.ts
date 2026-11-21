@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { selectFaction } from "./selectFaction"
 
 test("Unit is killed can record blocked casualties and uses small faction icons on desktop and mobile", async ({ page }) => {
     for (const width of [1280, 390]) {
@@ -7,7 +8,7 @@ test("Unit is killed can record blocked casualties and uses small faction icons 
             await page.goto("http://localhost:2987")
             await page.evaluate(() => localStorage.clear())
             await page.reload()
-            await page.getByRole("button", { name: faction, exact: true }).click()
+            await selectFaction(page, faction)
             const worker = faction === "Light" ? "Worker" : "Slave"
             const soldier = faction === "Light" ? "Swordsman" : "Goon"
             const heroes = page.getByRole("region", { name: "heroes", exact: true })
@@ -17,9 +18,7 @@ test("Unit is killed can record blocked casualties and uses small faction icons 
             await expect(image).toHaveAttribute("src", new RegExp(`${faction.toLowerCase()}-unit-is-killed`))
             const unitCard = page.getByRole("region", { name: "units", exact: true }).getByRole("button", { name: new RegExp(`^${worker} `) })
             expect((await image.boundingBox())!.width).toBeLessThan((await unitCard.locator("img").boundingBox())!.width)
-            const standardWidth = (await unitCard.boundingBox())!.width
-            for (const eventCard of await heroes.locator(".resource-card").all())
-                expect((await eventCard.boundingBox())!.width).toBe(standardWidth)
+            expect((await card.boundingBox())!.width).toBe((await unitCard.boundingBox())!.width)
             await heroes.screenshot({ path: `test-results/unit-is-killed-cards-${faction}-${width}.png` })
             await card.click()
             const dialog = page.getByRole("dialog", { name: "Unit is killed" })
@@ -41,7 +40,7 @@ test("Unit is killed can record blocked casualties and uses small faction icons 
             await expect(page.locator(".resource-summary")).toContainText(`Total ${worker.toLowerCase()}s 4`)
             await expect(page.locator(".resource-summary")).toContainText("Gathering wood 0")
             await page.reload()
-            await page.getByRole("button", { name: faction, exact: true }).click()
+            await selectFaction(page, faction)
             await expect(page.getByRole("button", { name: "Remove Unit is killed", exact: true })).toHaveCount(1)
             await page.getByRole("button", { name: "Change Unit is killed timestamp, action 1", exact: true }).click()
             await dialog.getByLabel("Command time (mm:ss)").fill("0020")

@@ -18,16 +18,18 @@ timeline.
 ## Getting started
 
 Choose **Light** or **Dark** at the top of the planner. Each faction has its own browser-saved draft.
+If the switch takes more than 100 ms, the planner shows a spinner while loading the destination draft.
 
 ### Build order
 
-- Use **Initial worker allocation** (Light) or **Initial slave allocation** (Dark) to split your starting workers between gold and wood.
-- From **Worker events** (Light) or **Slave events** (Dark), choose **Limit gold miners** to control gold assignments from a chosen
-  time. Gatherers can switch after delivering a load, and empty-handed builders can switch when
-  construction finishes.
-- In **Worker events** (Light) or **Slave events** (Dark), choose **Move from gold to wood** or **Move from wood to gold** to
-  direct a chosen number of workers to switch resources. Moves to gold use the available slots
-  under the current gold limit.
+- Use **Initial worker allocation** (Light) or **Initial slave allocation** (Dark) to split your starting
+  workers between gold and wood.
+- From **Worker events** (Light) or **Slave events** (Dark), choose **Limit gold miners** to control gold
+  assignments from a chosen time. Gatherers can switch after delivering a load, and empty-handed
+  builders can switch when construction finishes.
+- In **Worker events** (Light) or **Slave events** (Dark), choose **Move from gold to wood** or
+  **Move from wood to gold** to reassign workers. Moves to gold use the available slots under the
+  current gold limit.
 - Drag rows to reorder your actions. Click an editable row to edit it, or right-click for its menu.
 - Check **Latest order state** for resources and workers at the latest command.
 
@@ -41,8 +43,9 @@ to reuse those settings in other builds for the same faction.
 Add buildings, units, heroes, upgrades, scrolls, and timed events. The planner adds missing
 prerequisites automatically. Right-click a building or upgrade level to configure construction.
 See the [construction guide](docs/CONSTRUCTION.md) for timing and worker options.
-Open **Control point events** to record gaining or losing a mana well. Open **Worker events** (Light) or **Slave events** (Dark)
-to move workers between gold and wood, idle or activate them, or limit the number of gold miners.
+Open **Control point events** to record gaining or losing a mana well. Open **Worker events** (Light) or
+**Slave events** (Dark) to move workers between gold and wood, idle or activate them, or limit the
+number of gold miners.
 
 ### Timeline
 

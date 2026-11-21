@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { selectFaction } from "./selectFaction"
 import { FILE_VERSION, GAME_RULES_VERSION } from "../src/game/buildOrderFile"
 import { factions } from "../src/game/gameData"
 import { initialGameProfile } from "../src/game/gameProfile"
@@ -7,7 +8,7 @@ for (const faction of ["Light", "Dark"] as const) {
     test(`${faction} worker event options and restored events share readable artwork`, async ({ page }) => {
         await page.setViewportSize({ width: faction === "Light" ? 1440 : 320, height: 900 })
         await page.goto("http://localhost:2987")
-        await page.getByRole("button", { name: faction, exact: true }).click()
+        await selectFaction(page, faction)
         const worker = faction === "Light" ? "Worker" : "Slave"
         const idleName = `Make ${worker} idle`
         const activateLabel = `Activate ${worker.toLowerCase()}`
@@ -33,13 +34,14 @@ for (const faction of ["Light", "Dark"] as const) {
         }
         expect(sources[0]).not.toBe(sources[1])
         await trigger.click()
-        await page.getByRole("button", { name: faction === "Light" ? "Dark" : "Light", exact: true }).click()
+        await selectFaction(page, faction === "Light" ? "Dark" : "Light")
         await expect(menu).toHaveCount(0)
         const otherWorker = faction === "Light" ? "Slave" : "Worker"
-        await trigger.click()
-        await expect(menu.getByRole("menuitem", { name: idleName, exact: true })).toHaveCount(0)
-        await expect(menu.getByRole("menuitem", { name: `Make ${otherWorker} idle`, exact: true }).locator("img")).not.toHaveAttribute("src", sources[0])
-        await page.getByRole("button", { name: faction, exact: true }).click()
+        await page.getByRole("button", { name: `${otherWorker} events`, exact: true }).click()
+        const otherMenu = page.getByRole("menu", { name: `${otherWorker} events` })
+        await expect(otherMenu.getByRole("menuitem", { name: idleName, exact: true })).toHaveCount(0)
+        await expect(otherMenu.getByRole("menuitem", { name: `Make ${otherWorker} idle`, exact: true }).locator("img")).not.toHaveAttribute("src", sources[0])
+        await selectFaction(page, faction)
         await page.reload()
         for (const [index, { name }] of events.entries()) {
             await expect(page.getByRole("listitem").filter({ hasText: name }).locator("img")).toHaveAttribute("src", sources[index])
@@ -58,7 +60,7 @@ for (const faction of ["light", "dark"] as const) for (const width of [1440, 320
     test(`${faction} at ${width}px phase geometry, dialog keyboard controls and separate drag interaction`, async ({ page }) => {
         await page.setViewportSize({ width, height: 1000 })
         await page.goto("http://localhost:2987")
-        await page.getByRole("button", { name: faction === "light" ? "Light" : "Dark", exact: true }).click()
+        await selectFaction(page, faction === "light" ? "Light" : "Dark")
         await page.getByLabel("Starting gold", { exact: true }).fill("10000")
         await page.getByLabel("Starting wood", { exact: true }).fill("10000")
         const card = page.locator(".action-panel").getByRole("button", { name: /^Barracks \d/ })
@@ -146,7 +148,7 @@ for (const faction of ["light", "dark"] as const) for (const width of [1440, 320
     test(`${faction} at ${width}px focuses Preparation when adding and editing an upgrade`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 })
         await page.goto("http://localhost:2987")
-        await page.getByRole("button", { name: faction === "light" ? "Light" : "Dark", exact: true }).click()
+        await selectFaction(page, faction === "light" ? "Light" : "Dark")
         await page.getByLabel("Starting gold", { exact: true }).fill("10000")
         await page.getByLabel("Starting wood", { exact: true }).fill("10000")
         const building = faction === "light" ? "Castle" : "Citadel"

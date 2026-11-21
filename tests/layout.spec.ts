@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { selectFaction } from "./selectFaction"
 import { serializeBuildOrder } from "../src/game/buildOrderFile"
 import { initialGameProfile } from "../src/game/gameProfile"
 
@@ -52,7 +53,7 @@ for (const width of [1440, 1024, 390]) {
         await page.setViewportSize({ width, height: 900 })
         await page.goto("http://localhost:2987")
         for (const faction of ["Light", "Dark"]) {
-            await page.getByRole("button", { name: faction, exact: true }).click()
+            await selectFaction(page, faction)
             const actions = await page.locator(".action-panel").boundingBox()
             const timeline = await page.locator(".timeline").boundingBox()
             const planner = await page.locator(".planner-area").boundingBox()

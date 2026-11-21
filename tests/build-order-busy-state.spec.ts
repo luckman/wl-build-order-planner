@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import { FILE_VERSION, GAME_RULES_VERSION } from "../src/game/buildOrderFile"
+import { draftStorageKey } from "../src/game/draftStorage"
 import { initialGameProfile } from "../src/game/gameProfile"
 import { createShareableLink } from "../src/game/shareableLink"
 
@@ -94,20 +95,31 @@ for (const from of ["Light", "Dark"] as const) {
     for (const outcome of ["fast", "slow", "failed"] as const) {
         test(`switching from ${from} to ${to} handles a ${outcome} update`, async ({ page }) => {
             await controlWorker(page)
-            await page.addInitScript(({ active, profile, version, gameRulesVersion }) => {
+            await page.addInitScript(({ active, drafts, profile, version, gameRulesVersion }) => {
                 localStorage.setItem("wl-active-faction", active)
-                for (const [faction, itemId] of [["light", "worker"], ["dark", "slave"]]) {
-                    localStorage.setItem(`wl-build-draft-v2-${faction}`, JSON.stringify({
+                for (const { faction, key, itemId } of drafts) {
+                    localStorage.setItem(key, JSON.stringify({
                         format: "wl-build-order", version, gameRulesVersion, faction, gameProfile: profile,
                         buildOrder: [{ type: "allocate-workers", goldWorkers: 4 }, { itemId }],
                     }))
                 }
-            }, { active: from.toLowerCase(), profile: initialGameProfile, version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION })
+            }, {
+                active: from.toLowerCase(),
+                drafts: [
+                    { faction: "light", key: draftStorageKey("light"), itemId: "worker" },
+                    { faction: "dark", key: draftStorageKey("dark"), itemId: "slave" },
+                ],
+                profile: initialGameProfile,
+                version: FILE_VERSION,
+                gameRulesVersion: GAME_RULES_VERSION,
+            })
             await page.clock.install()
             await page.goto(plannerUrl)
             const source = page.getByRole("button", { name: from, exact: true })
             const destination = page.getByRole("button", { name: to, exact: true })
+            const sourceBox = (await source.boundingBox())!
             const destinationBox = (await destination.boundingBox())!
+            const destinationPoint = { x: destinationBox.x + destinationBox.width / 2, y: destinationBox.y + destinationBox.height / 2 }
             const selected = page.locator(".factions .selected")
             const rows = page.locator(".sortable-order li")
             const timeline = page.locator(".event.unit")
@@ -116,16 +128,16 @@ for (const from of ["Light", "Dark"] as const) {
 
             await expect(rows).toContainText(sourceUnit)
             await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 500))
-            await source.dispatchEvent("click")
+            await page.mouse.click(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
             await expect(planner(page)).toHaveAttribute("aria-busy", "false")
-            await destination.dispatchEvent("click")
+            await page.mouse.click(destinationPoint.x, destinationPoint.y)
             await expect(planner(page)).toHaveAttribute("aria-busy", "true")
             await expect(planner(page)).toHaveAttribute("inert", "")
             await expect(busyStatus(page)).toHaveAttribute("aria-live", "polite")
             await expect(selected).toHaveText(from)
             await expect(rows).toContainText(sourceUnit)
             if (outcome === "slow") {
-                await page.mouse.click(destinationBox.x + destinationBox.width / 2, destinationBox.y + destinationBox.height / 2)
+                expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest(".sc2-shell") === null, destinationPoint)).toBe(true)
                 await page.keyboard.press("Tab")
                 expect(await planner(page).evaluate(element => element.contains(document.activeElement))).toBe(false)
             }
@@ -140,7 +152,6 @@ for (const from of ["Light", "Dark"] as const) {
             await expect(planner(page)).toHaveAttribute("aria-busy", "false")
             await expect(planner(page)).not.toHaveAttribute("inert")
             await expect(busyStatus(page)).toHaveCount(0)
-            await page.clock.runFor(100)
             await expect(spinner(page)).toHaveCount(0)
             if (outcome === "failed") {
                 await expect(page.getByRole("alert")).toContainText("Could not update the build order")
@@ -151,6 +162,10 @@ for (const from of ["Light", "Dark"] as const) {
                 await expect(selected).toHaveText(to)
                 await expect(rows).toContainText(destinationUnit)
                 await expect(timeline).toContainText(destinationUnit)
+            }
+            if (outcome === "fast") {
+                await page.clock.runFor(100)
+                await expect(spinner(page)).toHaveCount(0)
             }
         })
     }

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { selectFaction } from "./selectFaction"
 
 for (const width of [1440, 390]) {
     test(`Copy link uses its entire highlighted row and native keyboard activation at ${width}px`, async ({ page }) => {
@@ -14,7 +15,7 @@ for (const width of [1440, 390]) {
         const toggle = page.getByText("Share / Import", { exact: true })
         const copy = page.getByRole("button", { name: "Copy link", exact: true })
         for (const faction of ["Light", "Dark"]) {
-            await page.getByRole("button", { name: faction, exact: true }).click()
+            await selectFaction(page, faction)
             for (const target of ["title", "subtitle", "gap", "left padding", "right padding", "top padding", "bottom padding", "Enter", "Space"]) {
                 await toggle.click()
                 await expect(copy).toHaveAccessibleDescription("Share this build order")
@@ -57,7 +58,7 @@ for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 780 })
         await page.goto(process.env.PLANNER_TEST_URL ?? "http://localhost:2987")
         // Dark has the longer template list and is the tighter layout case.
-        await page.getByRole("button", { name: "Dark", exact: true }).click()
+        await selectFaction(page, "Dark")
         const toggle = page.getByText("Share / Import", { exact: true })
         await toggle.focus()
         await page.keyboard.press("Enter")

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { selectFaction } from "./selectFaction"
 
 test("resource card placement and exact-time dialog work on desktop and mobile", async ({ page }) => {
     for (const width of [1280, 390]) {
@@ -27,7 +28,7 @@ test("resource card placement and exact-time dialog work on desktop and mobile",
         await expect(page.locator(".resource-summary")).toContainText("Gold 450")
         await expect(page.locator(".resource-summary")).toContainText("Wood 350")
         await expect(page.locator(".order li")).toContainText("Command 0:00")
-        await page.getByRole("button", { name: "Dark", exact: true }).click()
+        await selectFaction(page, "Dark")
         await expect(heroes.getByRole("button", { name: "Resources collected", exact: true })).toBeVisible()
     }
 })

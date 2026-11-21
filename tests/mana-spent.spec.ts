@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { selectFaction } from "./selectFaction"
 import { FILE_VERSION, GAME_RULES_VERSION } from "../src/game/buildOrderFile"
 import { initialGameProfile, initialOpeningAction, type GameProfile } from "../src/game/gameProfile"
 
@@ -89,7 +90,7 @@ for (const faction of ["light", "dark"] as const) {
         await expect(manaCard(page)).toBeFocused()
         await page.reload()
         await expect(page.getByRole("button", { name: "Remove Mana spent", exact: true })).toHaveCount(1)
-        await page.getByRole("button", { name: faction === "light" ? "Dark" : "Light", exact: true }).click()
+        await selectFaction(page, faction === "light" ? "Dark" : "Light")
         await expect(page.getByRole("button", { name: "Remove Mana spent", exact: true })).toHaveCount(0)
     })
 }

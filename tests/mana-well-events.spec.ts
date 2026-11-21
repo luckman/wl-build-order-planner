@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { selectFaction } from "./selectFaction"
 
 for (const faction of ["Light", "Dark"]) test(`${faction} mana well dropdown, ownership validation and timestamp-only dialogs work on desktop and mobile`, async ({ page }) => {
     for (const width of [1280, 390]) {
@@ -6,7 +7,7 @@ for (const faction of ["Light", "Dark"]) test(`${faction} mana well dropdown, ow
         await page.goto("http://localhost:2987")
         await page.evaluate(() => localStorage.clear())
         await page.reload()
-        await page.getByRole("button", { name: faction, exact: true }).click()
+        await selectFaction(page, faction)
         const heroes = page.getByRole("region", { name: "heroes", exact: true })
         const point = heroes.getByRole("button", { name: "Control point events", exact: true })
         const menu = page.getByRole("menu", { name: "Control point events" })
@@ -51,7 +52,7 @@ for (const faction of ["Light", "Dark"]) test(`${faction} mana well dropdown, ow
         await expect(page.getByRole("button", { name: "Remove Mana well is captured", exact: true })).toBeVisible()
         await page.getByRole("button", { name: "Remove Mana well is captured", exact: true }).click()
         await expect(page.locator(".order-blocked")).toContainText("Mana well is lost requires at least one")
-        await page.getByRole("button", { name: faction === "Light" ? "Dark" : "Light", exact: true }).click()
+        await selectFaction(page, faction === "Light" ? "Dark" : "Light")
         await point.click()
         await expect(capture).toBeVisible()
         await expect(lose).toBeVisible()

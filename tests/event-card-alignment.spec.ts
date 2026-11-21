@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { selectFaction } from "./selectFaction"
 
 test.use({ hasTouch: true })
 
@@ -10,7 +11,7 @@ for (const faction of ["Light", "Dark"]) {
         test(`${faction} event names reserve equal space and icons align at ${width}px`, async ({ page }) => {
             await page.setViewportSize({ width, height: 900 })
             await page.goto(process.env.PLANNER_TEST_URL ?? "http://localhost:2987")
-            await page.getByRole("button", { name: faction, exact: true }).click()
+            await selectFaction(page, faction)
             const heroes = page.getByRole("region", { name: "heroes", exact: true })
             const cards = heroes.getByRole("button").and(heroes.locator(".resource-card"))
             expect(await cards.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(eventNames)
