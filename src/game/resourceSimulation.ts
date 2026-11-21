@@ -89,8 +89,7 @@ export type GatheringWorker = {
     cargoWood: number
     whipUntil: number
     lastManualMoveAt?: number
-    woodReturnIndex?: number
-    woodReturnTarget?: number
+    woodReturn?: Readonly<{ resultIndex: number; target?: number }>
     constructionDuration?: number
     constructionReturnDuration?: number
 }
@@ -396,7 +395,7 @@ export class WorkerEconomy {
 
     get nextEventTime() {
         return Math.min(
-            ...this.workers.map(worker => worker.woodReturnTarget === undefined ? worker.nextAt : this.woodDepartureTime(worker)),
+            ...this.workers.map(worker => worker.woodReturn?.target === undefined ? worker.nextAt : this.woodDepartureTime(worker)),
             this.delayedInitialWoodWorkerIds.length ? this.settings.orderDelay : Infinity,
             ...this.sawmillCompletions.filter(time => time > this.time),
             ...this.whipStarts.map(window => window.startTime),
@@ -493,7 +492,7 @@ export class WorkerEconomy {
         // Workers are stored in ascending ID order. Keep the first on an exact tie.
         for (const worker of this.workers) {
             if (worker.assignment !== "wood" || worker.state !== "gathering") continue
-            if (worker.woodReturnIndex !== undefined) {
+            if (worker.woodReturn) {
                 reserved = true
                 continue
             }
@@ -516,31 +515,31 @@ export class WorkerEconomy {
         }
         result.workerId = selected.id
         result.endTime = null
-        selected.woodReturnIndex = index
         this.pendingWoodReturns++
         if (action.mode === "target" && wholeWood < action.target) {
-            selected.woodReturnTarget = action.target
+            selected.woodReturn = { resultIndex: index, target: action.target }
         } else {
+            selected.woodReturn = { resultIndex: index }
             this.departWithWood(selected, wholeWood)
             if (selected.nextAt === this.time) this.advanceTo(this.time)
         }
     }
 
     private departWithWood(worker: GatheringWorker, wood: number) {
-        this.woodReturnResults[worker.woodReturnIndex!].departedAt = this.time
-        delete worker.woodReturnTarget
+        const { resultIndex, target } = worker.woodReturn!
+        this.woodReturnResults[resultIndex].departedAt = this.time
+        if (target !== undefined) worker.woodReturn = { resultIndex }
         worker.cargoWood = wood
         this.transition(worker, "deposit", this.travel("wood"))
     }
 
     private finishWoodReturn(worker: GatheringWorker, reason?: string) {
-        if (worker.woodReturnIndex === undefined) return
-        const result = this.woodReturnResults[worker.woodReturnIndex]
+        if (!worker.woodReturn) return
+        const result = this.woodReturnResults[worker.woodReturn.resultIndex]
         result.endTime = this.time
         if (reason) result.reason = reason
         else result.delivered = worker.cargoWood
-        delete worker.woodReturnIndex
-        delete worker.woodReturnTarget
+        delete worker.woodReturn
         this.pendingWoodReturns--
     }
 
@@ -551,7 +550,8 @@ export class WorkerEconomy {
     }
 
     private woodDepartureTime(worker: GatheringWorker) {
-        return worker.woodReturnTarget === undefined ? Infinity : Math.max(this.time, this.woodTargetTime(worker, worker.woodReturnTarget))
+        const target = worker.woodReturn?.target
+        return target === undefined ? Infinity : Math.max(this.time, this.woodTargetTime(worker, target))
     }
 
     manualWorkerMoveResult(index: number) {
@@ -689,7 +689,7 @@ export class WorkerEconomy {
             : this.travel("wood")
     }
 
-    private canRedirectFinishedBuilder(worker: GatheringWorker, incomingGoldLimit: GoldMinerLimitAction | undefined,
+    private canRedirectAtTransition(worker: GatheringWorker, incomingGoldLimit: GoldMinerLimitAction | undefined,
         incomingManualMoveSources: ReadonlySet<ManualWorkerMoveSource> | undefined) {
         if (worker.assignment === "idle") return false
         const eligibleForManualMove = incomingManualMoveSources?.has(worker.assignment) ||
@@ -710,7 +710,7 @@ export class WorkerEconomy {
         // and can receive a fresh effect. The previous effect was cleared at start.
         for (const worker of this.workers.filter(worker => worker.state === "construction" && worker.nextAt === this.time)) {
             this.transition(worker, "construction-return", worker.constructionReturnDuration!)
-            if (transitions && this.canRedirectFinishedBuilder(worker, incomingGoldLimit, incomingManualMoveSources)) {
+            if (transitions && this.canRedirectAtTransition(worker, incomingGoldLimit, incomingManualMoveSources)) {
                 transitions.push({ worker, nextAt: worker.nextAt, state: "construction-return" })
                 worker.nextAt = Infinity
             }
@@ -739,8 +739,9 @@ export class WorkerEconomy {
             // Whip changes gathering and travel rates at the boundary. A due
             // departure uses the movement rate in effect once the worker leaves.
             for (const worker of this.workers) {
-                if (worker.woodReturnTarget !== undefined && this.woodDepartureTime(worker) <= this.time + roundoff) {
-                    this.departWithWood(worker, worker.woodReturnTarget)
+                const target = worker.woodReturn?.target
+                if (target !== undefined && this.woodDepartureTime(worker) <= this.time + roundoff) {
+                    this.departWithWood(worker, target)
                 }
             }
         }
@@ -771,6 +772,7 @@ export class WorkerEconomy {
                     this.travel(worker.assignment === "gold" ? "gold" : "wood"),
                 )
             } else if (worker.state === "deposit") {
+                const wasEarlyWoodReturn = worker.woodReturn !== undefined
                 this.finishWoodReturn(worker)
                 this.deliveries.push({
                     time: this.time,
@@ -782,7 +784,11 @@ export class WorkerEconomy {
                 worker.cargoWood = 0
                 if (worker.assignment !== "idle") {
                     this.transition(worker, "outbound", this.travel(worker.assignment))
-                    if (transitions) {
+                    // A completed partial return can resume chopping immediately
+                    // when there is no travel and no reassignment to reconcile.
+                    const resumeNow = wasEarlyWoodReturn && worker.nextAt === this.time &&
+                        !this.canRedirectAtTransition(worker, incomingGoldLimit, incomingManualMoveSources)
+                    if (transitions && !resumeNow) {
                         transitions.push({ worker, nextAt: worker.nextAt, state: "outbound" })
                         worker.nextAt = Infinity
                     }

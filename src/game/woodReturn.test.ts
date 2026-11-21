@@ -82,6 +82,15 @@ test("a due departure and a due deposit both resolve before later worker command
     expect(atDeposit.deliveries).toEqual([{ time: 6, worker: 0, gold: 0, wood: 10 }])
 })
 
+test("a zero-travel deposit resumes chopping before a new target at the same time", () => {
+    const settings = { ...economy, workerCount: 1, woodWorkers: 1, woodTravelTime: 0, orderDelay: 0 }
+    const result = simulate([waitForWood(0, 10), waitForWood(2, 10)], settings)
+    expect(result.plan.map(action => action.finishTime)).toEqual([2, 4])
+    expect(result.deliveries.slice(0, 2)).toEqual([
+        { time: 2, worker: 0, gold: 0, wood: 10 }, { time: 4, worker: 0, gold: 0, wood: 10 },
+    ])
+})
+
 test("an interruption while chopping keeps the existing cargo and identifies the originally selected worker", () => {
     const settings = { ...economy, workerCount: 1, woodWorkers: 1 }
     const result = simulate([waitForWood(2, 25), idle(4), active(10)], settings)
