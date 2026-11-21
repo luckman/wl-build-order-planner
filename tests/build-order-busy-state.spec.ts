@@ -89,6 +89,73 @@ for (const outcome of ["fast", "slow", "failed"] as const) {
     })
 }
 
+for (const from of ["Light", "Dark"] as const) {
+    const to = from === "Light" ? "Dark" : "Light"
+    for (const outcome of ["fast", "slow", "failed"] as const) {
+        test(`switching from ${from} to ${to} handles a ${outcome} update`, async ({ page }) => {
+            await controlWorker(page)
+            await page.addInitScript(({ active, profile, version, gameRulesVersion }) => {
+                localStorage.setItem("wl-active-faction", active)
+                for (const [faction, itemId] of [["light", "worker"], ["dark", "slave"]]) {
+                    localStorage.setItem(`wl-build-draft-v2-${faction}`, JSON.stringify({
+                        format: "wl-build-order", version, gameRulesVersion, faction, gameProfile: profile,
+                        buildOrder: [{ type: "allocate-workers", goldWorkers: 4 }, { itemId }],
+                    }))
+                }
+            }, { active: from.toLowerCase(), profile: initialGameProfile, version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION })
+            await page.clock.install()
+            await page.goto(plannerUrl)
+            const source = page.getByRole("button", { name: from, exact: true })
+            const destination = page.getByRole("button", { name: to, exact: true })
+            const destinationBox = (await destination.boundingBox())!
+            const selected = page.locator(".factions .selected")
+            const rows = page.locator(".sortable-order li")
+            const timeline = page.locator(".event.unit")
+            const sourceUnit = from === "Light" ? "Worker" : "Slave"
+            const destinationUnit = to === "Light" ? "Worker" : "Slave"
+
+            await expect(rows).toContainText(sourceUnit)
+            await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 500))
+            await source.dispatchEvent("click")
+            await expect(planner(page)).toHaveAttribute("aria-busy", "false")
+            await destination.dispatchEvent("click")
+            await expect(planner(page)).toHaveAttribute("aria-busy", "true")
+            await expect(planner(page)).toHaveAttribute("inert", "")
+            await expect(busyStatus(page)).toHaveAttribute("aria-live", "polite")
+            await expect(selected).toHaveText(from)
+            await expect(rows).toContainText(sourceUnit)
+            if (outcome === "slow") {
+                await page.mouse.click(destinationBox.x + destinationBox.width / 2, destinationBox.y + destinationBox.height / 2)
+                await page.keyboard.press("Tab")
+                expect(await planner(page).evaluate(element => element.contains(document.activeElement))).toBe(false)
+            }
+            await page.clock.runFor(99)
+            await expect(spinner(page)).toHaveCount(0)
+            if (outcome !== "fast") {
+                await page.clock.runFor(1)
+                await expect(spinner(page)).toBeVisible()
+            }
+
+            await releaseWorker(page, outcome === "failed")
+            await expect(planner(page)).toHaveAttribute("aria-busy", "false")
+            await expect(planner(page)).not.toHaveAttribute("inert")
+            await expect(busyStatus(page)).toHaveCount(0)
+            await page.clock.runFor(100)
+            await expect(spinner(page)).toHaveCount(0)
+            if (outcome === "failed") {
+                await expect(page.getByRole("alert")).toContainText("Could not update the build order")
+                await expect(selected).toHaveText(from)
+                await expect(rows).toContainText(sourceUnit)
+                await expect(timeline).toContainText(sourceUnit)
+            } else {
+                await expect(selected).toHaveText(to)
+                await expect(rows).toContainText(destinationUnit)
+                await expect(timeline).toContainText(destinationUnit)
+            }
+        })
+    }
+}
+
 test("recalculates a real build order with repeated preparation", async ({ page }) => {
     await page.addInitScript(file => localStorage.setItem("wl-build-draft-v2-light", JSON.stringify(file)), {
         format: "wl-build-order",
@@ -231,9 +298,6 @@ test("locks for template application, opening allocation and Clear", async ({ pa
     await controlWorker(page)
     await page.goto(plannerUrl)
     const profile = page.getByLabel("Starting gold", { exact: true })
-    await page.getByRole("button", { name: "Dark", exact: true }).click()
-    await expect(planner(page)).toHaveAttribute("aria-busy", "false")
-    await page.getByRole("button", { name: "Light", exact: true }).click()
     await profile.fill("900")
     await expect(planner(page)).toHaveAttribute("aria-busy", "false")
     const rows = page.locator(".sortable-order li")

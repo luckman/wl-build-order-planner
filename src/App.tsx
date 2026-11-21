@@ -307,7 +307,7 @@ export default function App() {
             // each input row so editing and reordering retain row identity.
             result.plan.forEach((action, index) => { action.item = draft.items[index] })
             setCalculated({ draft, profile, result })
-            updateBuildOrders(current => ({ ...current, [target]: draft }))
+            updateBuildOrders(current => current[target] === draft ? current : { ...current, [target]: draft })
             onSuccess?.(result)
         })
         if (accepted) {
@@ -630,10 +630,12 @@ export default function App() {
                                     key={entry.id}
                                     className={entry.id === factionId ? "selected" : ""}
                                     onClick={() => {
-                                        setFactionId(entry.id)
-                                        setConfirmation(null)
-                                        setDependencyError(null)
-                                        setHoverTime(null)
+                                        if (entry.id === factionId) return
+                                        updateDraft(entry.id, buildOrders[entry.id], gameProfiles[entry.id], () => {
+                                            setFactionId(entry.id)
+                                            setDependencyError(null)
+                                            setHoverTime(null)
+                                        })
                                     }}
                                 >
                                     {entry.name}
