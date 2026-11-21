@@ -1,6 +1,7 @@
 import { constructionCommand, parseConstructionSettings, parseConstructionTimeModifier, type ConstructionSettings } from "./constructionSettings"
 import type { WorkerCasualtyGroup } from "./gameData"
 import { createWorkerEvent, workerEventCommand, type WorkerEventCommand } from "./workerEvents"
+import { createWoodReturn, woodReturnCommand, type WoodReturnCommand } from "./woodReturn"
 import { createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, type GoldMinerLimitCommand } from "./goldMinerLimit"
 import { createManualWorkerMove, manualWorkerMoveCommand, manualWorkerMoveIdentities, type ManualWorkerMoveCommand, type ManualWorkerMoveType } from "./manualWorkerMoves"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision, type ManaSpentCommand } from "./manaSpent"
@@ -17,7 +18,7 @@ import { createScrollAction, scrollCommand, type ScrollCommand } from "./scrolls
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-11-21.2"
+export const GAME_RULES_VERSION = "2026-11-21.3"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -25,7 +26,7 @@ export type BuildOrderDocument = {
     gameRulesVersion: string
     faction: FactionId
     gameProfile: GameProfile
-    buildOrder: Array<OpeningAction | ((WorkerEventCommand | ManualWorkerMoveCommand | GoldMinerLimitCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
+    buildOrder: Array<OpeningAction | ((WorkerEventCommand | WoodReturnCommand | ManualWorkerMoveCommand | GoldMinerLimitCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
         itemId: string; construction?: ConstructionSettings
     }) & {
         timings?: Pick<ScheduledAction, "commandTime" | "departureTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime">
@@ -35,6 +36,7 @@ export type BuildOrderDocument = {
 export function buildOrderCommand(item: PlannerItem) {
     switch (item.kind) {
         case "worker-event": return workerEventCommand(item)
+        case "wood-return": return woodReturnCommand(item)
         case "manual-worker-move": return manualWorkerMoveCommand(item)
         case "limit-gold-miners": return goldMinerLimitCommand(item)
         case "mana-spent": return manaSpentCommand(item)
@@ -152,6 +154,13 @@ export function parseBuildOrder(text: string): {
             return createWorkerEvent({ type: action.type, commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
                 count: number(action.count, `Action ${index + 1}.count`, true, true),
                 travelDuration: action.travelDuration === undefined ? 0 : number(action.travelDuration, `Action ${index + 1}.travelDuration`) }, faction)
+        }
+        if (action.type === "bring-wood-back-to-base") {
+            if (action.mode !== "immediate" || action.target !== undefined) {
+                throw new Error(`Action ${index + 1} must specify immediate wood return without a target.`)
+            }
+            return createWoodReturn({ type: action.type, mode: action.mode,
+                commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`) })
         }
         if (typeof action.type === "string" && Object.prototype.hasOwnProperty.call(manualWorkerMoveIdentities, action.type)) {
             return createManualWorkerMove({ type: action.type as ManualWorkerMoveType,

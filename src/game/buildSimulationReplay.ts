@@ -12,13 +12,13 @@ export function replayOrder(items: PlannerItem[]) {
     const catalogPositions = new Map<number, number>()
     const authoredWorkerTimes = new Map<number, number>()
     for (const item of items) {
-        if (item.kind === "limit-gold-miners" || item.kind === "manual-worker-move")
+        if (item.kind === "limit-gold-miners" || item.kind === "manual-worker-move" || item.kind === "wood-return")
             authoredWorkerTimes.set(goldMinerLimitTimeKey(item.commandTime), item.commandTime)
     }
     for (const [index, item] of items.entries()) {
         const key = JSON.stringify(item)
         if (isTimedEvent(item) && "commandTime" in item) {
-            const time = item.kind === "worker-event" || item.kind === "unit-is-killed"
+            const time = item.kind === "worker-event" || item.kind === "unit-is-killed" || item.kind === "wood-return"
                 ? alignTimeWithGoldMinerLimit(item.commandTime, authoredWorkerTimes) : item.commandTime
             fixed.push({ index, key, time })
         } else {

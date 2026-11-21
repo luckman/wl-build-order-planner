@@ -8,6 +8,31 @@ import { serializeBuildOrder } from "./game/buildOrderFile"
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
+test.each(["Light", "Dark"])("%s can add, edit, reopen, and remove a partial wood return", faction => {
+    const name = "Bring wood back to base"
+    const { unmount } = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction }))
+    fireEvent.click(screen.getByRole("button", { name: faction === "Light" ? "Worker events" : "Slave events" }))
+    fireEvent.click(screen.getByRole("menuitem", { name }))
+    const dialog = within(screen.getByRole("dialog", { name }))
+    expect((dialog.getByRole("radio", { name: "Return immediately" }) as HTMLInputElement).checked).toBe(true)
+    expect(dialog.queryByRole("spinbutton")).toBeNull()
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "00:08" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
+    const remove = () => screen.getByRole("button", { name: `Remove ${name}` })
+    expect(remove().closest("li")?.textContent).toMatch(/Deposited \d+ wood/)
+    fireEvent.click(remove().closest("li")!)
+    const edit = within(screen.getByRole("dialog", { name: `Edit ${name}` }))
+    fireEvent.change(edit.getByLabelText("Command time (mm:ss)"), { target: { value: "00:00" } })
+    fireEvent.click(edit.getByRole("button", { name: "Save event" }))
+    expect(remove().closest("li")?.textContent).toContain("No wood gatherer is actively chopping.")
+    unmount()
+    render(<App />)
+    expect(remove().closest("li")?.textContent).toContain("No wood gatherer is actively chopping.")
+    fireEvent.click(remove())
+    expect(screen.queryByRole("button", { name: `Remove ${name}` })).toBeNull()
+})
+
 function chooseUpgrade(name: string) {
     const trigger = screen.getByRole("button", { name: `${name.split(" lvl ")[0]} upgrade` })
     if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger)

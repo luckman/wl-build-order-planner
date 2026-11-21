@@ -18,5 +18,5 @@ export function resourcesCollectedCommand(item: ResourcesCollectedAction): Resou
     return { type: "resources-collected", commandTime: item.commandTime, gold: item.collectedGold, wood: item.collectedWood }
 }
 export function isTimedEvent(item: PlannerItem) {
-    return item.kind === "worker-event" || item.kind === "manual-worker-move" || item.kind === "limit-gold-miners" || item.kind === "mana-spent" || item.kind === "scroll" || item.kind === "resources-collected" || item.kind === "mana-well" || item.kind === "unit-is-killed"
+    return item.kind === "worker-event" || item.kind === "manual-worker-move" || item.kind === "wood-return" || item.kind === "limit-gold-miners" || item.kind === "mana-spent" || item.kind === "scroll" || item.kind === "resources-collected" || item.kind === "mana-well" || item.kind === "unit-is-killed"
 }

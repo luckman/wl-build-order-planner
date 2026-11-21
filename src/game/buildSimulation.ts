@@ -1,6 +1,7 @@
 import { matchesPreparation, matchesPreparationReuse, schedulePreparation, type PreparationReuse, type PreparationSchedule } from "./preparationScheduling"
 import { isConstruction, parseConstructionSettings } from "./constructionSettings"
 import { parseWorkerEvent, workerEventCommand } from "./workerEvents"
+import { createWoodReturn, woodReturnCommand, type WoodReturnResult } from "./woodReturn"
 import { createManualWorkerMove, manualWorkerMoveCommand, recordManualWorkerMoveBoundary, type ManualWorkerMoveResult, type ManualWorkerMoveSource } from "./manualWorkerMoves"
 import { alignTimeWithGoldMinerLimit, createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, goldMinerLimitTimeKey, timestampRoundoff } from "./goldMinerLimit"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
@@ -38,6 +39,7 @@ export type ScheduledAction = {
     foodReleased?: number
     manaCost?: number
     manualMove?: ManualWorkerMoveResult
+    woodReturn?: WoodReturnResult
 }
 
 type BuildSimulation = {
@@ -82,7 +84,8 @@ function copyCheckpoint(checkpoint: Checkpoint): Checkpoint {
 function checkpointWeight(state: Checkpoint) {
     const { simulation } = state
     return simulation.deliveries.length + simulation.eventBoundaries.size + simulation.workers.length +
-        state.plan.length + state.unitInstances.length + state.timedEventsByIndex.size + simulation.manualMoveCheckpointWeight
+        state.plan.length + state.unitInstances.length + state.timedEventsByIndex.size +
+        simulation.manualMoveCheckpointWeight + simulation.woodReturnCheckpointWeight
 }
 
 function restoreCheckpoint(checkpoint: Checkpoint, buildOrder: PlannerItem[], order: ReplayOrder, rowMap?: Map<number, number>) {
@@ -151,9 +154,9 @@ const simulationSources = new WeakMap<BuildSimulation, {
 }>()
 
 function projectSimulation(result: Pick<ReturnType<typeof simulateBuildOrderPass>, "plan" | "orderedPlan" | "projectDeliveries"> & {
-    projectManualMoves?: () => void
+    projectWorkerOrders?: () => void
 }): BuildSimulation {
-    result.projectManualMoves?.()
+    result.projectWorkerOrders?.()
     const buildEnd = Math.max(0, ...result.orderedPlan.map(action => action.item.kind === "manual-worker-move"
         ? action.manualMove?.endTime ?? action.commandTime ?? 0 : action.blocked ? 0 : action.finishTime!))
     const horizon = Math.min(MAX_PLAN_SECONDS, Math.max(buildEnd + RESOURCE_PROJECTION_SECONDS, timelineEnd(result.plan)))
@@ -426,12 +429,15 @@ function simulateBuildOrderPass(
         if (item.kind === "manual-worker-move") {
             recordManualWorkerMoveBoundary(item, item.commandTime, goldLimitTimes, manualMoveSourcesByTime)
         }
+        if (item.kind === "wood-return") goldLimitTimes.set(goldMinerLimitTimeKey(item.commandTime), item.commandTime)
     }
     const hasManualMoves = manualMoveSourcesByTime.size > 0
+    const hasWoodReturns = buildOrder.some(item => item.kind === "wood-return")
     const pendingWorkerAndLossEvents = buildOrder.flatMap((item, index) => {
-        if (item.kind !== "unit-is-killed" && item.kind !== "worker-event" && item.kind !== "manual-worker-move") return []
+        if (item.kind !== "unit-is-killed" && item.kind !== "worker-event" && item.kind !== "manual-worker-move" && item.kind !== "wood-return") return []
         if (item.kind === "worker-event") parseWorkerEvent(workerEventCommand(item))
         else if (item.kind === "manual-worker-move") createManualWorkerMove(manualWorkerMoveCommand(item))
+        else if (item.kind === "wood-return") createWoodReturn(woodReturnCommand(item))
         else createUnitKilledAction(unitKilledCommand(item), faction)
         return [{ item, index, time: alignTimeWithGoldMinerLimit(item.commandTime, goldLimitTimes) }]
     }).sort((a, b) => a.time - b.time || a.index - b.index)
@@ -480,7 +486,7 @@ function simulateBuildOrderPass(
         pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity)
     const nextWorkerTransitionTime = () => {
         const transition = alignTimeWithGoldMinerLimit(simulation.nextEventTime, goldLimitTimes)
-        if (!simulation.hasExplicitGoldMinerLimit && !hasManualMoves) return transition
+        if (!simulation.hasExplicitGoldMinerLimit && !hasManualMoves && !simulation.hasPendingWoodReturns) return transition
         const command = nextWorkerCommandTime()
         return Number.isFinite(command) && Math.abs(command - transition) <= timestampRoundoff(command) ? command : transition
     }
@@ -498,6 +504,12 @@ function simulateBuildOrderPass(
         simulation.resolvePendingManualMoves()
         while (pendingWorkerAndLossEvents[0]?.time === eventTime) {
             const { item, index } = pendingWorkerAndLossEvents.shift()!
+            if (item.kind === "wood-return") {
+                simulation.startWoodReturn()
+                timedEventsByIndex.set(index, { item, blocked: false, cost: { gold: 0, wood: 0 },
+                    commandTime: eventTime, startTime: null, finishTime: null, workerReturnTime: null, workerId: null })
+                continue
+            }
             if (item.kind === "manual-worker-move") {
                 const blockedReason = simulation.startManualWorkerMove(item)
                 timedEventsByIndex.set(index, { item, blocked: blockedReason !== undefined, cost: { gold: 0, wood: 0 },
@@ -540,7 +552,9 @@ function simulateBuildOrderPass(
             const limitAtTime = pendingLimit?.commandTime === eventTime ? pendingLimit : undefined
             const workerCommandAtTime = nextRecruitTime() === eventTime || pendingWorkerAndLossEvents[0]?.time === eventTime
             const manualMoveAtTime = manualMoveSourcesByTime.get(eventTime)
-            if (limitAtTime || ((simulation.hasExplicitGoldMinerLimit || simulation.hasPendingManualMoves || manualMoveAtTime) && workerCommandAtTime)) {
+            if (limitAtTime || (workerCommandAtTime &&
+                (simulation.hasExplicitGoldMinerLimit || simulation.hasPendingManualMoves || manualMoveAtTime ||
+                    simulation.hasPendingWoodReturns || pendingWorkerAndLossEvents[0]?.item.kind === "wood-return"))) {
                 simulation.advanceTo(eventTime, () => applyWorkerCommandsAt(eventTime), limitAtTime, manualMoveAtTime)
             } else {
                 simulation.advanceTo(eventTime)
@@ -916,18 +930,28 @@ function simulateBuildOrderPass(
     const orderedPlan = inputPlan.map((action, index) => ({ action, index }))
         .sort((a, b) => (a.action.commandTime ?? Infinity) - (b.action.commandTime ?? Infinity) || a.index - b.index)
         .map(({ action }) => action)
-    const projectManualMoves = hasManualMoves ? () => {
-        while (simulation.hasPendingManualMoves && simulation.time < MAX_PLAN_SECONDS) {
+    const projectWorkerOrders = hasManualMoves || hasWoodReturns ? () => {
+        while ((simulation.hasPendingManualMoves || simulation.hasPendingWoodReturns) && simulation.time < MAX_PLAN_SECONDS) {
             const alignedTransition = nextWorkerTransitionTime()
             const transition = alignedTransition <= simulation.time ? simulation.nextEventTime : alignedTransition
             advanceTo(Math.min(nextQueuedEventTime(), transition, MAX_PLAN_SECONDS))
         }
         let moveIndex = 0
+        let returnIndex = 0
         for (const action of orderedPlan) {
-            if (action.item.kind !== "manual-worker-move") continue
-            const result = simulation.manualWorkerMoveResult(moveIndex++)
-            action.manualMove = result
-            if (!result.reason) action.finishTime = result.endTime
+            if (action.item.kind === "manual-worker-move") {
+                const result = simulation.manualWorkerMoveResult(moveIndex++)
+                action.manualMove = result
+                if (!result.reason) action.finishTime = result.endTime
+            } else if (action.item.kind === "wood-return") {
+                const result = simulation.woodReturnResult(returnIndex++)
+                action.woodReturn = result
+                action.workerId = result.workerId
+                action.startTime = result.departedAt
+                action.blocked = result.reason !== undefined
+                action.blockedReason = result.reason
+                if (!result.reason) action.finishTime = result.endTime
+            }
         }
     } : undefined
     const projectDeliveries = (horizon: number) => {
@@ -937,5 +961,5 @@ function simulateBuildOrderPass(
     }
     const candidateEventTimes = collectCandidatesThrough === undefined ? []
         : [...simulation.eventBoundaries, ...simulation.deliveries.map(({ time }) => time)]
-    return { plan: inputPlan, orderedPlan, preparationFailures, candidateEventTimes, projectManualMoves, projectDeliveries, beforeTail, end }
+    return { plan: inputPlan, orderedPlan, preparationFailures, candidateEventTimes, projectWorkerOrders, projectDeliveries, beforeTail, end }
 }

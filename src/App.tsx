@@ -4,6 +4,8 @@ import ConstructionDialog from "./ConstructionDialog"
 import { isConstruction, hasCustomConstruction, constructionDescription } from "./game/constructionSettings"
 import WorkerEventDialog from "./WorkerEventDialog"
 import ManualWorkerMoveDialog from "./ManualWorkerMoveDialog"
+import WoodReturnDialog from "./WoodReturnDialog"
+import { createWoodReturn, WOOD_RETURN_ICON, WOOD_RETURN_NAME } from "./game/woodReturn"
 import { formatDuration } from "./durationTime"
 import { createManualWorkerMove, manualWorkerMoveIdentities, type ManualWorkerMoveType } from "./game/manualWorkerMoves"
 import { createWorkerEvent, workerEventIdentity, type WorkerEventCommand } from "./game/workerEvents"
@@ -230,6 +232,7 @@ export default function App() {
     const [configuringConstruction, setConfiguringConstruction] = useState<PlannerItem | null>(null)
     const [workerEventDialogOpen, setWorkerEventDialogOpen] = useState<WorkerEventCommand["type"] | null>(null)
     const [manualWorkerMoveDialogOpen, setManualWorkerMoveDialogOpen] = useState<ManualWorkerMoveType | null>(null)
+    const [woodReturnDialogOpen, setWoodReturnDialogOpen] = useState(false)
     const [goldMinerLimitDialogOpen, setGoldMinerLimitDialogOpen] = useState(false)
     const [unitKilledDialogOpen, setUnitKilledDialogOpen] = useState(false)
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
@@ -415,7 +418,11 @@ export default function App() {
     const [hoverTime, setHoverTime] = useState<number | null>(null)
     const reorderActions = ({ source, destination }: DropResult) => {
         if (!destination || source.index === destination.index) return
-        if (isTimedEvent(displayPlan[source.index].item)) return
+        const sourceAction = displayPlan[source.index]
+        if (sourceAction.item.kind === "wood-return") {
+            const target = displayPlan[destination.index]
+            if (!isTimedEvent(target.item) || target.commandTime !== sourceAction.commandTime) return
+        } else if (isTimedEvent(sourceAction.item)) return
         setBuildOrder(current => {
             const reordered = [...current]
             const sourceIndex = current.indexOf(displayPlan[source.index].item as typeof current[number])
@@ -714,6 +721,7 @@ export default function App() {
                                                 <EventDropdown key={`worker-events-${factionId}`} name={`${faction.workerName} events`}
                                                     icon={iconSources[factionId === "light" ? "lightWorker" : "darkSlave"]}
                                                     portalContainer={shell} options={[
+                                                        { name: WOOD_RETURN_NAME, icon: iconSources[WOOD_RETURN_ICON], select: () => setWoodReturnDialogOpen(true) },
                                                         ...(["move-gold-miner-to-wood", "move-wood-gatherer-to-gold"] as const).map(type => {
                                                             const { source, destination, icon } = manualWorkerMoveIdentities[type]
                                                             return { name: `Move from ${source} to ${destination}`, icon: plannerIconSource(icon, factionId), select: () => setManualWorkerMoveDialogOpen(type) }
@@ -887,28 +895,30 @@ export default function App() {
                             <Droppable droppableId="build-order">
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
                                 {displayPlan.map((action, index) => {
-                                    const { item, commandTime, finishTime, blocked, blockedReason, manualMove } = action
+                                    const { item, commandTime, finishTime, blocked, blockedReason, manualMove, woodReturn } = action
+                                    const draggable = !isTimedEvent(item) || item.kind === "wood-return"
+                                    const keyboardEditable = isConstruction(item) || item.kind === "wood-return"
                                     let timing = blockedReason
-                                    if (manualMove && commandTime !== null) timing = `Command ${formatDuration(commandTime)}`
+                                    if ((manualMove || woodReturn) && commandTime !== null) timing = `Command ${formatDuration(commandTime)}`
                                     else if (!blocked && commandTime !== null) {
                                         timing = finishTime !== null && finishTime > commandTime
                                             ? `${formatTimeWithTenths(commandTime)} - ${formatTimeWithTenths(finishTime)}`
                                             : `Command ${formatTime(commandTime)}`
                                     }
-                                    return <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={isTimedEvent(item)} disableInteractiveElementBlocking>
+                                    return <Draggable key={(item as typeof buildOrder[number]).orderId} draggableId={(item as typeof buildOrder[number]).orderId} index={index} isDragDisabled={!draggable} disableInteractiveElementBlocking>
                                     {(drag, snapshot) => <li ref={drag.innerRef} {...drag.draggableProps} className={[blocked && "order-blocked", snapshot.isDragging && "order-dragging", isTimedEvent(item) && "order-timed-event", hasCustomConstruction(item) && "order-custom-construction"].filter(Boolean).join(" ") || undefined} title={actionTimingTitle(action, economy.constructionStartDelay)}
-                                        tabIndex={isConstruction(item) ? 0 : -1}
+                                        tabIndex={keyboardEditable ? 0 : -1}
                                         onContextMenu={event => {
                                             event.preventDefault()
                                             setActionMenu({ source: "build-order", item, anchor: event.currentTarget })
                                         }}
-                                        onKeyDown={event => { if (isConstruction(item) && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setEditingEventId((item as typeof buildOrder[number]).orderId) } }}
+                                        onKeyDown={event => { if (keyboardEditable && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setEditingEventId((item as typeof buildOrder[number]).orderId) } }}
                                         onClick={isTimedEvent(item) || isConstruction(item) ? () => {
                                             closeActionMenu()
                                             setDependencyError(null)
                                             setEditingEventId((item as typeof buildOrder[number]).orderId)
                                         } : undefined}>
-                                        {isTimedEvent(item) ? <button className="scroll-order-marker" aria-label={`Change ${item.name} timestamp, action ${index + 1}`} title="Click to change timestamp">◷</button>
+                                        {!draggable ? <button className="scroll-order-marker" aria-label={`Change ${item.name} timestamp, action ${index + 1}`} title="Click to change timestamp">◷</button>
                                             : <button className="order-drag-handle" {...drag.dragHandleProps} onClick={event => event.stopPropagation()} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>}
                                         <span className="order-number">{index + 1}</span>
                                         <img src={plannerIconSource(item.icon, factionId)} alt="" />
@@ -923,6 +933,7 @@ export default function App() {
                                             {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
                                             <small>{timing}</small>
+                                            {woodReturn && <small>{woodReturn.reason ?? `Deposited ${woodReturn.delivered} wood at ${formatDuration(finishTime!)}`}</small>}
                                             {manualMove?.reason && manualMove.endTime !== null &&
                                                 <small>Ended {formatDuration(manualMove.endTime)} · {manualMove.reason}</small>}
                                         </div>
@@ -1041,6 +1052,19 @@ export default function App() {
                             : [...current, action], () => {
                             setWorkerEventDialogOpen(null); setEditingEventId(null); setHoverTime(null)
                         })
+                    }} />}
+                {(woodReturnDialogOpen || editingEvent?.kind === "wood-return") && <WoodReturnDialog
+                    key={editingEvent?.orderId ?? "new-wood-return"} defaultTime={defaultEventTime}
+                    action={editingEvent?.kind === "wood-return" ? editingEvent : undefined}
+                    validationError={editingEvent ? null : additionError}
+                    onClose={() => { setWoodReturnDialogOpen(false); setEditingEventId(null) }}
+                    onSave={command => {
+                        const action = createWoodReturn(command)
+                        setBuildOrder(current => editingEvent?.kind === "wood-return"
+                            ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
+                            : [...current, ...withOrderIds([action])], () => {
+                                setWoodReturnDialogOpen(false); setEditingEventId(null); setHoverTime(null)
+                            })
                     }} />}
                 {(manualWorkerMoveDialogOpen || editingEvent?.kind === "manual-worker-move") && <ManualWorkerMoveDialog
                     key={editingEvent?.orderId ?? manualWorkerMoveDialogOpen!} defaultTime={defaultEventTime}

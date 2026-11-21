@@ -255,6 +255,7 @@ including blocked commands.
 | Limit gold miners (both factions) | Sets the gold assignment limit at a chosen time, before recruits finishing at the same time are assigned. |
 | Move gold miner to wood (both factions) | Redirects a chosen number of currently assigned gold miners to wood without changing the limit. |
 | Move wood gatherer to gold (both factions) | Redirects a chosen number of currently assigned wood gatherers to available gold slots. |
+| Bring wood back to base (both factions) | Sends one actively chopping worker back with a partial load. |
 
 For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively.
 Levels are independent profile settings, editable for Light in Resources collection, and default to
@@ -323,6 +324,18 @@ activity and casualty events at the same timestamp run in Build order sequence b
 The latest order state reports idle workers separately from workers building or travelling.
 
 ## Editing a plan
+
+In **Worker events** or **Slave events**, select **Bring wood back to base** and set the command
+time. **Return immediately** picks the worker who is chopping and holds the most wood. Equal loads
+are resolved by the lowest worker ID. The worker needs at least one whole wood and returns with
+the whole portion of their load. Ordinary wood travel, Sawmill routing, and Whip still apply.
+Wood becomes available on deposit, and the worker then resumes gathering. Lumber Gathering adds
+its bonus only to full loads.
+
+Build order shows the deposit time and amount, or the reason the order failed. Construction,
+Make idle, or worker death can interrupt the return. Due deposits happen before worker commands
+at the same time. Drag a wood return to reorder it among worker commands at the same timestamp.
+Edit the timestamp to move it to a different time.
 
 Select a construction or timed-event row in Build order to edit it. Right-click a row to open
 its action menu. **Delete from here** asks for confirmation before removing the selected row and

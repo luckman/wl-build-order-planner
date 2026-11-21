@@ -595,3 +595,8 @@ finish after the horizon are also blocked. Profile durations must be within 0–
 profiles that could exceed the runtime budget of 200,000 simulation steps. Graphs use at most 361
 regular samples, with bounded action timestamps added for food/mana discontinuities. These checks
 apply to editing, import/export, links and draft restore/save.
+### Bring wood back to base
+
+An immediate return is stored as `{ "type": "bring-wood-back-to-base", "commandTime": 8, "mode": "immediate" }`.
+Drafts, JSON files, and share links store the command. The planner recalculates the selected
+worker, deposit, and any interruption from the current build order and profile.

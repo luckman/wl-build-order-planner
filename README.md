@@ -10,7 +10,7 @@ timeline.
 
 - Buildings, units, heroes, upgrades, and faction scrolls, with automatic prerequisite insertion.
 - Gold, wood, food, and mana simulation, including gathering, construction, and production queues.
-- Timed events for resources, mana, unit losses, and worker events.
+- Timed events for resources, mana, unit losses, and worker commands such as bringing a partial wood load back to base.
 - Editable account and map settings
 - Reorderable build orders, starter templates, and warnings for blocked actions.
 - Shareable links, JSON import/export, and separate browser-saved drafts for each faction.
