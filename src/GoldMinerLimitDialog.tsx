@@ -21,6 +21,7 @@ export default function GoldMinerLimitDialog({ defaultTime, action, items, profi
     onClose: () => void
 }) {
     const [limit, setLimit] = useState<string | null>(action ? String(action.goldLimit) : null)
+    const [reassign, setReassign] = useState(action?.reassign ?? true)
     const otherLimits = items.filter((item): item is GoldMinerLimitAction => item.kind === "limit-gold-miners" && item !== action)
     const previousLimit = (time: number) => goldMinerLimitBefore(otherLimits, profileLimit, time)
     const limitInputAt = (time: number) => {
@@ -32,7 +33,7 @@ export default function GoldMinerLimitDialog({ defaultTime, action, items, profi
         return goldLimit < previous || goldAssignmentsBefore(time) > goldLimit
     }
     const command = (time: number): GoldMinerLimitCommand => ({
-        type: "limit-gold-miners", commandTime: time, limit: Number(limitInputAt(time)), reassign: action?.reassign ?? true,
+        type: "limit-gold-miners", commandTime: time, limit: Number(limitInputAt(time)), reassign,
     })
     return <EventTimeDialog name={GOLD_MINER_LIMIT_NAME} title={action ? `Edit ${GOLD_MINER_LIMIT_NAME}` : GOLD_MINER_LIMIT_NAME}
         commandTime={action?.commandTime ?? defaultTime} submitLabel={action ? "Save event" : "Add event"}
@@ -51,13 +52,17 @@ export default function GoldMinerLimitDialog({ defaultTime, action, items, profi
             const value = limitInputAt(time ?? defaultTime)
             const goldLimit = Number(value)
             const validLimit = value.trim().length > 0 && Number.isInteger(goldLimit) && goldLimit >= 0 && goldLimit <= MAX_EXPLICIT_GOLD_MINERS
+            const canShowReassignment = validLimit && time !== null
+            const required = canShowReassignment && requiresReassignment(time, goldLimit)
+            const increasing = canShowReassignment && goldLimit > previousLimit(time)
             return <>
                 <label>Gold miner limit
                     <input type="number" min="0" max={MAX_EXPLICIT_GOLD_MINERS} step="1"
                         value={value} onChange={event => setLimit(event.target.value)} />
                 </label>
-                {validLimit && time !== null && requiresReassignment(time, goldLimit) && <label className="scroll-automatic">
-                    <input type="checkbox" checked disabled /> Reassign existing workers
+                {(required || increasing) && <label className="scroll-automatic">
+                    <input type="checkbox" checked={required || reassign} disabled={required}
+                        onChange={event => setReassign(event.target.checked)} /> Reassign existing workers
                 </label>}
                 {validLimit && canBeFirstAtOpening && time === 0 && goldLimit < openingGoldWorkers &&
                     <p className="opening-gold-limit-warning" role="status">{OPENING_GOLD_LIMIT_WARNING}</p>}

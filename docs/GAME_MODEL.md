@@ -137,6 +137,14 @@ to wood. Each deposit checks whether miners still need to switch. The first fore
 current wood travel time until a Sawmill completes, then uses **Maximum wood travel time**.
 Later trips follow the usual wood travel rules.
 
+When raising the limit, **Reassign existing workers** is checked by default. Uncheck it to leave
+the new slots for recruits. With it checked, empty outbound wood gatherers can switch immediately.
+The worker farthest from the forest goes first, and the redirected trip takes the greater of their
+remaining forest travel and configured gold travel. Chopping workers and workers carrying wood
+first deliver a full load, including any bonus, then use the normal gold travel time if a slot is
+still open. Recruits finishing at the same time have first pick. The permission to reassign wood
+gatherers ends once gold fills or a later limit event replaces it.
+
 Decreases require reassignment, as does applying the same threshold when too many workers are
 assigned to gold. If the first action at 00:00 sets a limit below the opening allocation, the planner
 suggests reducing the starting gold miners. The initial worker split stays as entered.

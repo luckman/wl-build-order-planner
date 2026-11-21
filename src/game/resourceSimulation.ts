@@ -123,6 +123,7 @@ export class WorkerEconomy {
     time = 0
     private steps = 0
     private explicitGoldLimit: number | undefined
+    private allowWoodReassignment = false
     private readonly profileGoldLimit: number
     private mineWorker: number | null = null
     private delayedInitialWoodWorkerIds: number[] = []
@@ -189,11 +190,14 @@ export class WorkerEconomy {
                     : this.travel(assignment)
             this.transition(worker, "outbound", outboundTravel)
         }
+        if (assignment === "gold") this.expireWoodReassignmentAtLimit()
         return worker
     }
 
     applyGoldMinerLimit(action: GoldMinerLimitAction) {
+        const previousLimit = this.goldMinerLimit
         this.explicitGoldLimit = action.goldLimit
+        this.allowWoodReassignment = action.reassign && action.goldLimit > previousLimit && this.goldAssignments < action.goldLimit
     }
 
     get goldMinerLimit() {
@@ -408,6 +412,7 @@ export class WorkerEconomy {
     }
 
     private reassignAfterDeposits(deposits: HeldDeposit[]) {
+        const woodDepositors = this.allowWoodReassignment ? new Set<number>() : undefined
         // Deposits have already credited their loads. Check the assignment again
         // because a command at the same time could have idled or killed the worker.
         for (const { worker, nextAt } of deposits.sort((a, b) => a.worker.id - b.worker.id)) {
@@ -416,9 +421,29 @@ export class WorkerEconomy {
                 worker.assignment = "wood"
                 this.transition(worker, "outbound", this.woodTravelAfterGold())
             } else {
+                if (worker.assignment === "wood") woodDepositors?.add(worker.id)
                 worker.nextAt = nextAt
             }
         }
+        if (woodDepositors) this.reassignWoodGatherers(woodDepositors)
+    }
+
+    private expireWoodReassignmentAtLimit() {
+        if (this.allowWoodReassignment && this.goldAssignments >= this.goldMinerLimit) this.allowWoodReassignment = false
+    }
+
+    private reassignWoodGatherers(woodDepositors: ReadonlySet<number>) {
+        const openSlots = Math.max(0, this.goldMinerLimit - this.goldAssignments)
+        const eligible = this.workers.flatMap(worker => {
+            if (worker.assignment !== "wood" || worker.state !== "outbound" || worker.cargoWood !== 0) return []
+            const remainingTravel = woodDepositors.has(worker.id) ? 0 : (worker.nextAt - this.time) * this.rate(worker)
+            return [{ worker, remainingTravel }]
+        }).sort((left, right) => right.remainingTravel - left.remainingTravel || left.worker.id - right.worker.id)
+        for (const { worker, remainingTravel } of eligible.slice(0, openSlots)) {
+            worker.assignment = "gold"
+            this.transition(worker, "outbound", Math.max(remainingTravel, this.settings.goldTravelTime))
+        }
+        this.expireWoodReassignmentAtLimit()
     }
 
     private woodTravelAfterGold() {
@@ -492,7 +517,7 @@ export class WorkerEconomy {
                 worker.cargoWood = 0
                 if (worker.assignment !== "idle") {
                     this.transition(worker, "outbound", this.travel(worker.assignment))
-                    if (deposits && worker.assignment === "gold") {
+                    if (deposits) {
                         deposits.push({ worker, nextAt: worker.nextAt })
                         worker.nextAt = Infinity
                     }
@@ -583,6 +608,7 @@ export class WorkerEconomy {
                 this.transition(worker, "reactivation", item.travelDuration)
             }
         }
+        this.expireWoodReassignmentAtLimit()
         this.advanceTo(this.time)
         return true
     }
