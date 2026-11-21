@@ -1,7 +1,7 @@
 import { matchesPreparation, matchesPreparationReuse, schedulePreparation, type PreparationReuse, type PreparationSchedule } from "./preparationScheduling"
 import { isConstruction, parseConstructionSettings } from "./constructionSettings"
 import { parseWorkerEvent, workerEventCommand } from "./workerEvents"
-import { alignTimeWithGoldMinerLimit, createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, goldMinerLimitTimeKey } from "./goldMinerLimit"
+import { alignTimeWithGoldMinerLimit, createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, goldMinerLimitTimeKey, timestampRoundoff } from "./goldMinerLimit"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, foodUsedAt } from "./unitsKilled"
@@ -409,22 +409,22 @@ function simulateBuildOrderPass(
         createResourcesCollectedAction(resourcesCollectedCommand(item))
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
-    const pendingWorkerAndLossEvents = buildOrder.flatMap((item, index) => {
-        if (item.kind !== "unit-is-killed" && item.kind !== "worker-event") return []
-        if (item.kind === "worker-event") parseWorkerEvent(workerEventCommand(item))
-        else createUnitKilledAction(unitKilledCommand(item), faction)
-        return [{ item, index }]
-    }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
     const pendingGoldLimits = buildOrder.flatMap((item, index) => {
         if (item.kind !== "limit-gold-miners") return []
         createGoldMinerLimit(goldMinerLimitCommand(item))
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime)
     const goldLimitTimes = new Map(pendingGoldLimits.map(({ item }) => [goldMinerLimitTimeKey(item.commandTime), item.commandTime]))
+    const pendingWorkerAndLossEvents = buildOrder.flatMap((item, index) => {
+        if (item.kind !== "unit-is-killed" && item.kind !== "worker-event") return []
+        if (item.kind === "worker-event") parseWorkerEvent(workerEventCommand(item))
+        else createUnitKilledAction(unitKilledCommand(item), faction)
+        return [{ item, index, time: alignTimeWithGoldMinerLimit(item.commandTime, goldLimitTimes) }]
+    }).sort((a, b) => a.time - b.time || a.index - b.index)
     const resolvedEvents = [...timedEventsByIndex.values()]
     const unitKilledPlan = resolvedEvents.filter(action => action.item.kind === "unit-is-killed")
     const lastFixedCommand = Math.max(0,
-        pendingWorkerAndLossEvents[pendingWorkerAndLossEvents.length - 1]?.item.commandTime ?? 0,
+        pendingWorkerAndLossEvents[pendingWorkerAndLossEvents.length - 1]?.time ?? 0,
         pendingResourcesCollected[pendingResourcesCollected.length - 1]?.item.commandTime ?? 0,
         pendingScrolls[pendingScrolls.length - 1]?.item.commandTime ?? 0,
         pendingGoldLimits[pendingGoldLimits.length - 1]?.item.commandTime ?? 0,
@@ -460,51 +460,67 @@ function simulateBuildOrderPass(
     }
     let buildOrderPrefixLength = nextIndex
     const nextRecruitTime = () => alignTimeWithGoldMinerLimit(workerCompletions[0] ?? Infinity, goldLimitTimes)
-    const nextQueuedEventTime = () => Math.min(pendingDepartures[0]?.time ?? Infinity, nextRecruitTime(),
-        pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity,
-        pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity, pendingGoldLimits[0]?.item.commandTime ?? Infinity)
+    const nextWorkerCommandTime = () => Math.min(nextRecruitTime(),
+        pendingWorkerAndLossEvents[0]?.time ?? Infinity, pendingGoldLimits[0]?.item.commandTime ?? Infinity)
+    const nextQueuedEventTime = () => Math.min(pendingDepartures[0]?.time ?? Infinity, nextWorkerCommandTime(),
+        pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity)
+    const nextWorkerTransitionTime = () => {
+        const transition = alignTimeWithGoldMinerLimit(simulation.nextEventTime, goldLimitTimes)
+        if (!simulation.hasExplicitGoldMinerLimit) return transition
+        const command = nextWorkerCommandTime()
+        return Number.isFinite(command) && Math.abs(command - transition) <= timestampRoundoff(command) ? command : transition
+    }
+    const applyWorkerCommandsAt = (eventTime: number) => {
+        if (pendingGoldLimits[0]?.item.commandTime === eventTime) {
+            const { item, index } = pendingGoldLimits.shift()!
+            simulation.applyGoldMinerLimit(item)
+            timedEventsByIndex.set(index, { item, cost: { gold: 0, wood: 0 }, blocked: false,
+                commandTime: eventTime, startTime: eventTime, finishTime: eventTime, workerReturnTime: null, workerId: null })
+        }
+        while (nextRecruitTime() === eventTime) {
+            workerCompletions.shift()
+            simulation.addRecruit()
+        }
+        while (pendingWorkerAndLossEvents[0]?.time === eventTime) {
+            const { item, index } = pendingWorkerAndLossEvents.shift()!
+            if (item.kind === "worker-event") {
+                const blocked = !simulation.applyWorkerEvent(item)
+                timedEventsByIndex.set(index, { item, blocked, cost: { gold: 0, wood: 0 }, commandTime: eventTime,
+                    startTime: blocked ? null : eventTime, finishTime: blocked ? null : eventTime, workerReturnTime: null, workerId: null,
+                    ...(blocked ? { blockedReason: `${item.name}: not enough eligible workers for count ${item.count}.` } : {}) })
+                continue
+            }
+            const target = catalog.find(unit => unit.id === item.unitId)!
+            const isWorker = target.id === workerItem.id
+            const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.killed &&
+                (isWorker ? alignTimeWithGoldMinerLimit(unit.readyAt, goldLimitTimes) : unit.readyAt) <= eventTime)
+            const worker = isWorker ? simulation.selectWorkerToKill(item.workerGroup) : undefined
+            const blocked = !instance || (isWorker && !worker)
+            if (!blocked) {
+                instance!.killed = true
+                if (worker) simulation.killWorker(worker.id)
+            }
+            const action: ScheduledAction = { item, cost: { gold: 0, wood: 0 }, blocked,
+                commandTime: eventTime, startTime: blocked ? null : eventTime, finishTime: blocked ? null : eventTime,
+                workerReturnTime: null, workerId: blocked ? null : worker?.id ?? null,
+                foodReleased: blocked ? 0 : target.food,
+                ...(blocked ? { blockedReason: isWorker && instance
+                    ? `Unit is killed: no available ${item.workerGroup === "idle" ? "idle" : "gathering"} ${target.name}; workers assigned to construction cannot be killed.`
+                    : `Unit is killed requires a living ${target.name} at this timestamp (recruitment must be complete).` } : {}) }
+            unitKilledPlan.push(action)
+            timedEventsByIndex.set(index, action)
+        }
+    }
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
         for (let eventTime = nextQueuedEventTime(); eventTime <= time; eventTime = nextQueuedEventTime()) {
-            simulation.advanceTo(eventTime)
-            if (pendingGoldLimits[0]?.item.commandTime === eventTime) {
-                const { item, index } = pendingGoldLimits.shift()!
-                simulation.applyGoldMinerLimit(item)
-                timedEventsByIndex.set(index, { item, cost: { gold: 0, wood: 0 }, blocked: false,
-                    commandTime: eventTime, startTime: eventTime, finishTime: eventTime, workerReturnTime: null, workerId: null })
-            }
-            while (nextRecruitTime() === eventTime) {
-                workerCompletions.shift()
-                simulation.addRecruit()
-            }
-            while (pendingWorkerAndLossEvents[0]?.item.commandTime === eventTime) {
-                const { item, index } = pendingWorkerAndLossEvents.shift()!
-                if (item.kind === "worker-event") {
-                    const blocked = !simulation.applyWorkerEvent(item)
-                    timedEventsByIndex.set(index, { item, blocked, cost: { gold: 0, wood: 0 }, commandTime: eventTime,
-                        startTime: blocked ? null : eventTime, finishTime: blocked ? null : eventTime, workerReturnTime: null, workerId: null,
-                        ...(blocked ? { blockedReason: `${item.name}: not enough eligible workers for count ${item.count}.` } : {}) })
-                    continue
-                }
-                const target = catalog.find(unit => unit.id === item.unitId)!
-                const isWorker = target.id === workerItem.id
-                const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.killed &&
-                    (isWorker ? alignTimeWithGoldMinerLimit(unit.readyAt, goldLimitTimes) : unit.readyAt) <= eventTime)
-                const worker = isWorker ? simulation.selectWorkerToKill(item.workerGroup) : undefined
-                const blocked = !instance || (isWorker && !worker)
-                if (!blocked) {
-                    instance!.killed = true
-                    if (worker) simulation.killWorker(worker.id)
-                }
-                const action: ScheduledAction = { item, cost: { gold: 0, wood: 0 }, blocked,
-                    commandTime: eventTime, startTime: blocked ? null : eventTime, finishTime: blocked ? null : eventTime,
-                    workerReturnTime: null, workerId: blocked ? null : worker?.id ?? null,
-                    foodReleased: blocked ? 0 : target.food,
-                    ...(blocked ? { blockedReason: isWorker && instance
-                        ? `Unit is killed: no available ${item.workerGroup === "idle" ? "idle" : "gathering"} ${target.name}; workers assigned to construction cannot be killed.`
-                        : `Unit is killed requires a living ${target.name} at this timestamp (recruitment must be complete).` } : {}) }
-                unitKilledPlan.push(action)
-                timedEventsByIndex.set(index, action)
+            const limitAtTime = pendingGoldLimits[0]?.item.commandTime === eventTime
+            const workerCommandAtTime = nextRecruitTime() === eventTime || pendingWorkerAndLossEvents[0]?.time === eventTime
+            if (limitAtTime || (simulation.hasExplicitGoldMinerLimit && workerCommandAtTime)) {
+                simulation.advanceTo(eventTime, () => applyWorkerCommandsAt(eventTime))
+            } else {
+                simulation.advanceTo(eventTime)
+                applyWorkerCommandsAt(eventTime)
             }
             while (pendingResourcesCollected[0]?.item.commandTime === eventTime) {
                 const { item, index } = pendingResourcesCollected.shift()!
@@ -800,13 +816,13 @@ function simulateBuildOrderPass(
             }
             const nextTime = Math.min(
                 ...[
-                    simulation.nextEventTime,
+                    nextWorkerTransitionTime(),
                     pendingDepartures[0]?.time ?? Infinity,
                     preparationCommand,
                     commandReadyAt,
                     pendingScrolls[0]?.item.commandTime ?? Infinity,
                     pendingResourcesCollected[0]?.item.commandTime ?? Infinity,
-                    pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity,
+                    pendingWorkerAndLossEvents[0]?.time ?? Infinity,
                     pendingGoldLimits[0]?.item.commandTime ?? Infinity,
                     ...(goldLimitTimes.size ? workerCompletions.map(time => alignTimeWithGoldMinerLimit(time, goldLimitTimes)) : workerCompletions),
                     ...buildings.map(({ availableAt }) => availableAt),

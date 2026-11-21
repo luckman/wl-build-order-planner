@@ -16,6 +16,7 @@
 .scroll-dialog input:disabled { opacity: .6; }
 .scroll-dialog .scroll-time-hint { margin: -6px 0 0; }
 .scroll-dialog [role="alert"] { margin: 0; color: #f6bcc5; }
+.scroll-dialog .opening-gold-limit-warning, .opening-action .opening-gold-limit-warning { color: #f3d497; font-size: .8rem; margin: 0; }
 .scroll-dialog-buttons { display: flex; justify-content: flex-end; gap: 10px; }
 .scroll-dialog-buttons button { padding: 8px 14px; color: #e4eef8; background: #1c3954; border: 1px solid #49667e; }
 .scroll-dialog-buttons button[type="submit"] { border-color: #e1b55f; }

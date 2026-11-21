@@ -1,6 +1,6 @@
 import type { PlannerItem, WorkerCasualtyGroup } from "./gameData"
 import type { WorkerEventAction } from "./workerEvents"
-import { alignTimeWithGoldMinerLimit, goldMinerLimitTimeKey, profileGoldMinerLimit, type GoldMinerLimitAction } from "./goldMinerLimit"
+import { alignTimeWithGoldMinerLimit, goldMinerLimitTimeKey, profileGoldMinerLimit, timestampRoundoff, type GoldMinerLimitAction } from "./goldMinerLimit"
 import { growingWoodTravelTime } from "./gatheringRules"
 import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
 import type { PlayerBuildingLevels } from "./playerLevels"
@@ -102,6 +102,8 @@ export type WorkerAllocation = {
     buildingOrTravelling: number
 }
 
+type HeldDeposit = { worker: GatheringWorker; nextAt: number }
+
 type WorkerStateAction = {
     item: PlannerItem
     commandTime: number | null
@@ -124,6 +126,7 @@ export class WorkerEconomy {
     private readonly profileGoldLimit: number
     private mineWorker: number | null = null
     private delayedInitialWoodWorkerIds: number[] = []
+    private applyingWorkerCommands = false
     private sawmillCompletions: number[] = []
     private lumberGatheringWindows: Array<{ startTime: number; finishTime: number; bonus: number }> = []
     private goldRushWindows: Array<{ startTime: number; finishTime: number; bonus: number }> = []
@@ -195,6 +198,10 @@ export class WorkerEconomy {
 
     get goldMinerLimit() {
         return this.explicitGoldLimit ?? this.profileGoldLimit
+    }
+
+    get hasExplicitGoldMinerLimit() {
+        return this.explicitGoldLimit !== undefined
     }
 
     get goldAssignments() {
@@ -362,80 +369,137 @@ export class WorkerEconomy {
         )
     }
 
-    advanceTo(time: number) {
+    advanceTo(time: number, commandsAtTime?: () => void) {
         validatePlanTime(time, "Simulation time")
-        while (this.nextEventTime <= time) {
-            if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
-            this.time = this.nextEventTime
-            if (this.recordBoundaries) this.eventBoundaries.add(this.time)
-            // A construction finishing exactly at activation is already returning
-            // and can receive a fresh effect. The previous effect was cleared at start.
-            for (const worker of this.workers.filter(worker => worker.state === "construction" && worker.nextAt === this.time)) {
-                this.transition(worker, "construction-return", worker.constructionReturnDuration!)
-            }
-            // Apply boundaries before mine entry; existing gold visits retain their entry rate.
-            for (const worker of this.workers.filter(worker => worker.whipUntil === this.time)) {
-                this.changeWhip(worker, -Infinity, true)
-            }
-            const starts = this.whipStarts.filter(window => window.startTime === this.time)
-            this.whipStarts = this.whipStarts.filter(window => window.startTime !== this.time)
-            for (const window of starts) {
-                for (const worker of this.workers.filter(worker =>
-                    worker.state !== "idle" && worker.state !== "construction" && worker.state !== "killed")) {
-                    this.changeWhip(worker, window.finishTime, worker.whipUntil > this.time)
+        const roundoff = commandsAtTime ? timestampRoundoff(time) : 0
+        for (let next = this.nextEventTime; next <= time + roundoff; next = this.nextEventTime) {
+            if (commandsAtTime && Math.abs(next - time) <= roundoff) {
+                for (const worker of this.workers) {
+                    if (Math.abs(worker.nextAt - time) <= roundoff) worker.nextAt = time
                 }
+                next = this.nextEventTime
             }
-            if (this.delayedInitialWoodWorkerIds.length && this.time === this.settings.orderDelay) {
-                for (const workerId of this.delayedInitialWoodWorkerIds) {
-                    const worker = this.workers[workerId]
-                    worker.assignment = "wood"
-                    this.transition(worker, "outbound", this.travel("wood"))
-                }
-                this.delayedInitialWoodWorkerIds = []
+            if (next > time) break
+            this.time = next
+            const atCommand = next === time && commandsAtTime !== undefined
+            const deposits: HeldDeposit[] | undefined = !this.applyingWorkerCommands &&
+                (atCommand || this.hasExplicitGoldMinerLimit) ? [] : undefined
+            do {
+                this.advanceWorkerEvents(deposits)
+            } while (deposits && this.nextEventTime === next)
+
+            if (atCommand) {
+                const runCommands = commandsAtTime!
+                commandsAtTime = undefined
+                this.runWorkerCommands(runCommands)
             }
-            // Process simultaneous arrivals/departures before assigning the mine slot.
-            for (const worker of this.workers.filter((candidate) => candidate.nextAt === this.time)) {
-                if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
-                if (worker.state === "construction-outbound") {
-                    worker.whipUntil = -Infinity
-                    this.transition(worker, "construction", worker.constructionDuration!)
-                } else if (worker.state === "reactivation" || worker.state === "outbound" || worker.state === "construction-return") {
-                    this.arrive(worker)
-                } else if (worker.state === "gathering") {
-                    if (worker.assignment === "gold") {
-                        this.mineWorker = null
-                        // Lock cargo at mine exit: start is inclusive, expiry is exclusive.
-                        worker.cargoGold = this.settings.goldPerTrip + Math.max(0,
-                            ...this.goldRushWindows.filter(window => window.startTime <= this.time && this.time < window.finishTime)
-                                .map(window => window.bonus))
-                    } else if (worker.assignment === "wood") {
-                        // Cargo is fixed at gathering completion, even when returned after expiry.
-                        worker.cargoWood = this.settings.woodPerTrip + Math.max(0,
-                            ...this.lumberGatheringWindows.filter(window => window.startTime <= this.time && this.time < window.finishTime)
-                                .map(window => window.bonus))
-                    }
-                    this.transition(
-                        worker,
-                        "deposit",
-                        this.travel(worker.assignment === "gold" ? "gold" : "wood"),
-                    )
-                } else if (worker.state === "deposit") {
-                    this.deliveries.push({
-                        time: this.time,
-                        worker: worker.id,
-                        gold: worker.assignment === "gold" ? worker.cargoGold : 0,
-                        wood: worker.assignment === "wood" ? worker.cargoWood : 0,
-                    })
-                    worker.cargoGold = 0
-                    worker.cargoWood = 0
-                    if (worker.assignment !== "idle") {
-                        this.transition(worker, "outbound", this.travel(worker.assignment))
-                    }
-                }
-            }
-            this.startMine()
+            if (deposits) this.reassignAfterDeposits(deposits)
         }
         this.time = time
+        if (commandsAtTime) {
+            this.runWorkerCommands(commandsAtTime)
+            this.reassignAfterDeposits([])
+        }
+    }
+
+    private runWorkerCommands(commands: () => void) {
+        this.applyingWorkerCommands = true
+        try { commands() } finally { this.applyingWorkerCommands = false }
+    }
+
+    private reassignAfterDeposits(deposits: HeldDeposit[]) {
+        // Deposits have already credited their loads. Check the assignment again
+        // because a command at the same time could have idled or killed the worker.
+        for (const { worker, nextAt } of deposits.sort((a, b) => a.worker.id - b.worker.id)) {
+            if (worker.state !== "outbound" || worker.nextAt !== Infinity) continue
+            if (worker.assignment === "gold" && this.explicitGoldLimit !== undefined && this.goldAssignments > this.explicitGoldLimit) {
+                worker.assignment = "wood"
+                this.transition(worker, "outbound", this.woodTravelAfterGold())
+            } else {
+                worker.nextAt = nextAt
+            }
+        }
+    }
+
+    private woodTravelAfterGold() {
+        return this.sawmillCompletions.some(finish => finish <= this.time)
+            ? this.settings.maxWoodTravelTime
+            : this.travel("wood")
+    }
+
+    private advanceWorkerEvents(deposits: HeldDeposit[] | undefined) {
+        if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
+        if (this.recordBoundaries) this.eventBoundaries.add(this.time)
+        // A construction finishing exactly at activation is already returning
+        // and can receive a fresh effect. The previous effect was cleared at start.
+        for (const worker of this.workers.filter(worker => worker.state === "construction" && worker.nextAt === this.time)) {
+            this.transition(worker, "construction-return", worker.constructionReturnDuration!)
+        }
+        // Apply boundaries before mine entry; existing gold visits retain their entry rate.
+        for (const worker of this.workers.filter(worker => worker.whipUntil === this.time)) {
+            this.changeWhip(worker, -Infinity, true)
+        }
+        const starts = this.whipStarts.filter(window => window.startTime === this.time)
+        this.whipStarts = this.whipStarts.filter(window => window.startTime !== this.time)
+        for (const window of starts) {
+            for (const worker of this.workers.filter(worker =>
+                worker.state !== "idle" && worker.state !== "construction" && worker.state !== "killed")) {
+                this.changeWhip(worker, window.finishTime, worker.whipUntil > this.time)
+            }
+        }
+        if (this.delayedInitialWoodWorkerIds.length && this.time === this.settings.orderDelay) {
+            for (const workerId of this.delayedInitialWoodWorkerIds) {
+                const worker = this.workers[workerId]
+                worker.assignment = "wood"
+                this.transition(worker, "outbound", this.travel("wood"))
+            }
+            this.delayedInitialWoodWorkerIds = []
+        }
+        // Process simultaneous arrivals/departures before assigning the mine slot.
+        for (const worker of this.workers.filter((candidate) => candidate.nextAt === this.time)) {
+            if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
+            if (worker.state === "construction-outbound") {
+                worker.whipUntil = -Infinity
+                this.transition(worker, "construction", worker.constructionDuration!)
+            } else if (worker.state === "reactivation" || worker.state === "outbound" || worker.state === "construction-return") {
+                this.arrive(worker)
+            } else if (worker.state === "gathering") {
+                if (worker.assignment === "gold") {
+                    this.mineWorker = null
+                    // Lock cargo at mine exit: start is inclusive, expiry is exclusive.
+                    worker.cargoGold = this.settings.goldPerTrip + Math.max(0,
+                        ...this.goldRushWindows.filter(window => window.startTime <= this.time && this.time < window.finishTime)
+                            .map(window => window.bonus))
+                } else if (worker.assignment === "wood") {
+                    // Cargo is fixed at gathering completion, even when returned after expiry.
+                    worker.cargoWood = this.settings.woodPerTrip + Math.max(0,
+                        ...this.lumberGatheringWindows.filter(window => window.startTime <= this.time && this.time < window.finishTime)
+                            .map(window => window.bonus))
+                }
+                this.transition(
+                    worker,
+                    "deposit",
+                    this.travel(worker.assignment === "gold" ? "gold" : "wood"),
+                )
+            } else if (worker.state === "deposit") {
+                this.deliveries.push({
+                    time: this.time,
+                    worker: worker.id,
+                    gold: worker.assignment === "gold" ? worker.cargoGold : 0,
+                    wood: worker.assignment === "wood" ? worker.cargoWood : 0,
+                })
+                worker.cargoGold = 0
+                worker.cargoWood = 0
+                if (worker.assignment !== "idle") {
+                    this.transition(worker, "outbound", this.travel(worker.assignment))
+                    if (deposits && worker.assignment === "gold") {
+                        deposits.push({ worker, nextAt: worker.nextAt })
+                        worker.nextAt = Infinity
+                    }
+                }
+            }
+        }
+        this.startMine()
     }
 
     /** Remaining work already accounts for Whip activation and expiry. */
@@ -589,11 +653,12 @@ export function resourceAt(
 }
 
 /** Returns the worker allocation at a command timestamp, including builders in transit. */
-export function workerAllocationAt(
+function replayWorkerEconomy(
     settings: EconomySettings,
     actions: WorkerStateAction[],
     time: number,
-): WorkerAllocation {
+    observeBeforeCommands?: (simulation: WorkerEconomy) => void,
+) {
     const simulation = new WorkerEconomy(settings)
     const goldLimitTimes = new Map<number, number>()
     for (const action of actions) {
@@ -621,8 +686,9 @@ export function workerAllocationAt(
                 travelTime?: number
                 returnTravelTime?: number
             }> = []
-            if (action.item.kind === "worker-event" && !action.blocked && action.commandTime !== null) {
-                events.push({ time: action.commandTime, type: "worker-event", action: action.item })
+            if (action.item.kind === "worker-event" && action.commandTime !== null) {
+                events.push({ time: alignTimeWithGoldMinerLimit(action.commandTime, goldLimitTimes), type: "worker-event",
+                    action: action.blocked ? undefined : action.item })
             }
             if (action.item.kind === "limit-gold-miners" && !action.blocked && action.commandTime !== null) {
                 events.push({ time: action.commandTime, type: "limit-gold-miners", goldMinerLimit: action.item })
@@ -631,8 +697,9 @@ export function workerAllocationAt(
                 !action.blocked && action.commandTime !== null) {
                 events.push({ time: action.commandTime, type: "player-whip-preparation" })
             }
-            if (action.item.kind === "unit-is-killed" && !action.blocked && action.commandTime !== null && action.workerId !== null) {
-                events.push({ time: action.commandTime, type: "kill", workerId: action.workerId })
+            if (action.item.kind === "unit-is-killed" && action.commandTime !== null) {
+                events.push({ time: alignTimeWithGoldMinerLimit(action.commandTime, goldLimitTimes), type: "kill",
+                    workerId: action.blocked ? undefined : action.workerId ?? undefined })
             }
             if ((action.item.id === "worker" || action.item.id === "slave") && action.finishTime !== null) {
                 events.push({ time: alignTimeWithGoldMinerLimit(action.finishTime, goldLimitTimes), type: "worker" })
@@ -657,11 +724,10 @@ export function workerAllocationAt(
             }
             return events
         })
-        .filter((event) => event.time <= allocationTime)
+        .filter(event => event.time < allocationTime || (!observeBeforeCommands && event.time === allocationTime))
         .sort((left, right) => left.time - right.time || eventPriority[left.type] - eventPriority[right.type])
 
-    for (const event of events) {
-        simulation.advanceTo(event.time)
+    const applyEvent = (event: (typeof events)[number]) => {
         if (event.type === "limit-gold-miners") {
             simulation.applyGoldMinerLimit(event.goldMinerLimit!)
         } else if (event.type === "worker") {
@@ -669,9 +735,9 @@ export function workerAllocationAt(
         } else if (event.type === "prepare") {
             simulation.prepareConstruction(simulation.workers[event.workerId!])
         } else if (event.type === "worker-event") {
-            simulation.applyWorkerEvent(event.action!)
+            if (event.action) simulation.applyWorkerEvent(event.action)
         } else if (event.type === "kill") {
-            simulation.killWorker(event.workerId!)
+            if (event.workerId !== undefined) simulation.killWorker(event.workerId)
         } else if (event.type === "player-whip-preparation") {
             simulation.prepareGoldWorkerForWhip()
         } else {
@@ -682,7 +748,38 @@ export function workerAllocationAt(
             }
         }
     }
-    simulation.advanceTo(allocationTime)
+    for (let index = 0; index < events.length; ) {
+        const { time } = events[index]
+        const applyWorkerCommands = () => {
+            while (events[index]?.time === time && eventPriority[events[index].type] <= eventPriority.kill) {
+                applyEvent(events[index++])
+            }
+        }
+        const { type } = events[index]
+        if (type === "limit-gold-miners" || (simulation.hasExplicitGoldMinerLimit && eventPriority[type] <= eventPriority.kill)) {
+            simulation.advanceTo(time, applyWorkerCommands)
+            while (events[index]?.time === time) {
+                simulation.advanceTo(time)
+                applyEvent(events[index++])
+            }
+        } else {
+            // Plans before the first limit retain the existing per-event progression.
+            simulation.advanceTo(time)
+            applyEvent(events[index++])
+        }
+    }
+    simulation.advanceTo(allocationTime, observeBeforeCommands && (() => observeBeforeCommands(simulation)))
+    return simulation
+}
+
+export function projectedGoldAssignmentsBefore(settings: EconomySettings, actions: WorkerStateAction[], time: number) {
+    let assignments = 0
+    replayWorkerEconomy(settings, actions, time, simulation => { assignments = simulation.goldAssignments })
+    return assignments
+}
+
+export function workerAllocationAt(settings: EconomySettings, actions: WorkerStateAction[], time: number): WorkerAllocation {
+    const simulation = replayWorkerEconomy(settings, actions, time)
     const buildingOrTravelling = simulation.workers.filter(
         worker => worker.state !== "killed" && (isBuildingWorker(worker) || worker.state === "reactivation" || (worker.state === "idle" && worker.assignment !== "idle")),
     ).length

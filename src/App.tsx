@@ -5,7 +5,7 @@ import { isConstruction, hasCustomConstruction, constructionDescription } from "
 import WorkerEventDialog from "./WorkerEventDialog"
 import { createWorkerEvent, workerEventIdentity, type WorkerEventCommand } from "./game/workerEvents"
 import GoldMinerLimitDialog from "./GoldMinerLimitDialog"
-import { createGoldMinerLimit, GOLD_MINER_LIMIT_NAME, profileGoldMinerLimit } from "./game/goldMinerLimit"
+import { createGoldMinerLimit, GOLD_MINER_LIMIT_NAME, OPENING_GOLD_LIMIT_WARNING, profileGoldMinerLimit } from "./game/goldMinerLimit"
 import ManaSpentDialog from "./ManaSpentDialog"
 import { createManaSpentAction, manaSpentCollision, type ManaSpentCommand } from "./game/manaSpent"
 import Notification, { type NotificationMessage } from "./Notification"
@@ -41,7 +41,7 @@ import {
     type ItemKind,
     type PlannerItem,
 } from "./game/gameData"
-import { manaAt, resourceAt, workerAllocationAt } from "./game/resourceSimulation"
+import { manaAt, projectedGoldAssignmentsBefore, resourceAt, workerAllocationAt } from "./game/resourceSimulation"
 import { economyFromProfile, type GameProfile } from "./game/gameProfile"
 import { loadFactionProfiles, loadSavedProfile, saveProfile } from "./game/profileStorage"
 import { discardFactionDraft, loadActiveFaction, saveActiveFaction, loadFactionDrafts, saveFactionDrafts } from "./game/draftStorage"
@@ -475,6 +475,18 @@ export default function App() {
     const minimumScrollTime = scrollTimes.length ? Math.max(...scrollTimes) + scrollCooldown(economy) + economy.orderDelay : 0
     const automaticScrollTime = earliestScrollTime(economy, plan, minimumScrollTime, scrollDialogOpen ?? "gold-rush")
     const displayPlan = buildOrder.some(isTimedEvent) ? scheduled.orderedPlan : plan
+    const firstAction = displayPlan[0]
+    const openingGoldLimitWarning = firstAction?.item.kind === "limit-gold-miners" &&
+        firstAction.commandTime === 0 && firstAction.item.goldLimit < economy.goldWorkers
+    const goldLimitBeingEdited = editingEvent?.kind === "limit-gold-miners" ? editingEvent : undefined
+    const goldLimitEditIndex = goldLimitBeingEdited ? buildOrder.indexOf(goldLimitBeingEdited) : buildOrder.length
+    const goldAssignmentsBeforeLimit = (time: number) => {
+        const basePlan = goldLimitBeingEdited && goldLimitBeingEdited.commandTime < time
+            ? simulateBuildOrder(buildOrder.filter(item => item !== goldLimitBeingEdited), economy,
+                initialFoodUsed, baseFoodLimit, foodPerFarm, faction.startingTownHall).plan
+            : plan
+        return projectedGoldAssignmentsBefore(economy, basePlan, time)
+    }
     const menuRowIndex = actionMenu?.source === "build-order" ? displayPlan.findIndex(({ item }) => item === actionMenu.item) : -1
     const deleteFromIndex = confirmation?.type === "delete-from" ? displayPlan.findIndex(({ item }) => item === confirmation.item) : -1
     const deleteFromHere = () => {
@@ -831,6 +843,7 @@ export default function App() {
                                     aria-valuetext={`${economy.goldWorkers} gold miners, ${economy.woodWorkers} wood gatherers`}
                                     defaultValue={economy.goldWorkers} />
                                 <p className="initial-allocation">Initial gold miners: {economy.goldWorkers} · Initial wood gatherers: {economy.woodWorkers}</p>
+                                {openingGoldLimitWarning && <p className="opening-gold-limit-warning">{OPENING_GOLD_LIMIT_WARNING}</p>}
                             </div>
                         </section>
                         {!buildOrder.length ? (
@@ -963,7 +976,9 @@ export default function App() {
                 {(goldMinerLimitDialogOpen || editingEvent?.kind === "limit-gold-miners") && <GoldMinerLimitDialog
                     key={editingEvent?.orderId ?? "new-gold-miner-limit"} defaultTime={defaultEventTime}
                     items={buildOrder} profileLimit={profileGoldMinerLimit(economy)}
-                    action={editingEvent?.kind === "limit-gold-miners" ? editingEvent : undefined}
+                    action={goldLimitBeingEdited} goldAssignmentsBefore={goldAssignmentsBeforeLimit}
+                    openingGoldWorkers={economy.goldWorkers}
+                    canBeFirstAtOpening={!plan.some(({ commandTime }, index) => index < goldLimitEditIndex && commandTime === 0)}
                     validationError={editingEvent ? null : additionError}
                     onClose={() => { setGoldMinerLimitDialogOpen(false); setEditingEventId(null) }}
                     onSave={command => {

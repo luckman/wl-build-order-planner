@@ -4,6 +4,7 @@ import { validateCommandTime } from "./plannerLimits"
 
 export const GOLD_MINER_LIMIT_NAME = "Limit gold miners"
 export const MAX_EXPLICIT_GOLD_MINERS = 5
+export const OPENING_GOLD_LIMIT_WARNING = "This limit is below the opening allocation. Consider reducing the number of starting gold miners."
 
 export type GoldMinerLimitCommand = {
     type: "limit-gold-miners"
@@ -58,4 +59,16 @@ export function goldMinerLimitCollision(items: PlannerItem[]): string | null {
 
 export function profileGoldMinerLimit({ goldTravelTime, goldGatherTime }: { goldTravelTime: number; goldGatherTime: number }) {
     return Math.max(1, Math.ceil((2 * goldTravelTime + goldGatherTime) / Math.max(0.001, goldGatherTime)))
+}
+
+export function goldMinerLimitBefore(events: GoldMinerLimitAction[], profileLimit: number, time: number) {
+    const commandTime = goldMinerLimitTimeKey(time)
+    let previous = profileLimit
+    let previousTime = -Infinity
+    for (const event of events) {
+        if (event.commandTime >= commandTime || event.commandTime < previousTime) continue
+        previous = event.goldLimit
+        previousTime = event.commandTime
+    }
+    return previous
 }

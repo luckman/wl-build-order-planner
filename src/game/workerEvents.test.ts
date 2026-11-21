@@ -51,6 +51,66 @@ test("a gold limit at an authored fractional recruit finish time takes effect be
     expect(result.deliveries.some(delivery => delivery.worker === 1 && delivery.gold > 0)).toBe(false)
 })
 
+test("excess miners deliver before switching, including miners still outbound or queued", () => {
+    const economy = { ...settings, workerCount: 3, goldWorkers: 3, woodWorkers: 0,
+        goldTravelTime: 2, goldGatherTime: 3, initialGoldTravelReduction: 0,
+        woodTravelTime: 3, woodGatherTime: 5, woodTravelTimeIncreaseBase: 0, maxWoodTravelTime: 9 }
+    const event = createGoldMinerLimit({ type: "limit-gold-miners", commandTime: 1, limit: 1, reassign: false })
+    const result = simulateBuildOrder([event], economy, 2, 200, economy.foodPerFarm, "Castle", 40)
+    const allocation = (time: number) => workerAllocationAt(economy, result.plan, time)
+    expect(allocation(6)).toMatchObject({ gold: 3, wood: 0 })
+    expect(allocation(7)).toMatchObject({ gold: 2, wood: 1 })
+    expect(allocation(10)).toMatchObject({ gold: 1, wood: 2 })
+    expect(result.deliveries.slice(0, 3)).toEqual([7, 10, 13].map((time, worker) => ({ time, worker, gold: economy.goldPerTrip, wood: 0 })))
+    for (const [worker, time] of [[0, 18], [1, 21]]) {
+        expect(result.deliveries.find(delivery => delivery.worker === worker && delivery.wood > 0)?.time).toBe(time)
+        expect(result.deliveries.filter(delivery => delivery.worker === worker && delivery.gold > 0)).toHaveLength(1)
+    }
+    expect(result.deliveries.filter(delivery => delivery.worker === 2 && delivery.gold > 0).length).toBeGreaterThan(1)
+})
+
+test("an explicit limit reconciles the opening assignment even when the profile limit was the same", () => {
+    const economy = { ...settings, workerCount: 4, goldWorkers: 4, woodWorkers: 0,
+        goldTravelTime: 2, goldGatherTime: 3, initialGoldTravelReduction: 0 }
+    const event = createGoldMinerLimit({ type: "limit-gold-miners", commandTime: 0, limit: 3 })
+    const result = simulateBuildOrder([event], economy, 2, 200, economy.foodPerFarm, "Castle", 40)
+    expect(workerAllocationAt(economy, result.plan, 0)).toMatchObject({ gold: 4, wood: 0 })
+    expect(workerAllocationAt(economy, result.plan, 10)).toMatchObject({ gold: 3, wood: 1 })
+})
+
+test("a replacement limit takes effect before deciding whether a miner who deposits at that time must switch", () => {
+    const economy = { ...settings, workerCount: 3, goldWorkers: 3, woodWorkers: 0,
+        goldTravelTime: 2.5, goldGatherTime: 3.11, initialGoldTravelReduction: 0, orderDelay: 1 }
+    const limit = (time: number, count: number) => createGoldMinerLimit({ type: "limit-gold-miners", commandTime: time, limit: count, reassign: false })
+    const result = simulateBuildOrder([limit(1, 1), limit(11.22, 3)], economy, 2, 200, economy.foodPerFarm, "Castle", 40)
+    expect(result.deliveries.find(({ worker, gold }) => worker === 1 && gold > 0)?.time).toBeCloseTo(11.22)
+    expect(workerAllocationAt(economy, result.plan, 11.22)).toMatchObject({ gold: 2, wood: 1 })
+    expect(result.deliveries.some(({ worker, wood }) => worker === 1 && wood > 0)).toBe(false)
+})
+
+test("a resource-only command leaves both projections on the same side of a fractional deposit", () => {
+    const economy = { ...settings, workerCount: 1, goldWorkers: 1, woodWorkers: 0,
+        goldTravelTime: 0.07, goldGatherTime: 0.99, initialGoldTravelReduction: 0 }
+    const event = createGoldMinerLimit({ type: "limit-gold-miners", commandTime: 0.5, limit: 0 })
+    const resources = createResourcesCollectedAction({ type: "resources-collected", commandTime: 1.13, gold: 150, wood: 0 })
+    const result = simulateBuildOrder([event, resources], economy, 2, 200, economy.foodPerFarm, "Castle", 40)
+    const deposit = result.deliveries.find(({ worker, gold }) => worker === 0 && gold > 0)!
+    expect(deposit.time).toBeGreaterThan(1.13)
+    expect(workerAllocationAt(economy, result.plan, 1.13)).toMatchObject({ gold: 1, wood: 0 })
+    expect(workerAllocationAt(economy, result.plan, deposit.time)).toMatchObject({ gold: 0, wood: 1 })
+})
+
+test.each([[6, 22, 29], [7, 16, 23]])("a miner starting for the forest uses the right route when the Sawmill finishes at %ss", (seconds, firstWood, secondWood) => {
+    const economy = { ...settings, workerCount: 2, goldWorkers: 1, woodWorkers: 1, constructionStartDelay: 0,
+        goldTravelTime: 2, goldGatherTime: 3, initialGoldTravelReduction: 0, woodTravelTime: 3,
+        sawmillWoodTravelTime: 1, woodGatherTime: 5, woodTravelTimeIncreaseBase: 0, maxWoodTravelTime: 9 }
+    const sawmill = { ...factions.light.items.find(item => item.id === "sawmill")!, seconds }
+    const event = createGoldMinerLimit({ type: "limit-gold-miners", commandTime: 1, limit: 0 })
+    const result = simulateBuildOrder([sawmill, event], economy, 4, 200, economy.foodPerFarm, "Castle", 40)
+    expect(result.plan[0].finishTime).toBe(seconds + 1)
+    expect(result.deliveries.filter(({ worker, wood }) => worker === 0 && wood > 0).slice(0, 2).map(({ time }) => time)).toEqual([firstWood, secondWood])
+})
+
 test.each(["light", "dark"] as const)("%s worker batches are atomic, fixed-time and exclude idle workers from construction", faction => {
     const run = (items: PlannerItem[]) => simulateBuildOrder(items, settings, 2, 200, settings.foodPerFarm, factions[faction].startingTownHall, 120)
     const farm = factions[faction].items.find(item => item.id === (faction === "light" ? "farm" : "pigsty"))!

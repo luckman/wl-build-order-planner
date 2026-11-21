@@ -132,6 +132,14 @@ Until the first **Limit gold miners** event, newly recruited workers join gold u
 The timed event sets an explicit limit of 0–5 that applies to recruits finishing at that time or later.
 The next event replaces the limit. The opening allocation takes effect as entered. Recruitment also
 counts gold-assigned builders and reactivating gold miners when checking for an open slot.
+When the assignment is above the active limit, gold miners finish and deliver a load before switching
+to wood. Each deposit checks whether miners still need to switch. The first forest trip uses the
+current wood travel time until a Sawmill completes, then uses **Maximum wood travel time**.
+Later trips follow the usual wood travel rules.
+
+Decreases require reassignment, as does applying the same threshold when too many workers are
+assigned to gold. If the first action at 00:00 sets a limit below the opening allocation, the planner
+suggests reducing the starting gold miners. The initial worker split stays as entered.
 
 ## Player progression and in-match upgrades
 
