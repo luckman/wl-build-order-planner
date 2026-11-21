@@ -78,10 +78,11 @@ for (const width of [1440, 1024, 390]) {
                 const cards = groups.nth(index).locator(".action")
                 const boxes = await cards.evaluateAll(elements => elements.map(el => {
                     const box = el.getBoundingClientRect()
-                    return { y: box.y, width: box.width }
+                    return { y: box.y, width: box.width, label: el.getAttribute("aria-label") }
                 }))
                 expect(new Set(boxes.map(box => box.y)).size).toBe(boxes.length ? 1 : 0)
-                expect(boxes.map(box => box.width)).toEqual(Array(boxes.length).fill(index === 3 ? 84 : 70))
+                const expectedWidths = boxes.map(box => box.label === "The point is Captured/Lost" ? 88 : index === 3 ? 84 : 70)
+                expect(boxes.map(box => box.width)).toEqual(expectedWidths)
                 if (index !== 3) await expect(groups.nth(index).locator(".action:not(.resource-card) .action-name")).toHaveCount(0)
                 else expect(await cards.locator(".action-name").allTextContents())
                     .toEqual(Array(boxes.length).fill("Upgrade"))
@@ -98,7 +99,7 @@ for (const width of [1440, 1024, 390]) {
             await expect(upgrade).toHaveAttribute("title", `${townHall} upgrade`)
             await upgrade.click()
             const menu = page.getByRole("menu", { name: `${townHall} upgrades` })
-            await expect(menu.locator(".upgrade-option-name")).toHaveText(
+            await expect(menu.locator(".action-dropdown-option-name")).toHaveText(
                 [2, 3, 4].map(level => `${townHall} lvl ${level}`),
             )
             await expect(menu.locator(".upgrade-option-cost").first()).toHaveText("200 gold · 200 wood")

@@ -14,7 +14,7 @@ export default function EventDropdown({ name, icon, portalContainer, options }: 
     const dismiss = useCallback(() => setOpen(null), [])
 
     return <>
-        <button type="button" className="action resource-card upgrade-card event-dropdown" aria-label={name}
+        <button type="button" className="action resource-card action-dropdown-card event-dropdown" aria-label={name}
             aria-haspopup="menu" aria-expanded={!!open} aria-controls={open ? id : undefined}
             onClick={event => {
                 if (open) {
@@ -32,7 +32,7 @@ export default function EventDropdown({ name, icon, portalContainer, options }: 
             }}>
             <span className="action-name">{name}</span>
             <img src={icon} alt="" />
-            <span className="upgrade-arrow" aria-hidden="true">▾</span>
+            <span className="action-dropdown-arrow" aria-hidden="true">▾</span>
         </button>
         {open && <ActionCardMenu anchor={open.anchor} last={open.last} portalContainer={portalContainer}
             id={id} label={name} onDismiss={dismiss}>
@@ -41,8 +41,8 @@ export default function EventDropdown({ name, icon, portalContainer, options }: 
                 dismiss()
                 option.select()
             }}>
-                <img className="upgrade-option-icon" src={option.icon} alt="" />
-                <span className="upgrade-option-name">{option.name}</span>
+                <img className="action-dropdown-option-icon" src={option.icon} alt="" />
+                <span className="action-dropdown-option-name">{option.name}</span>
             </button>)}
         </ActionCardMenu>}
     </>

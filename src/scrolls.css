@@ -1,4 +1,4 @@
-.hero-scroll-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 10px repeat(5, var(--action-card-width)); }
+.hero-scroll-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 88px repeat(2, var(--action-card-width)); }
 .scroll-card-delimiter { border-left: 1px solid #49667e; margin: 10px 4px; }
 .scroll-order-marker { color: #bda3d5; text-align: center; }
 .order-timed-event { cursor: pointer; }
@@ -101,7 +101,7 @@
     .scroll-dialog.construction-dialog { --construction-inset: 14px; }
 }
 
-.dark-events-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 10px repeat(5, var(--action-card-width)); }
+.dark-events-grid { grid-template-columns: repeat(3, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 10px repeat(2, var(--action-card-width)) 88px repeat(2, var(--action-card-width)); }
 .event.resources-collected { background: linear-gradient(#8b723a, #52421f); border-color: #e1b55f; }
 
 .action.resource-card { min-height: 64px; align-self: stretch; padding: 3px 2px; }
@@ -116,5 +116,4 @@
 
 .event.mana-spent { background: linear-gradient(#74539a, #42305f); border-color: #b49bd1; }
 
-.action.event-dropdown .action-name { overflow-wrap: anywhere; }
-.action.event-dropdown .upgrade-arrow { top: auto; bottom: 10px; transform: none; }
+.action.event-dropdown .action-dropdown-arrow { top: auto; bottom: 10px; transform: none; }

@@ -48,7 +48,7 @@ export default function ActionCardMenu({ anchor, last, id, label, portalContaine
         }
     }, [anchor, onDismiss, portalContainer])
 
-    return portalContainer.current && createPortal(<div ref={menu} className="upgrade-menu" role="menu"
+    return portalContainer.current && createPortal(<div ref={menu} className="action-dropdown-menu" role="menu"
         id={id} aria-label={label}
         onKeyDown={event => {
             if (event.key === "Escape" || event.key === "Tab") {

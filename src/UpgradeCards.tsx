@@ -26,7 +26,7 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, portalC
 
     return <><div className="action-grid upgrade-grid">
         {buildings.map(building => {
-            return <button type="button" className="action upgrade-card" key={building.id}
+            return <button type="button" className="action action-dropdown-card" key={building.id}
                 aria-label={`${building.name} upgrade`} title={`${building.name} upgrade`} aria-haspopup="menu"
                 aria-expanded={open?.building.id === building.id}
                 aria-controls={open?.building.id === building.id ? `upgrade-menu-${faction.id}-${building.id}` : undefined}
@@ -39,7 +39,7 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, portalC
                 }}>
                 <span className="action-name">Upgrade</span>
                 <img src={iconSources[building.icon]} alt="" />
-                <span className="upgrade-arrow" aria-hidden="true">▾</span>
+                <span className="action-dropdown-arrow" aria-hidden="true">▾</span>
             </button>
         })}
     </div>{open && <ActionCardMenu anchor={open.anchor} last={open.last} portalContainer={portalContainer}
@@ -47,8 +47,8 @@ export default function UpgradeCards({ faction, buildOrder, iconSources, portalC
         {upgrades.map(item => {
             const cost = itemCost(item, buildOrder, faction.startingTownHall)
             return <button type="button" role="menuitem" tabIndex={-1} key={item.id} onContextMenu={event => { event.preventDefault(); close(); onConfigure(item) }} onClick={() => { onAdd(item); close() }}>
-                <img className="upgrade-option-icon" src={iconSources[item.icon]} alt="" />
-                <span className="upgrade-option-name">{item.name}</span>
+                <img className="action-dropdown-option-icon" src={iconSources[item.icon]} alt="" />
+                <span className="action-dropdown-option-name">{item.name}</span>
                 <span className="upgrade-option-cost">{cost.gold} gold · {cost.wood} wood</span>
             </button>
         })}
