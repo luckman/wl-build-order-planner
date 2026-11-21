@@ -425,14 +425,17 @@ function simulateBuildOrderPass(
     }).sort((a, b) => a.item.commandTime - b.item.commandTime)
     const goldLimitTimes = new Map(pendingGoldLimits.map(({ item }) => [goldMinerLimitTimeKey(item.commandTime), item.commandTime]))
     const manualMoveSourcesByTime = new Map<number, Set<ManualWorkerMoveSource>>()
+    const woodReturnTimes = new Set<number>()
     for (const item of buildOrder) {
         if (item.kind === "manual-worker-move") {
             recordManualWorkerMoveBoundary(item, item.commandTime, goldLimitTimes, manualMoveSourcesByTime)
         }
-        if (item.kind === "wood-return") goldLimitTimes.set(goldMinerLimitTimeKey(item.commandTime), item.commandTime)
+        if (item.kind === "wood-return") {
+            goldLimitTimes.set(goldMinerLimitTimeKey(item.commandTime), item.commandTime)
+            woodReturnTimes.add(item.commandTime)
+        }
     }
     const hasManualMoves = manualMoveSourcesByTime.size > 0
-    const hasWoodReturns = buildOrder.some(item => item.kind === "wood-return")
     const pendingWorkerAndLossEvents = buildOrder.flatMap((item, index) => {
         if (item.kind !== "unit-is-killed" && item.kind !== "worker-event" && item.kind !== "manual-worker-move" && item.kind !== "wood-return") return []
         if (item.kind === "worker-event") parseWorkerEvent(workerEventCommand(item))
@@ -554,7 +557,7 @@ function simulateBuildOrderPass(
             const manualMoveAtTime = manualMoveSourcesByTime.get(eventTime)
             if (limitAtTime || (workerCommandAtTime &&
                 (simulation.hasExplicitGoldMinerLimit || simulation.hasPendingManualMoves || manualMoveAtTime ||
-                    simulation.hasPendingWoodReturns || pendingWorkerAndLossEvents[0]?.item.kind === "wood-return"))) {
+                    simulation.hasPendingWoodReturns || woodReturnTimes.has(eventTime)))) {
                 simulation.advanceTo(eventTime, () => applyWorkerCommandsAt(eventTime), limitAtTime, manualMoveAtTime)
             } else {
                 simulation.advanceTo(eventTime)
@@ -930,7 +933,7 @@ function simulateBuildOrderPass(
     const orderedPlan = inputPlan.map((action, index) => ({ action, index }))
         .sort((a, b) => (a.action.commandTime ?? Infinity) - (b.action.commandTime ?? Infinity) || a.index - b.index)
         .map(({ action }) => action)
-    const projectWorkerOrders = hasManualMoves || hasWoodReturns ? () => {
+    const projectWorkerOrders = hasManualMoves || woodReturnTimes.size ? () => {
         while ((simulation.hasPendingManualMoves || simulation.hasPendingWoodReturns) && simulation.time < MAX_PLAN_SECONDS) {
             const alignedTransition = nextWorkerTransitionTime()
             const transition = alignedTransition <= simulation.time ? simulation.nextEventTime : alignedTransition

@@ -721,7 +721,6 @@ export default function App() {
                                                 <EventDropdown key={`worker-events-${factionId}`} name={`${faction.workerName} events`}
                                                     icon={iconSources[factionId === "light" ? "lightWorker" : "darkSlave"]}
                                                     portalContainer={shell} options={[
-                                                        { name: WOOD_RETURN_NAME, icon: iconSources[WOOD_RETURN_ICON], select: () => setWoodReturnDialogOpen(true) },
                                                         ...(["move-gold-miner-to-wood", "move-wood-gatherer-to-gold"] as const).map(type => {
                                                             const { source, destination, icon } = manualWorkerMoveIdentities[type]
                                                             return { name: `Move from ${source} to ${destination}`, icon: plannerIconSource(icon, factionId), select: () => setManualWorkerMoveDialogOpen(type) }
@@ -739,6 +738,7 @@ export default function App() {
                                                             icon: plannerIconSource("limitGoldMiners", factionId),
                                                             select: () => setGoldMinerLimitDialogOpen(true),
                                                         },
+                                                        { name: WOOD_RETURN_NAME, icon: iconSources[WOOD_RETURN_ICON], select: () => setWoodReturnDialogOpen(true) },
                                                     ]} />
                                             </>}
                                         </div>}

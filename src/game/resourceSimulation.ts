@@ -489,8 +489,8 @@ export class WorkerEconomy {
             result.reason = "No wood gatherer is actively chopping."
             return
         }
-        const nearest = Math.round(cargo)
-        const wholeWood = Math.abs(cargo - nearest) <= timestampRoundoff(this.settings.woodPerTrip) ? nearest : Math.floor(cargo)
+        const nextWhole = Math.ceil(cargo)
+        const wholeWood = nextWhole > 0 && this.woodTargetTime(selected, nextWhole) <= this.time ? nextWhole : Math.floor(cargo)
         if (wholeWood < 1) {
             result.reason = "No eligible gatherer has at least one whole wood."
             return
@@ -513,6 +513,12 @@ export class WorkerEconomy {
         else result.delivered = worker.cargoWood
         delete worker.woodReturnIndex
         this.pendingWoodReturns--
+    }
+
+    private woodTargetTime(worker: GatheringWorker, amount: number) {
+        const remainingFraction = (this.settings.woodPerTrip - amount) / this.settings.woodPerTrip
+        const remainingSeconds = Math.max(0.001, this.settings.woodGatherTime) * remainingFraction / this.rate(worker)
+        return goldMinerLimitTimeKey(worker.nextAt - remainingSeconds)
     }
 
     manualWorkerMoveResult(index: number) {
@@ -912,6 +918,7 @@ function replayWorkerEconomy(
     const simulation = new WorkerEconomy(settings)
     const goldLimitTimes = new Map<number, number>()
     const manualMoveSourcesByTime = new Map<number, Set<ManualWorkerMoveSource>>()
+    const woodReturnTimes = new Set<number>()
     for (const action of actions) {
         if (action.item.kind === "limit-gold-miners" && !action.blocked && action.commandTime !== null) {
             goldLimitTimes.set(goldMinerLimitTimeKey(action.commandTime), action.commandTime)
@@ -921,6 +928,7 @@ function replayWorkerEconomy(
         }
         if (action.item.kind === "wood-return" && action.commandTime !== null) {
             goldLimitTimes.set(goldMinerLimitTimeKey(action.commandTime), action.commandTime)
+            woodReturnTimes.add(action.commandTime)
         }
         if (action.item.kind === "scroll" && !action.blocked && action.startTime != null && action.finishTime !== null) {
             simulation.scheduleScroll(action.item.id as ScrollId, action.startTime, action.finishTime)
@@ -1033,7 +1041,7 @@ function replayWorkerEconomy(
         const manualMoveAtTime = manualMoveSourcesByTime.get(time)
         if (type === "limit-gold-miners" ||
             ((simulation.hasExplicitGoldMinerLimit || simulation.hasPendingManualMoves || manualMoveAtTime ||
-                simulation.hasPendingWoodReturns || type === "wood-return") &&
+                simulation.hasPendingWoodReturns || woodReturnTimes.has(time)) &&
                 eventPriority[type] <= eventPriority.kill)) {
             simulation.advanceTo(time, applyWorkerCommands, events[index].goldMinerLimit, manualMoveAtTime)
             while (events[index]?.time === time) {

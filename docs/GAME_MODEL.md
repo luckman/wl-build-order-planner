@@ -334,7 +334,7 @@ its bonus only to full loads.
 
 Build order shows the deposit time and amount, or the reason the order failed. Construction,
 Make idle, or worker death can interrupt the return. Due deposits happen before worker commands
-at the same time. Drag a wood return to reorder it among worker commands at the same timestamp.
+at the same time. Drag a wood return to reorder it among timed rows at the same timestamp.
 Edit the timestamp to move it to a different time.
 
 Select a construction or timed-event row in Build order to edit it. Right-click a row to open

@@ -50,6 +50,21 @@ test("outbound workers, sub-unit cargo, and workers returning with a full load l
     expect(result.deliveries).toEqual(simulate([], settings).deliveries)
 })
 
+test("a finer imported command below one whole wood remains blocked", () => {
+    const settings = { ...economy, workerCount: 1, woodWorkers: 1 }
+    expect(simulate([immediate(2.199999999999996)], settings).plan[0].blockedReason).toMatch(/one whole wood/)
+    expect(simulate([immediate(2.2)], settings).plan[0].woodReturn?.delivered).toBe(1)
+    expect(simulate([immediate(268.2)], settings).plan[0].woodReturn?.delivered).toBe(1)
+    expect(simulate([immediate(1402.6)], settings).plan[0].woodReturn?.delivered).toBe(3)
+})
+
+test("a preceding no-op at the same time does not turn a completed load into a partial return", () => {
+    const settings = { ...economy, workerCount: 1, woodWorkers: 1, woodTravelTime: 0.1, woodGatherTime: 0.2, orderDelay: 0 }
+    const result = simulate([active(0.3), immediate(0.3)], settings)
+    expect(result.plan[1].blockedReason).toMatch(/actively chopping/)
+    expect(result.deliveries[0]).toEqual({ time: 0.4, worker: 0, gold: 0, wood: 50 })
+})
+
 test("a due deposit precedes death, but death during the return discards the load", () => {
     const settings = { ...economy, workerCount: 1, woodWorkers: 1 }
     const delivered = simulate([immediate(5), kill(7)], settings)
