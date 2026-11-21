@@ -12,7 +12,8 @@ test.each(["Light", "Dark"])("%s gold limits show an icon, reject invalid or dup
     const view = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
     const picker = screen.getByRole("button", { name, exact: true })
-    expect(picker.querySelector("img")).toHaveAttribute("src", expect.stringContaining("limit-gold-miners"))
+    const icon = `${faction.toLowerCase()}-limit-gold-miners.png`
+    expect(picker.querySelector("img")).toHaveAttribute("src", expect.stringContaining(icon))
     fireEvent.click(picker)
     let dialog = within(screen.getByRole("dialog", { name }))
     expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(3)
@@ -37,6 +38,7 @@ test.each(["Light", "Dark"])("%s gold limits show an icon, reject invalid or dup
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
     view.unmount()
     render(<App />)
+    expect(row().querySelector("img")).toHaveAttribute("src", expect.stringContaining(icon))
     fireEvent.click(within(row()).getByRole("button", { name: /Change Limit gold miners timestamp/ }))
     dialog = within(screen.getByRole("dialog", { name: `Edit ${name}` }))
     expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(5)

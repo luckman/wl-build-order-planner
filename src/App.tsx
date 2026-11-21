@@ -60,6 +60,25 @@ import "./build-order-files.css"
 import "./scrolls.css"
 import "./build-order-busy.css"
 
+const workerResourceEventIcons: Partial<Record<PlannerItem["icon"], Record<FactionId, string>>> = {
+    limitGoldMiners: {
+        light: require("./icons/events/light-limit-gold-miners.png"),
+        dark: require("./icons/events/dark-limit-gold-miners.png"),
+    },
+    moveGoldMinerToWood: {
+        light: require("./icons/events/light-move-gold-miner-to-wood.png"),
+        dark: require("./icons/events/dark-move-gold-miner-to-wood.png"),
+    },
+    moveWoodGathererToGold: {
+        light: require("./icons/events/light-move-wood-gatherer-to-gold.png"),
+        dark: require("./icons/events/dark-move-wood-gatherer-to-gold.png"),
+    },
+}
+
+function plannerIconSource(icon: PlannerItem["icon"], faction: FactionId) {
+    return workerResourceEventIcons[icon]?.[faction] ?? iconSources[icon]
+}
+
 const iconSources: Record<string, string> = {
     lightUnitIsKilled: require("./icons/events/light-unit-is-killed.png"),
     darkUnitIsKilled: require("./icons/events/dark-unit-is-killed.png"),
@@ -68,9 +87,6 @@ const iconSources: Record<string, string> = {
     lightManaSpent: require("./icons/events/light-mana-spent.png"),
     darkManaSpent: require("./icons/events/dark-mana-spent.png"),
     resourcesCollected: require("./icons/events/resources-collected.png"),
-    limitGoldMiners: require("./icons/events/limit-gold-miners.png"),
-    moveGoldMinerToWood: require("./icons/events/move-gold-miner-to-wood.png"),
-    moveWoodGathererToGold: require("./icons/events/move-wood-gatherer-to-gold.png"),
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     darkWhip: require("./icons/scrolls/dark-whip.png"),
@@ -702,14 +718,14 @@ export default function App() {
                                                 <button className="action resource-card" aria-label={GOLD_MINER_LIMIT_NAME} title="Set how many workers can mine gold at a chosen timestamp"
                                                     onClick={() => setGoldMinerLimitDialogOpen(true)}>
                                                     <span className="action-name">{GOLD_MINER_LIMIT_NAME}</span>
-                                                    <img src={iconSources.limitGoldMiners} alt="" />
+                                                    <img src={plannerIconSource("limitGoldMiners", factionId)} alt="" />
                                                 </button>
                                                 {(Object.keys(manualWorkerMoveIdentities) as ManualWorkerMoveType[]).map(type => {
                                                     const { name, icon } = manualWorkerMoveIdentities[type]
                                                     return <button key={type} className="action resource-card" aria-label={name}
                                                         onClick={() => setManualWorkerMoveDialogOpen(type)}>
                                                         <span className="action-name">{name}</span>
-                                                        <img src={iconSources[icon]} alt="" />
+                                                        <img src={plannerIconSource(icon, factionId)} alt="" />
                                                     </button>
                                                 })}
                                             </>}
@@ -803,7 +819,7 @@ export default function App() {
                                                                 onClick={event => toggleMenu(event.currentTarget)}
                                                                 onContextMenu={event => { event.preventDefault(); toggleMenu(event.currentTarget) }}
                                                             >
-                                                                {phaseDescriptionId ? <ConstructionPhases action={action} icon={iconSources[item.icon]} descriptionId={phaseDescriptionId} timing={title} /> : <><img src={iconSources[item.icon]} alt="" /><span>{item.name}</span></>}
+                                                                {phaseDescriptionId ? <ConstructionPhases action={action} icon={iconSources[item.icon]} descriptionId={phaseDescriptionId} timing={title} /> : <><img src={plannerIconSource(item.icon, factionId)} alt="" /><span>{item.name}</span></>}
                                                             </button>
                                                         },
                                                     )}
@@ -817,7 +833,7 @@ export default function App() {
                                 <h3>{blockedActions.length} blocked {blockedActions.length === 1 ? "action" : "actions"}</h3>
                                 {blockedActions.map(({ item, index, blockedReason }) => (
                                     <div className="blocked-event" key={`${item.id}-${index}`}>
-                                        <img src={iconSources[item.icon]} alt="" />
+                                        <img src={plannerIconSource(item.icon, factionId)} alt="" />
                                         <div><b>#{index + 1} {item.name} — Blocked</b><p>{blockedReason}</p></div>
                                     </div>
                                 ))}
@@ -891,7 +907,7 @@ export default function App() {
                                         {isTimedEvent(item) ? <button className="scroll-order-marker" aria-label={`Change ${item.name} timestamp, action ${index + 1}`} title="Click to change timestamp">◷</button>
                                             : <button className="order-drag-handle" {...drag.dragHandleProps} onClick={event => event.stopPropagation()} aria-label={`Reorder ${item.name}, action ${index + 1}`} title="Drag to reorder; or press Space, arrow keys, then Space to drop">⠿</button>}
                                         <span className="order-number">{index + 1}</span>
-                                        <img src={iconSources[item.icon]} alt="" />
+                                        <img src={plannerIconSource(item.icon, factionId)} alt="" />
                                         <div>
                                             <b>{item.name}{item.kind === "worker-event" && item.workerEvent === "make-idle" && item.count > 1 ? ` (${item.count})` : ""}</b>
                                             {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}

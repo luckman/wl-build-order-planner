@@ -16,7 +16,8 @@ test.each([
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "2" } })
     const picker = screen.getByRole("button", { name, exact: true })
     const icon = picker.querySelector("img")!
-    expect(icon).toHaveAttribute("src", expect.stringContaining(iconFile))
+    const factionIcon = `${faction.toLowerCase()}-${iconFile}.png`
+    expect(icon).toHaveAttribute("src", expect.stringContaining(factionIcon))
     fireEvent.click(picker)
     const add = within(screen.getByRole("dialog", { name }))
     const count = add.getByLabelText("Worker count")
@@ -35,6 +36,7 @@ test.each([
 
     planner.unmount()
     render(<App />)
+    expect(row().querySelector("img")).toHaveAttribute("src", expect.stringContaining(factionIcon))
     fireEvent.click(within(row()).getByRole("button", { name: new RegExp(`Change ${name} timestamp`) }))
     const edit = within(screen.getByRole("dialog", { name: `Edit ${name}` }))
     expect(edit.getByLabelText("Worker count")).toHaveValue(6)
