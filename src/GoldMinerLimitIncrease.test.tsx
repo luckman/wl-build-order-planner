@@ -7,7 +7,8 @@ afterEach(() => window.localStorage.clear())
 
 test("increasing the gold limit can leave existing wood gatherers in place and save that choice", () => {
     const planner = render(<App />)
-    fireEvent.click(screen.getByRole("button", { name: "Limit gold miners", exact: true }))
+    fireEvent.click(screen.getByRole("button", { name: "Worker events" }))
+    fireEvent.click(screen.getByRole("menuitem", { name: "Limit gold miners", exact: true }))
     const addDialog = within(screen.getByRole("dialog", { name: "Limit gold miners" }))
     fireEvent.change(addDialog.getByLabelText("Gold miner limit"), { target: { value: "5" } })
     const option = addDialog.getByRole("checkbox", { name: "Reassign existing workers" })

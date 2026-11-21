@@ -14,7 +14,9 @@ test.each([
     const planner = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
     fireEvent.change(screen.getByLabelText("Initial gold miners"), { target: { value: "2" } })
-    const picker = screen.getByRole("button", { name, exact: true })
+    const trigger = screen.getByRole("button", { name: "Worker events" })
+    fireEvent.click(trigger)
+    const picker = screen.getByRole("menuitem", { name, exact: true })
     const icon = picker.querySelector("img")!
     const factionIcon = `${faction.toLowerCase()}-${iconFile}.png`
     expect(icon).toHaveAttribute("src", expect.stringContaining(factionIcon))
@@ -27,6 +29,7 @@ test.each([
     fireEvent.change(count, { target: { value: "6" } })
     fireEvent.change(add.getByLabelText("Command time (mm:ss)"), { target: { value: "001.5" } })
     fireEvent.click(add.getByRole("button", { name: "Add event" }))
+    expect(trigger).toHaveFocus()
 
     const row = () => screen.getByRole("button", { name: `Remove ${name}` }).closest("li")!
     expect(row().querySelector("img")).toHaveAttribute("src", icon.getAttribute("src"))
@@ -49,7 +52,8 @@ test.each([
 test("a move to gold displays the number of empty slots and how to make the move possible", () => {
     render(<App />)
     const name = "Move wood gatherer to gold"
-    fireEvent.click(screen.getByRole("button", { name, exact: true }))
+    fireEvent.click(screen.getByRole("button", { name: "Worker events" }))
+    fireEvent.click(screen.getByRole("menuitem", { name, exact: true }))
     const add = within(screen.getByRole("dialog", { name }))
     fireEvent.click(add.getByRole("button", { name: "Add event" }))
 

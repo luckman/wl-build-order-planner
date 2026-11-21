@@ -156,7 +156,7 @@ test("reset basic restores main fields while preserving advanced settings, hidde
     saveFactionProfiles({ light: editedProfile, dark: initialGameProfile })
     render(<App />)
     change("Initial gold miners", "2")
-    fireEvent.click(screen.getByRole("button", { name: /^Worker / }))
+    fireEvent.click(screen.getByRole("button", { name: /^Worker \d/ }))
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
     fireEvent.click(screen.getByRole("button", { name: "Reset basic to defaults" }))
 

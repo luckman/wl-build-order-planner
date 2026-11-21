@@ -20,7 +20,13 @@ export default function EventTimeDialog({ name, commandTime, onSave, onClose, ti
         dialog.current?.querySelector<HTMLInputElement>("input")?.focus()
         return () => { if (previousFocus?.isConnected) previousFocus.focus() }
     }, [])
-    return <div className="scroll-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
+    return <div className="scroll-dialog-backdrop" onMouseDown={event => {
+        if (event.target === event.currentTarget) {
+            // Keep the pointer's default focus change from overriding focus restoration.
+            event.preventDefault()
+            onClose()
+        }
+    }}>
         <div ref={dialog} className="scroll-dialog panel" role="dialog" aria-modal="true" aria-labelledby="event-time-dialog-title"
             onKeyDown={event => {
                 if (event.key === "Escape") { event.stopPropagation(); onClose() }

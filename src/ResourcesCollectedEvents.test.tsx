@@ -94,7 +94,7 @@ test("default timestamp excludes blocked scrolls and follows the latest active c
 
     render(<App />)
 
-    fireEvent.click(screen.getByRole("button", { name: /^Worker / }))
+    fireEvent.click(screen.getByRole("button", { name: /^Worker \d/ }))
 
     fireEvent.click(screen.getByRole("button", { name: /^Gold Rush / }))
 

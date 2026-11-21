@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test"
 
-const eventNames = ["Resources collected", "Mana spent", "The point is Captured/Lost", "Unit is killed"]
+const eventNames = ["Resources collected", "Mana spent", "The point is Captured/Lost", "Unit is killed", "Worker events"]
+
+test.use({ hasTouch: true })
 
 for (const faction of ["Light", "Dark"]) {
     for (const width of [1440, 390]) {
@@ -9,6 +11,18 @@ for (const faction of ["Light", "Dark"]) {
             await page.goto(process.env.PLANNER_TEST_URL ?? "http://localhost:2987")
             await page.getByRole("button", { name: faction, exact: true }).click()
             const heroes = page.getByRole("region", { name: "heroes", exact: true })
+            const cards = heroes.getByRole("button").and(heroes.locator(".resource-card"))
+            expect(await cards.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(eventNames)
+            const worker = faction === "Light" ? "Worker" : "Slave"
+            const workerPortrait = page.getByRole("region", { name: "units", exact: true })
+                .getByRole("button", { name: new RegExp(`^${worker} `) }).locator("img")
+            const workerOptions = [
+                ["Move gold miner to wood", "Move gold miner to wood", `${faction.toLowerCase()}-move-gold-miner-to-wood`],
+                ["Move wood gatherer to gold", "Move wood gatherer to gold", `${faction.toLowerCase()}-move-wood-gatherer-to-gold`],
+                [`Make ${worker} idle`, `Make ${worker} idle`, `${faction.toLowerCase()}-${worker.toLowerCase()}-idle`],
+                [`Activate ${worker.toLowerCase()}`, `Make ${worker} active`, `${faction.toLowerCase()}-${worker.toLowerCase()}-active`],
+                ["Limit gold miners", "Limit gold miners", `${faction.toLowerCase()}-limit-gold-miners`],
+            ]
             const positions = []
             for (const name of eventNames) {
                 const card = heroes.getByRole("button", { name, exact: true })
@@ -26,18 +40,35 @@ for (const faction of ["Light", "Dark"]) {
                 expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(width)
                 expect(await label.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true)
                 await card.focus()
-                await page.keyboard.press("Enter")
-                if (name === "The point is Captured/Lost") {
+                if (name === "Worker events" && width === 390) await card.tap()
+                else await page.keyboard.press("Enter")
+                if (name === "The point is Captured/Lost" || name === "Worker events") {
                     const menu = page.getByRole("menu", { name })
                     const options = menu.getByRole("menuitem")
-                    await expect(options).toHaveText(["Mana well is captured", "Mana well is lost"])
+                    const optionNames = name === "Worker events" ? workerOptions.map(([label]) => label) : ["Mana well is captured", "Mana well is lost"]
+                    await expect(options).toHaveText(optionNames)
                     await expect(options.first()).toBeFocused()
                     const box = (await menu.boundingBox())!
                     expect(box.x).toBeGreaterThanOrEqual(8)
                     expect(box.x + box.width).toBeLessThanOrEqual(width - 8)
                     expect(box.y).toBeGreaterThanOrEqual(8)
                     expect(box.y + box.height).toBeLessThanOrEqual(892)
-                    await card.screenshot({ path: `test-results/point-card-${faction}-${width}.png` })
+                    if (name === "The point is Captured/Lost") {
+                        await card.screenshot({ path: `test-results/point-card-${faction}-${width}.png` })
+                    } else {
+                        await expect(card.locator("img")).toHaveAttribute("src", (await workerPortrait.getAttribute("src"))!)
+                        for (const [index, [label, dialogName, icon]] of workerOptions.entries()) {
+                            const option = menu.getByRole("menuitem", { name: label, exact: true })
+                            await expect(option.locator("img")).toHaveAttribute("src", new RegExp(icon))
+                            await option.click()
+                            const dialog = page.getByRole("dialog", { name: dialogName, exact: true })
+                            await expect(dialog.getByLabel("Command time (mm:ss)")).toBeFocused()
+                            await dialog.getByRole("button", { name: "Cancel" }).click()
+                            await expect(card).toBeFocused()
+                            if (index < workerOptions.length - 1) await card.click()
+                        }
+                        continue
+                    }
                     await page.keyboard.press("Escape")
                     await expect(card).toBeFocused()
                     continue

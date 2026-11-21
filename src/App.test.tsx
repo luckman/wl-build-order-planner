@@ -46,13 +46,13 @@ test("opening upgrade cards adds nothing and selecting a higher level inserts pr
 test("faction drafts survive switching and Clear only clears the selected draft", () => {
     const { container } = render(<App />)
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
-    fireEvent.click(actions.getByRole("button", { name: /^Worker / }))
+    fireEvent.click(actions.getByRole("button", { name: /^Worker \d/ }))
     fireEvent.click(actions.getByRole("button", { name: /^Farm / }))
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(screen.getByRole("button", { name: "Remove Worker" })).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
     expect(screen.queryByRole("button", { name: "Remove Worker" })).toBeNull()
-    fireEvent.click(actions.getByRole("button", { name: /^Slave / }))
+    fireEvent.click(actions.getByRole("button", { name: /^Slave \d/ }))
     fireEvent.click(screen.getByRole("button", { name: "Light" }))
     expect(screen.getAllByRole("button", { name: /^Remove / }).map(button => button.getAttribute("aria-label")))
         .toEqual(["Remove Worker", "Remove Farm"])
@@ -101,9 +101,9 @@ test("upgrade menus support keyboard navigation, focus return, outside dismissal
 test("shared imports replace their faction draft and preserve the other draft", () => {
     const { container } = render(<App />)
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
-    fireEvent.click(actions.getByRole("button", { name: /^Worker / }))
+    fireEvent.click(actions.getByRole("button", { name: /^Worker \d/ }))
     fireEvent.click(screen.getByRole("button", { name: "Dark" }))
-    fireEvent.click(actions.getByRole("button", { name: /^Slave / }))
+    fireEvent.click(actions.getByRole("button", { name: /^Slave \d/ }))
     try {
         window.history.replaceState(null, "", createShareableLink(window.location.href, "dark", initialGameProfile, []))
         fireEvent(window, new Event("hashchange"))
@@ -140,7 +140,7 @@ test("resource-blocked orders are highlighted in both panels and clear when reso
 test("a newly blocked Worker shows its food shortage in the notification and both panels", () => {
     const { container } = render(<App />)
     const actions = within(container.querySelector(".action-panel") as HTMLElement)
-    for (let i = 0; i < 6; i++) fireEvent.click(actions.getByRole("button", { name: /^Worker / }))
+    for (let i = 0; i < 6; i++) fireEvent.click(actions.getByRole("button", { name: /^Worker \d/ }))
     const row = screen.getAllByRole("button", { name: "Remove Worker" })[5].closest("li")!
     const reason = "Insufficient supply: requires 2, available 0 (20/20 used)"
     expect(within(row).getByText(reason)).toBeTruthy()
@@ -184,7 +184,7 @@ test("action cards expose hover costs and group upgrades in dropdown cards", () 
     expect(screen.queryByText("Light build order")).toBeNull()
     expect(actions.queryByText("Click to add")).toBeNull()
     const castle = actions.getByRole("button", { name: /^Castle 500 gold/ })
-    const worker = actions.getByRole("button", { name: /^Worker / })
+    const worker = actions.getByRole("button", { name: /^Worker \d/ })
     const upgrade = actions.getByRole("button", { name: "Castle upgrade" })
     expect(castle.querySelector(".action-name")).toBeNull()
     expect(worker.querySelector(".action-name")).toBeNull()
@@ -211,7 +211,7 @@ test("action cards expose hover costs and group upgrades in dropdown cards", () 
 test("timeline actions require Delete from their menu and dismiss safely", () => {
     const { container } = render(<App />)
     fireEvent.change(screen.getByLabelText("Starting gold"), { target: { value: "1000" } })
-    const addWorker = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Worker / })
+    const addWorker = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Worker \d/ })
     fireEvent.click(addWorker)
     fireEvent.click(addWorker)
     const timeline = within(container.querySelector(".queue-lanes") as HTMLElement)
@@ -481,7 +481,7 @@ test("latest-command markers stay inside graphs during hover while amounts follo
     const { container } = render(<App />)
     expect(container.querySelector(".latest-command-line")).toBeNull()
     expect(container.querySelector(".latest-command-caption")).toBeNull()
-    const worker = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Worker / })
+    const worker = within(container.querySelector(".action-panel") as HTMLElement).getByRole("button", { name: /^Worker \d/ })
     fireEvent.click(worker)
     fireEvent.click(worker)
 

@@ -4,7 +4,7 @@ import { factions } from "../src/game/gameData"
 import { initialGameProfile } from "../src/game/gameProfile"
 
 for (const faction of ["Light", "Dark"] as const) {
-    test(`${faction} worker event cards and restored events share readable artwork`, async ({ page }) => {
+    test(`${faction} worker event options and restored events share readable artwork`, async ({ page }) => {
         await page.setViewportSize({ width: faction === "Light" ? 1440 : 320, height: 900 })
         await page.goto("http://localhost:2987")
         await page.getByRole("button", { name: faction, exact: true }).click()
@@ -13,46 +13,44 @@ for (const faction of ["Light", "Dark"] as const) {
         const activateLabel = `Activate ${worker.toLowerCase()}`
         const events = [
             { name: idleName, label: idleName },
-            { name: `Make ${worker} active`, label: activateLabel, lines: ["Activate", worker.toLowerCase()] },
+            { name: `Make ${worker} active`, label: activateLabel },
         ]
-        const actions = page.getByRole("region", { name: "Actions", exact: true })
-        const cards = actions.getByRole("region", { name: "heroes", exact: true }).getByRole("button")
-        const finalCards = await cards.evaluateAll(buttons => buttons.slice(-9).map(button => button.getAttribute("aria-label")))
-        expect(finalCards).toEqual(["Resources collected", "Mana spent", "The point is Captured/Lost", "Unit is killed", ...events.map(event => event.label), "Limit gold miners", "Move gold miner to wood", "Move wood gatherer to gold"])
-        await expect(cards.filter({ hasText: /^Make (idle|active)$/ })).toHaveCount(0)
+        const trigger = page.getByRole("button", { name: "Worker events", exact: true })
+        const menu = page.getByRole("menu", { name: "Worker events" })
         const sources: string[] = []
-        for (const [index, { name, label, lines }] of events.entries()) {
-            const card = actions.getByRole("button", { name: label, exact: true })
-            if (lines) {
-                const layout = await card.locator(".action-name").evaluate((label: HTMLElement) => ({
-                    lines: label.innerText.split("\n"),
-                    heightInLines: label.getBoundingClientRect().height / parseFloat(getComputedStyle(label).lineHeight),
-                }))
-                expect(layout.lines).toEqual(lines)
-                expect(layout.heightInLines).toBeCloseTo(2, 1)
-            }
-            const icon = card.locator("img")
+        for (const [index, { name, label }] of events.entries()) {
+            await trigger.click()
+            const option = menu.getByRole("menuitem", { name: label, exact: true })
+            const icon = option.locator("img")
             await expect(icon).toBeVisible()
             await expect.poll(() => icon.evaluate(image => [(image as HTMLImageElement).naturalWidth, (image as HTMLImageElement).naturalHeight])).toEqual([252, 252])
             sources.push((await icon.getAttribute("src"))!)
-            await card.click()
+            await option.click()
             const dialog = page.getByRole("dialog", { name, exact: true })
             await dialog.getByLabel("Command time (mm:ss)").fill(index === 0 ? "00:10" : "02:00")
             await dialog.getByRole("button", { name: "Add event" }).click()
+            await expect(trigger).toBeFocused()
         }
         expect(sources[0]).not.toBe(sources[1])
+        await trigger.click()
         await page.getByRole("button", { name: faction === "Light" ? "Dark" : "Light", exact: true }).click()
-        await expect(actions.getByRole("button", { name: idleName, exact: true })).toHaveCount(0)
+        await expect(menu).toHaveCount(0)
         const otherWorker = faction === "Light" ? "Slave" : "Worker"
-        await expect(actions.getByRole("button", { name: `Make ${otherWorker} idle`, exact: true }).locator("img")).not.toHaveAttribute("src", sources[0])
+        await trigger.click()
+        await expect(menu.getByRole("menuitem", { name: idleName, exact: true })).toHaveCount(0)
+        await expect(menu.getByRole("menuitem", { name: `Make ${otherWorker} idle`, exact: true }).locator("img")).not.toHaveAttribute("src", sources[0])
         await page.getByRole("button", { name: faction, exact: true }).click()
         await page.reload()
         for (const [index, { name }] of events.entries()) {
             await expect(page.getByRole("listitem").filter({ hasText: name }).locator("img")).toHaveAttribute("src", sources[index])
             await expect(page.getByRole("button", { name, exact: true }).and(page.locator('[aria-haspopup="menu"]')).locator("img")).toHaveAttribute("src", sources[index])
         }
-        await actions.getByRole("button", { name: activateLabel, exact: true }).scrollIntoViewIfNeeded()
-        await page.screenshot({ path: `test-results/${faction}-worker-icons.png` })
+        await trigger.click()
+        await menu.screenshot({ path: `test-results/${faction}-worker-icons.png` })
+        await menu.getByRole("menuitem", { name: "Limit gold miners" }).click()
+        await page.mouse.click(1, 1)
+        await expect(page.getByRole("dialog")).toHaveCount(0)
+        await expect(trigger).toBeFocused()
     })
 }
 

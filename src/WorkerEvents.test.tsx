@@ -7,11 +7,18 @@ import { saveProfile } from "./game/profileStorage"
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
+const workerCard = () => screen.getByRole("button", { name: "Worker events", exact: true })
+
+function workerOption(name: string) {
+    fireEvent.click(workerCard())
+    return screen.getByRole("menuitem", { name, exact: true })
+}
+
 test.each(["Light", "Dark"])("%s gold limits show an icon, reject invalid or duplicate values, and reopen with the saved value", faction => {
     const name = "Limit gold miners"
     const view = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
-    const picker = screen.getByRole("button", { name, exact: true })
+    const picker = workerOption(name)
     const icon = `${faction.toLowerCase()}-limit-gold-miners.png`
     expect(picker.querySelector("img")).toHaveAttribute("src", expect.stringContaining(icon))
     fireEvent.click(picker)
@@ -27,7 +34,8 @@ test.each(["Light", "Dark"])("%s gold limits show an icon, reject invalid or dup
     const row = () => screen.getByRole("button", { name: `Remove ${name}` }).closest("li")!
     expect(within(row()).getByText(name)).toBeVisible()
     expect(row().querySelector("img")).toHaveAttribute("src", picker.querySelector("img")!.getAttribute("src"))
-    fireEvent.click(picker)
+    expect(workerCard()).toHaveFocus()
+    fireEvent.click(workerOption(name))
     dialog = within(screen.getByRole("dialog", { name }))
     expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(4)
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0010" } })
@@ -36,6 +44,7 @@ test.each(["Light", "Dark"])("%s gold limits show an icon, reject invalid or dup
     expect(dialog.getByRole("alert")).toHaveTextContent("00:20")
     expect(dialog.getByRole("button", { name: "Add event" })).toBeDisabled()
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
+    expect(workerCard()).toHaveFocus()
     view.unmount()
     render(<App />)
     expect(row().querySelector("img")).toHaveAttribute("src", expect.stringContaining(icon))
@@ -48,9 +57,8 @@ test.each(["Light", "Dark"])("%s gold limits show an icon, reject invalid or dup
 test("gold limit suggestions clamp custom profile limits and edits cannot duplicate another limit's time", () => {
     saveProfile("light", { ...initialGameProfile, map: { ...initialGameProfile.map, goldTravelTime: 14 } })
     render(<App />)
-    const picker = screen.getByRole("button", { name: "Limit gold miners", exact: true })
     const openLimit = () => {
-        fireEvent.click(picker)
+        fireEvent.click(workerOption("Limit gold miners"))
         return within(screen.getByRole("dialog", { name: "Limit gold miners" }))
     }
     let dialog = openLimit()
@@ -69,8 +77,7 @@ test("gold limit suggestions clamp custom profile limits and edits cannot duplic
 
 test("decreasing the gold limit at the opening warns without preventing the event or changing the opening allocation", () => {
     render(<App />)
-    const picker = screen.getByRole("button", { name: "Limit gold miners", exact: true })
-    fireEvent.click(picker)
+    fireEvent.click(workerOption("Limit gold miners"))
     const dialog = within(screen.getByRole("dialog", { name: "Limit gold miners" }))
     const time = dialog.getByLabelText("Command time (mm:ss)")
     const limit = dialog.getByLabelText("Gold miner limit")
@@ -100,7 +107,7 @@ test("an unchanged limit with an excess assignment requires reassignment but a s
     const resources = within(screen.getByRole("dialog", { name: "Resources collected" }))
     fireEvent.change(resources.getByLabelText("Command time (mm:ss)"), { target: { value: "0000" } })
     fireEvent.click(resources.getByRole("button", { name: "Resources collected" }))
-    fireEvent.click(screen.getByRole("button", { name: "Limit gold miners", exact: true }))
+    fireEvent.click(workerOption("Limit gold miners"))
     const limit = within(screen.getByRole("dialog", { name: "Limit gold miners" }))
     const input = limit.getByLabelText("Gold miner limit")
     expect(input).toHaveValue(2)
@@ -117,7 +124,7 @@ test.each(["Light", "Dark"])("%s worker events add, edit, cancel and restore dra
     const idleName = `Make ${worker} idle`
     const activeName = `Make ${worker} active`
     const activateLabel = `Activate ${worker.toLowerCase()}`
-    fireEvent.click(screen.getByRole("button", { name: idleName, exact: true }))
+    fireEvent.click(workerOption(idleName))
     let dialog = within(screen.getByRole("dialog", { name: idleName }))
     expect((dialog.getByLabelText("Worker count") as HTMLInputElement).value).toBe("1")
     fireEvent.change(dialog.getByLabelText("Worker count"), { target: { value: "0" } })
@@ -140,10 +147,11 @@ test.each(["Light", "Dark"])("%s worker events add, edit, cancel and restore dra
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
     expect(idleRow().getByText(`${idleName} (2)`)).toBeTruthy()
     expect(idleRow().queryByText("2 workers")).toBeNull()
-    fireEvent.click(screen.getByRole("button", { name: activateLabel, exact: true }))
+    fireEvent.click(workerOption(activateLabel))
     dialog = within(screen.getByRole("dialog", { name: activeName }))
     fireEvent.change(dialog.getByLabelText("Reactivation travel (seconds)"), { target: { value: "7" } })
     fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
+    expect(workerCard()).toHaveFocus()
     view.unmount()
     render(<App />)
     expect(idleRow().getByText(`${idleName} (2)`)).toBeTruthy()
@@ -188,7 +196,7 @@ test.each(["Light", "Dark"])("%s idle casualty persists while blocked and become
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
     expect(casualtyRow().textContent).toContain(`no available idle ${worker}`)
 
-    fireEvent.click(screen.getByRole("button", { name: idleName, exact: true }))
+    fireEvent.click(workerOption(idleName))
     dialog = within(screen.getByRole("dialog"))
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0000" } })
     fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
@@ -208,7 +216,7 @@ test.each(["Light", "Dark"])("%s idle casualty persists while blocked and become
 test("a blocked fixed-time worker event still extends the timeline to its command", () => {
     const idleName = "Make Worker idle"
     const view = render(<App />)
-    fireEvent.click(screen.getByRole("button", { name: idleName, exact: true }))
+    fireEvent.click(workerOption(idleName))
     const dialog = within(screen.getByRole("dialog"))
     fireEvent.change(dialog.getByLabelText("Worker count"), { target: { value: "105" } })
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "20:00" } })

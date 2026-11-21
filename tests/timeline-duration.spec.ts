@@ -4,7 +4,7 @@ test("worker cards retain their duration as later events extend the timeline", a
     await page.setViewportSize({ width: 1920, height: 1080 })
     await page.goto("http://localhost:2987")
     await page.getByLabel("Starting gold", { exact: true }).fill("1000")
-    const worker = page.locator(".action-panel").getByRole("button", { name: /^Worker / })
+    const worker = page.locator(".action-panel").getByRole("button", { name: /^Worker \d/ })
     await worker.click()
     await worker.click()
 

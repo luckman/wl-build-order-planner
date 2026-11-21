@@ -5,7 +5,7 @@ import { initialGameProfile } from "../src/game/gameProfile"
 test("Reset all restores main and hidden advanced settings without clearing orders", async ({ page }) => {
     await page.goto("http://localhost:2987")
     await page.getByLabel("Starting gold", { exact: true }).fill("2000")
-    await page.locator(".action-panel").getByRole("button", { name: /^Worker / }).click()
+    await page.locator(".action-panel").getByRole("button", { name: /^Worker \d/ }).click()
     await page.getByRole("button", { name: /^Advanced/ }).click()
     await page.getByRole("spinbutton", { name: "Gold travel time (seconds each way)", exact: true }).fill("8")
     await page.getByRole("spinbutton", { name: "Order delay (seconds)", exact: true }).fill("3")
@@ -135,7 +135,7 @@ for (const width of [1440, 1024, 390]) {
             await expect(lastAction).toBeInViewport()
             // Use a recruit with no missing prerequisites to verify adding from the strip.
             await page.locator(".action-panel").getByRole("button", {
-                name: faction === "Light" ? /^Worker / : /^Slave /,
+                name: faction === "Light" ? /^Worker \d/ : /^Slave \d/,
             }).click()
             await expect(page.locator(".order li").first()).toBeVisible()
         }

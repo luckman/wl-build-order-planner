@@ -708,29 +708,27 @@ export default function App() {
                                                     <span className="action-name">Unit is killed</span>
                                                     <img src={iconSources[factionId === "light" ? "lightUnitIsKilled" : "darkUnitIsKilled"]} alt="" />
                                                 </button>
-                                                {(["make-idle", "make-active"] as const).map(type => {
-                                                    const { name, icon } = workerEventIdentity(type, factionId)
-                                                    const activationTarget = type === "make-active" ? faction.workerName.toLowerCase() : null
-                                                    return <button key={type} className="action resource-card"
-                                                        aria-label={activationTarget ? `Activate ${activationTarget}` : name}
-                                                        onClick={() => setWorkerEventDialogOpen(type)}>
-                                                        <span className="action-name">{activationTarget ? <>Activate<br />{activationTarget}</> : name}</span>
-                                                        <img src={iconSources[icon]} alt="" />
-                                                    </button>
-                                                })}
-                                                <button className="action resource-card" aria-label={GOLD_MINER_LIMIT_NAME} title="Set how many workers can mine gold at a chosen timestamp"
-                                                    onClick={() => setGoldMinerLimitDialogOpen(true)}>
-                                                    <span className="action-name">{GOLD_MINER_LIMIT_NAME}</span>
-                                                    <img src={plannerIconSource("limitGoldMiners", factionId)} alt="" />
-                                                </button>
-                                                {(Object.keys(manualWorkerMoveIdentities) as ManualWorkerMoveType[]).map(type => {
-                                                    const { name, icon } = manualWorkerMoveIdentities[type]
-                                                    return <button key={type} className="action resource-card" aria-label={name}
-                                                        onClick={() => setManualWorkerMoveDialogOpen(type)}>
-                                                        <span className="action-name">{name}</span>
-                                                        <img src={plannerIconSource(icon, factionId)} alt="" />
-                                                    </button>
-                                                })}
+                                                <EventDropdown key={`worker-events-${factionId}`} name="Worker events"
+                                                    icon={iconSources[factionId === "light" ? "lightWorker" : "darkSlave"]}
+                                                    portalContainer={shell} options={[
+                                                        ...(["move-gold-miner-to-wood", "move-wood-gatherer-to-gold"] as const).map(type => {
+                                                            const { name, icon } = manualWorkerMoveIdentities[type]
+                                                            return { name, icon: plannerIconSource(icon, factionId), select: () => setManualWorkerMoveDialogOpen(type) }
+                                                        }),
+                                                        ...(["make-idle", "make-active"] as const).map(type => {
+                                                            const { name, icon } = workerEventIdentity(type, factionId)
+                                                            return {
+                                                                name: type === "make-active" ? `Activate ${faction.workerName.toLowerCase()}` : name,
+                                                                icon: iconSources[icon],
+                                                                select: () => setWorkerEventDialogOpen(type),
+                                                            }
+                                                        }),
+                                                        {
+                                                            name: GOLD_MINER_LIMIT_NAME,
+                                                            icon: plannerIconSource("limitGoldMiners", factionId),
+                                                            select: () => setGoldMinerLimitDialogOpen(true),
+                                                        },
+                                                    ]} />
                                             </>}
                                         </div>}
                                     </section>
