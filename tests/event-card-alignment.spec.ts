@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-const eventNames = ["Resources collected", "Mana spent", "The point is Captured/Lost", "Unit is killed", "Worker events"]
+const eventNames = ["Resources collected", "Mana spent", "Point is Captured / Lost", "Unit is killed", "Worker events"]
 
 test.use({ hasTouch: true })
 
@@ -42,7 +42,7 @@ for (const faction of ["Light", "Dark"]) {
                 await card.focus()
                 if (name === "Worker events" && width === 390) await card.tap()
                 else await page.keyboard.press("Enter")
-                if (name === "The point is Captured/Lost" || name === "Worker events") {
+                if (name === "Point is Captured / Lost" || name === "Worker events") {
                     const menu = page.getByRole("menu", { name })
                     const options = menu.getByRole("menuitem")
                     const optionNames = name === "Worker events" ? workerOptions.map(([label]) => label) : ["Mana well is captured", "Mana well is lost"]
@@ -53,7 +53,7 @@ for (const faction of ["Light", "Dark"]) {
                     expect(box.x + box.width).toBeLessThanOrEqual(width - 8)
                     expect(box.y).toBeGreaterThanOrEqual(8)
                     expect(box.y + box.height).toBeLessThanOrEqual(892)
-                    if (name === "The point is Captured/Lost") {
+                    if (name === "Point is Captured / Lost") {
                         await card.screenshot({ path: `test-results/point-card-${faction}-${width}.png` })
                     } else {
                         await expect(card.locator("img")).toHaveAttribute("src", (await workerPortrait.getAttribute("src"))!)

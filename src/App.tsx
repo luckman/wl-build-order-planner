@@ -696,7 +696,7 @@ export default function App() {
                                                     <span className="action-name">Mana spent</span>
                                                     <img src={iconSources[factionId === "light" ? "lightManaSpent" : "darkManaSpent"]} alt="" />
                                                 </button>
-                                                <EventDropdown key={`point-${factionId}`} name="The point is Captured/Lost"
+                                                <EventDropdown key={`point-${factionId}`} name="Point is Captured / Lost"
                                                     icon={pointCapturedLost} portalContainer={shell}
                                                     options={(["mana-well-is-captured", "mana-well-is-lost"] as const).map(type => ({
                                                         name: MANA_WELL_EVENTS[type].name,

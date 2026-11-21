@@ -56,7 +56,7 @@ for (const faction of ["light", "dark"] as const) {
         const heroes = page.getByRole("region", { name: "heroes", exact: true })
         const names = await heroes.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))
         expect(names.indexOf("Mana spent")).toBe(names.indexOf("Resources collected") + 1)
-        expect(names.indexOf("The point is Captured/Lost")).toBe(names.indexOf("Mana spent") + 1)
+        expect(names.indexOf("Point is Captured / Lost")).toBe(names.indexOf("Mana spent") + 1)
         const icon = manaCard(page).locator("img")
         await expect(icon).toHaveAttribute("src", new RegExp(`${faction}-mana-spent`))
         expect(await icon.evaluate(image => [image.getBoundingClientRect().width, image.getBoundingClientRect().height])).toEqual([28, 28])

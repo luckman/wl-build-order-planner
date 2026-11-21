@@ -45,7 +45,7 @@ test.each(["Resources collected", "Mana well is captured", "Mana well is lost", 
         render(<App />)
         const panel = within(screen.getByRole("region", { name: "Actions" }))
         if (name.startsWith("Mana well")) {
-            fireEvent.click(panel.getByRole("button", { name: "The point is Captured/Lost" }))
+            fireEvent.click(panel.getByRole("button", { name: "Point is Captured / Lost" }))
             fireEvent.click(screen.getByRole("menuitem", { name, exact: true }))
         } else {
             fireEvent.click(panel.getByRole("button", { name: new RegExp(`^${name}( |$)`) }))

@@ -41,7 +41,7 @@ to reuse those settings in other builds for the same faction.
 Add buildings, units, heroes, upgrades, scrolls, and timed events. The planner adds missing
 prerequisites automatically. Right-click a building or upgrade level to configure construction.
 See the [construction guide](docs/CONSTRUCTION.md) for timing and worker options.
-Open **The point is Captured/Lost** to record gaining or losing a mana well. Open **Worker events**
+Open **Point is Captured / Lost** to record gaining or losing a mana well. Open **Worker events**
 to move workers between gold and wood, idle or activate them, or limit the number of gold miners.
 
 ### Timeline

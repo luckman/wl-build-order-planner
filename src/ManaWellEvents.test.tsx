@@ -2,7 +2,7 @@ import "@testing-library/jest-dom"
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
 
-const pointCard = () => screen.getByRole("button", { name: "The point is Captured/Lost", exact: true })
+const pointCard = () => screen.getByRole("button", { name: "Point is Captured / Lost", exact: true })
 
 function chooseWellEvent(name: string) {
     fireEvent.click(pointCard())
