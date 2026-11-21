@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test"
 
-const eventNames = ["Resources collected", "Mana spent", "Point is Captured / Lost", "Unit is killed", "Worker events"]
+const eventNames = ["Resources collected", "Mana spent", "Control point events", "Unit is killed", "Worker events"]
 
 test.use({ hasTouch: true })
 
 for (const faction of ["Light", "Dark"]) {
+    const worker = faction === "Light" ? "Worker" : "Slave"
+    const workerEvents = `${worker} events`
+    const eventNames = ["Resources collected", "Mana spent", "Control point events", "Unit is killed", workerEvents]
     for (const width of [1440, 390]) {
         test(`${faction} event names reserve equal space and icons align at ${width}px`, async ({ page }) => {
             await page.setViewportSize({ width, height: 900 })
@@ -17,8 +20,8 @@ for (const faction of ["Light", "Dark"]) {
             const workerPortrait = page.getByRole("region", { name: "units", exact: true })
                 .getByRole("button", { name: new RegExp(`^${worker} `) }).locator("img")
             const workerOptions = [
-                ["Move gold miner to wood", "Move gold miner to wood", `${faction.toLowerCase()}-move-gold-miner-to-wood`],
-                ["Move wood gatherer to gold", "Move wood gatherer to gold", `${faction.toLowerCase()}-move-wood-gatherer-to-gold`],
+                ["Move from gold to wood", "Move gold miner to wood", `${faction.toLowerCase()}-move-gold-miner-to-wood`],
+                ["Move from wood to gold", "Move wood gatherer to gold", `${faction.toLowerCase()}-move-wood-gatherer-to-gold`],
                 [`Make ${worker} idle`, `Make ${worker} idle`, `${faction.toLowerCase()}-${worker.toLowerCase()}-idle`],
                 [`Activate ${worker.toLowerCase()}`, `Make ${worker} active`, `${faction.toLowerCase()}-${worker.toLowerCase()}-active`],
                 ["Limit gold miners", "Limit gold miners", `${faction.toLowerCase()}-limit-gold-miners`],
@@ -40,12 +43,12 @@ for (const faction of ["Light", "Dark"]) {
                 expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(width)
                 expect(await label.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true)
                 await card.focus()
-                if (name === "Worker events" && width === 390) await card.tap()
+                if (name === workerEvents && width === 390) await card.tap()
                 else await page.keyboard.press("Enter")
-                if (name === "Point is Captured / Lost" || name === "Worker events") {
+                if (name === "Control point events" || name === workerEvents) {
                     const menu = page.getByRole("menu", { name })
                     const options = menu.getByRole("menuitem")
-                    const optionNames = name === "Worker events" ? workerOptions.map(([label]) => label) : ["Mana well is captured", "Mana well is lost"]
+                    const optionNames = name === workerEvents ? workerOptions.map(([label]) => label) : ["Mana well is captured", "Mana well is lost"]
                     await expect(options).toHaveText(optionNames)
                     await expect(options.first()).toBeFocused()
                     const box = (await menu.boundingBox())!
@@ -53,7 +56,7 @@ for (const faction of ["Light", "Dark"]) {
                     expect(box.x + box.width).toBeLessThanOrEqual(width - 8)
                     expect(box.y).toBeGreaterThanOrEqual(8)
                     expect(box.y + box.height).toBeLessThanOrEqual(892)
-                    if (name === "Point is Captured / Lost") {
+                    if (name === "Control point events") {
                         await card.screenshot({ path: `test-results/point-card-${faction}-${width}.png` })
                     } else {
                         await expect(card.locator("img")).toHaveAttribute("src", (await workerPortrait.getAttribute("src"))!)

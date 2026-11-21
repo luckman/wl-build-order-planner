@@ -21,11 +21,11 @@ Choose **Light** or **Dark** at the top of the planner. Each faction has its own
 
 ### Build order
 
-- Use **Initial worker allocation** to split your starting workers between gold and wood.
-- From **Worker events**, choose **Limit gold miners** to control gold assignments from a chosen
+- Use **Initial worker allocation** (Light) or **Initial slave allocation** (Dark) to split your starting workers between gold and wood.
+- From **Worker events** (Light) or **Slave events** (Dark), choose **Limit gold miners** to control gold assignments from a chosen
   time. Gatherers can switch after delivering a load, and empty-handed builders can switch when
   construction finishes.
-- In **Worker events**, choose **Move gold miner to wood** or **Move wood gatherer to gold** to
+- In **Worker events** (Light) or **Slave events** (Dark), choose **Move from gold to wood** or **Move from wood to gold** to
   direct a chosen number of workers to switch resources. Moves to gold use the available slots
   under the current gold limit.
 - Drag rows to reorder your actions. Click an editable row to edit it, or right-click for its menu.
@@ -41,7 +41,7 @@ to reuse those settings in other builds for the same faction.
 Add buildings, units, heroes, upgrades, scrolls, and timed events. The planner adds missing
 prerequisites automatically. Right-click a building or upgrade level to configure construction.
 See the [construction guide](docs/CONSTRUCTION.md) for timing and worker options.
-Open **Point is Captured / Lost** to record gaining or losing a mana well. Open **Worker events**
+Open **Control point events** to record gaining or losing a mana well. Open **Worker events** (Light) or **Slave events** (Dark)
 to move workers between gold and wood, idle or activate them, or limit the number of gold miners.
 
 ### Timeline

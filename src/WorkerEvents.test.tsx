@@ -7,7 +7,7 @@ import { saveProfile } from "./game/profileStorage"
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
-const workerCard = () => screen.getByRole("button", { name: "Worker events", exact: true })
+const workerCard = () => screen.getByRole("button", { name: /^(Worker|Slave) events$/ })
 
 function workerOption(name: string) {
     fireEvent.click(workerCard())
@@ -182,7 +182,7 @@ test.each(["Light", "Dark"])("%s idle casualty persists while blocked and become
     const casualtyRow = () => screen.getByRole("button", { name: "Remove Unit is killed" }).closest("li")!
     const summary = () => view.container.querySelector(".resource-summary")?.textContent
     expect(casualtyRow().textContent).toContain(`no available idle ${worker}`)
-    expect(summary()).toContain("Total workers 5")
+    expect(summary()).toContain(`Total ${faction === "Dark" ? "slaves" : "workers"} 5`)
     expect(summary()).toContain("Food 10 / 20")
 
     view.unmount()
@@ -201,7 +201,7 @@ test.each(["Light", "Dark"])("%s idle casualty persists while blocked and become
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0000" } })
     fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
     expect(casualtyRow().textContent).toContain("Command 0:01")
-    expect(summary()).toContain("Total workers 4")
+    expect(summary()).toContain(`Total ${faction === "Dark" ? "slaves" : "workers"} 4`)
     expect(summary()).toContain("Food 8 / 20")
 
     fireEvent.click(screen.getByRole("button", { name: /Change Unit is killed timestamp/ }))
@@ -209,7 +209,7 @@ test.each(["Light", "Dark"])("%s idle casualty persists while blocked and become
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0000" } })
     fireEvent.click(dialog.getByRole("button", { name: "Save event" }))
     expect(casualtyRow().textContent).toContain(`no available idle ${worker}`)
-    expect(summary()).toContain("Total workers 5")
+    expect(summary()).toContain(`Total ${faction === "Dark" ? "slaves" : "workers"} 5`)
     expect(summary()).toContain("Food 10 / 20")
 })
 

@@ -2,7 +2,7 @@ import "@testing-library/jest-dom"
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import App from "./App"
 
-const pointCard = () => screen.getByRole("button", { name: "Point is Captured / Lost", exact: true })
+const pointCard = () => screen.getByRole("button", { name: "Control point events", exact: true })
 
 function chooseWellEvent(name: string) {
     fireEvent.click(pointCard())
@@ -14,7 +14,7 @@ test("the point dropdown supports keyboard navigation and switches with the fact
     const card = pointCard()
     card.focus()
     fireEvent.keyDown(card, { key: "ArrowUp" })
-    const menu = within(screen.getByRole("menu"))
+    const menu = within(screen.getByRole("menu", { name: "Control point events" }))
     const capture = menu.getByRole("menuitem", { name: "Mana well is captured" })
     const loss = menu.getByRole("menuitem", { name: "Mana well is lost" })
     expect(menu.getAllByRole("menuitem")).toEqual([capture, loss])
@@ -35,7 +35,7 @@ test("the point dropdown supports keyboard navigation and switches with the fact
     fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }))
     expect(screen.queryByRole("menu")).not.toBeInTheDocument()
     fireEvent.click(pointCard())
-    expect(screen.getAllByRole("menuitem").map(option => option.textContent))
+    expect(within(screen.getByRole("menu", { name: "Control point events" })).getAllByRole("menuitem").map(option => option.textContent))
         .toEqual(["Mana well is captured", "Mana well is lost"])
 })
 

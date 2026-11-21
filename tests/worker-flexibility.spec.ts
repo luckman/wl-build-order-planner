@@ -15,8 +15,8 @@ for (const faction of ["Light", "Dark"] as const) {
             { name: idleName, label: idleName },
             { name: `Make ${worker} active`, label: activateLabel },
         ]
-        const trigger = page.getByRole("button", { name: "Worker events", exact: true })
-        const menu = page.getByRole("menu", { name: "Worker events" })
+        const trigger = page.getByRole("button", { name: faction === "Dark" ? "Slave events" : "Worker events", exact: true })
+        const menu = page.getByRole("menu", { name: faction === "Dark" ? "Slave events" : "Worker events" })
         const sources: string[] = []
         for (const [index, { name, label }] of events.entries()) {
             await trigger.click()

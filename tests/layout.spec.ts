@@ -81,7 +81,7 @@ for (const width of [1440, 1024, 390]) {
                     return { y: box.y, width: box.width, label: el.getAttribute("aria-label") }
                 }))
                 expect(new Set(boxes.map(box => box.y)).size).toBe(boxes.length ? 1 : 0)
-                const expectedWidths = boxes.map(box => box.label === "Point is Captured / Lost" ? 88 : index === 3 ? 84 : 70)
+                const expectedWidths = boxes.map(box => box.label === "Control point events" ? 88 : index === 3 ? 84 : 70)
                 expect(boxes.map(box => box.width)).toEqual(expectedWidths)
                 if (index !== 3) await expect(groups.nth(index).locator(".action:not(.resource-card) .action-name")).toHaveCount(0)
                 else expect(await cards.locator(".action-name").allTextContents())

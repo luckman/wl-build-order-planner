@@ -38,7 +38,7 @@ test("Unit is killed can record blocked casualties and uses small faction icons 
             await dialog.getByLabel("Command time (mm:ss)").fill("0000")
             await dialog.getByRole("button", { name: "Save event" }).click()
             await expect(page.locator(".resource-summary")).toContainText("Food 8 / 20")
-            await expect(page.locator(".resource-summary")).toContainText("Total workers 4")
+            await expect(page.locator(".resource-summary")).toContainText(`Total ${worker.toLowerCase()}s 4`)
             await expect(page.locator(".resource-summary")).toContainText("Gathering wood 0")
             await page.reload()
             await page.getByRole("button", { name: faction, exact: true }).click()

@@ -382,6 +382,7 @@ export default function App() {
     const { baseFoodLimit } = gameProfile.player
     const { foodPerFarm } = economy
     const faction = factions[factionId]
+    const workerName = faction.workerName.toLowerCase()
     const additionError = buildOrder.length >= MAX_PLAN_ACTIONS ? ACTION_LIMIT_MESSAGE : null
     const addCatalogItem = (item: PlannerItem) => {
         setDependencyError(null)
@@ -696,7 +697,7 @@ export default function App() {
                                                     <span className="action-name">Mana spent</span>
                                                     <img src={iconSources[factionId === "light" ? "lightManaSpent" : "darkManaSpent"]} alt="" />
                                                 </button>
-                                                <EventDropdown key={`point-${factionId}`} name="Point is Captured / Lost"
+                                                <EventDropdown key={`point-${factionId}`} name="Control point events"
                                                     icon={pointCapturedLost} portalContainer={shell}
                                                     options={(["mana-well-is-captured", "mana-well-is-lost"] as const).map(type => ({
                                                         name: MANA_WELL_EVENTS[type].name,
@@ -708,17 +709,17 @@ export default function App() {
                                                     <span className="action-name">Unit is killed</span>
                                                     <img src={iconSources[factionId === "light" ? "lightUnitIsKilled" : "darkUnitIsKilled"]} alt="" />
                                                 </button>
-                                                <EventDropdown key={`worker-events-${factionId}`} name="Worker events"
+                                                <EventDropdown key={`worker-events-${factionId}`} name={`${faction.workerName} events`}
                                                     icon={iconSources[factionId === "light" ? "lightWorker" : "darkSlave"]}
                                                     portalContainer={shell} options={[
                                                         ...(["move-gold-miner-to-wood", "move-wood-gatherer-to-gold"] as const).map(type => {
-                                                            const { name, icon } = manualWorkerMoveIdentities[type]
-                                                            return { name, icon: plannerIconSource(icon, factionId), select: () => setManualWorkerMoveDialogOpen(type) }
+                                                            const { source, destination, icon } = manualWorkerMoveIdentities[type]
+                                                            return { name: `Move from ${source} to ${destination}`, icon: plannerIconSource(icon, factionId), select: () => setManualWorkerMoveDialogOpen(type) }
                                                         }),
                                                         ...(["make-idle", "make-active"] as const).map(type => {
                                                             const { name, icon } = workerEventIdentity(type, factionId)
                                                             return {
-                                                                name: type === "make-active" ? `Activate ${faction.workerName.toLowerCase()}` : name,
+                                                                name: type === "make-active" ? `Activate ${workerName}` : name,
                                                                 icon: iconSources[icon],
                                                                 select: () => setWorkerEventDialogOpen(type),
                                                             }
@@ -866,9 +867,9 @@ export default function App() {
                                 Clear
                             </button>
                         </div>
-                        <section className="opening-action" aria-label="Opening worker allocation">
+                        <section className="opening-action" aria-label={`Opening ${workerName} allocation`}>
                             <div className="worker-allocation">
-                                <label htmlFor="initial-worker-allocation">Initial worker allocation ({initialWorkerCount} workers)</label>
+                                <label htmlFor="initial-worker-allocation">Initial {workerName} allocation ({initialWorkerCount} {workerName}s)</label>
                                 <input ref={openingSlider} id="initial-worker-allocation" type="range" min={1} max={4} step={1}
                                     aria-label="Initial gold miners"
                                     aria-valuetext={`${economy.goldWorkers} gold miners, ${economy.woodWorkers} wood gatherers`}
@@ -951,7 +952,7 @@ export default function App() {
                                     <span>Wood <b>{Math.round(latestResources.wood)}</b></span>
                                     <span>Food <b>{latestFoodUsed} / {latestFoodLimit}</b></span>
                                     {latestMana && <span>Mana <b>{Math.floor(latestMana.mana)} / {latestMana.limit}</b></span>}
-                                    <span>Total workers <b>{latestWorkers.total}</b></span>
+                                    <span>Total {workerName}s <b>{latestWorkers.total}</b></span>
                                     <span>Gathering gold <b>{latestWorkers.gold}</b></span>
                                     <span>Gathering wood <b>{latestWorkers.wood}</b></span>
                                     <span>Building or travelling <b>{latestWorkers.buildingOrTravelling}</b></span>
