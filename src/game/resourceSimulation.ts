@@ -576,7 +576,10 @@ export class WorkerEconomy {
                 this.delayedInitialWoodWorkerIds = this.delayedInitialWoodWorkerIds.filter(id => id !== worker.id)
                 this.transition(worker, "idle", Infinity)
             } else {
-                worker.assignment = worker.previousAssignment!
+                const savedAssignment = worker.previousAssignment!
+                const goldIsFull = savedAssignment === "gold" &&
+                    this.explicitGoldLimit !== undefined && this.goldAssignments >= this.explicitGoldLimit
+                worker.assignment = goldIsFull ? "wood" : savedAssignment
                 this.transition(worker, "reactivation", item.travelDuration)
             }
         }
