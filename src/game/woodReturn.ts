@@ -3,7 +3,7 @@ import { goldMinerLimitTimeKey } from "./goldMinerLimit"
 import { validateCommandTime } from "./plannerLimits"
 
 export const WOOD_RETURN_NAME = "Bring wood back to base"
-export const WOOD_RETURN_ICON = "resourcesCollected"
+export const WOOD_RETURN_ICON = "bringWoodBackToBase"
 
 export type WoodReturnMode = { mode: "immediate"; target?: never } | { mode: "target"; target: number }
 export type WoodReturnCommand = { type: "bring-wood-back-to-base"; commandTime: number } & WoodReturnMode

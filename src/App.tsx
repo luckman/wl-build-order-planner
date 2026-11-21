@@ -91,6 +91,7 @@ const iconSources: Record<string, string> = {
     lightManaSpent: require("./icons/events/light-mana-spent.png"),
     darkManaSpent: require("./icons/events/dark-mana-spent.png"),
     resourcesCollected: require("./icons/events/resources-collected.png"),
+    [WOOD_RETURN_ICON]: require("./icons/events/bring-wood-back-to-base.png"),
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     darkWhip: require("./icons/scrolls/dark-whip.png"),
