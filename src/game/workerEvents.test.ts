@@ -8,11 +8,48 @@ import { createShareableLink, parseShareableLink } from "./shareableLink"
 import { createScrollAction } from "./scrolls"
 import { buildOrderWithDependencies } from "./gameData"
 import { createUnitKilledAction } from "./unitsKilled"
+import { createGoldMinerLimit } from "./goldMinerLimit"
+import { createResourcesCollectedAction } from "./resourcesCollected"
 
 const settings = { ...economyFromProfile(initialGameProfile), startingGold: 10000, startingWood: 10000,
     workerCount: 1, goldWorkers: 0, woodWorkers: 1, orderDelay: 1, constructionStartDelay: 4 }
 const idle = (time: number, count = 1) => createWorkerEvent({ type: "make-idle", commandTime: time, count }, "light")
 const active = (time: number, travelDuration = 0) => createWorkerEvent({ type: "make-active", commandTime: time, count: 1, travelDuration }, "light")
+
+test.each(["light", "dark"] as const)("%s recruits use the current gold limit, including a limit at their finish time", factionId => {
+    const faction = factions[factionId]
+    const worker = faction.items.find(item => item.id === (factionId === "light" ? "worker" : "slave"))!
+    const args = [settings, 2, 200, settings.foodPerFarm, faction.startingTownHall] as const
+    const limit = (commandTime: number, limit: number) => createGoldMinerLimit({ type: "limit-gold-miners", commandTime, limit, reassign: false })
+    const recruits = Array.from({ length: 10 }, (_, index) => ({ ...worker, orderId: `worker-${index}` }))
+    const baseline = simulateBuildOrder(recruits, ...args)
+    const first = baseline.plan[0].finishTime!
+    const second = baseline.plan[1].finishTime!
+    const fifth = baseline.plan[4].finishTime!
+    const allocation = (result: typeof baseline, time: number) => workerAllocationAt(settings, result.orderedPlan, time)
+    expect(allocation(baseline, baseline.plan[9].finishTime!)).toMatchObject({ gold: 4, wood: 7 })
+    const order = [...recruits, limit(second, 0), limit(fifth, 5)]
+    const result = simulateBuildOrder(order, ...args)
+    expect(allocation(result, first)).toMatchObject({ gold: 1, wood: 1 })
+    expect(allocation(result, second)).toMatchObject({ gold: 1, wood: 2 })
+    expect(allocation(result, result.plan[9].finishTime!)).toMatchObject({ gold: 5, wood: 6 })
+    expect(result.deliveries.some(delivery => delivery.worker === 2 && delivery.wood > 0)).toBe(true)
+    expect(result.deliveries.some(delivery => delivery.worker === 2 && delivery.gold > 0)).toBe(false)
+    const edited = [...recruits, limit(second, 0), limit(fifth, 0)]
+    expect(simulateBuildOrder(edited, ...args, { previous: result })).toEqual(simulateBuildOrder(edited, ...args))
+})
+
+test("a gold limit at an authored fractional recruit finish time takes effect before the recruit", () => {
+    const economy = { ...settings, startingGold: 0, orderDelay: 0.2 }
+    const worker = factions.light.items.find(item => item.id === "worker")!
+    const resources = createResourcesCollectedAction({ type: "resources-collected", commandTime: 8.1, gold: 150, wood: 0 })
+    const limit = createGoldMinerLimit({ type: "limit-gold-miners", commandTime: 26.12, limit: 0 })
+    const result = simulateBuildOrder([worker, resources, limit], economy, 2, 200, economy.foodPerFarm, "Castle")
+    expect(result.plan[0].finishTime).toBeCloseTo(26.12)
+    expect(workerAllocationAt(economy, result.plan, 26.12)).toMatchObject({ gold: 0, wood: 2 })
+    expect(result.deliveries.some(delivery => delivery.worker === 1 && delivery.wood > 0)).toBe(true)
+    expect(result.deliveries.some(delivery => delivery.worker === 1 && delivery.gold > 0)).toBe(false)
+})
 
 test.each(["light", "dark"] as const)("%s worker batches are atomic, fixed-time and exclude idle workers from construction", faction => {
     const run = (items: PlannerItem[]) => simulateBuildOrder(items, settings, 2, 200, settings.foodPerFarm, factions[faction].startingTownHall, 120)

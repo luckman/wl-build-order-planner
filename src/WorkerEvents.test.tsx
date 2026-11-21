@@ -1,8 +1,69 @@
 import { fireEvent, render, screen, within } from "@testing-library/react"
+import "@testing-library/jest-dom"
 import App from "./App"
+import { initialGameProfile } from "./game/gameProfile"
+import { saveProfile } from "./game/profileStorage"
 
 beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
+
+test.each(["Light", "Dark"])("%s gold limits show an icon, reject invalid or duplicate values, and reopen with the saved value", faction => {
+    const name = "Limit gold miners"
+    const view = render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: faction, exact: true }))
+    const picker = screen.getByRole("button", { name, exact: true })
+    expect(picker.querySelector("img")).toHaveAttribute("src", expect.stringContaining("limit-gold-miners"))
+    fireEvent.click(picker)
+    let dialog = within(screen.getByRole("dialog", { name }))
+    expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(3)
+    for (const invalid of ["-1", "6", "1.5", ""]) {
+        fireEvent.change(dialog.getByLabelText("Gold miner limit"), { target: { value: invalid } })
+        expect(dialog.getByRole("button", { name: "Add event" })).toBeDisabled()
+    }
+    fireEvent.change(dialog.getByLabelText("Gold miner limit"), { target: { value: "5" } })
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0020" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
+    const row = () => screen.getByRole("button", { name: `Remove ${name}` }).closest("li")!
+    expect(within(row()).getByText(name)).toBeVisible()
+    expect(row().querySelector("img")).toHaveAttribute("src", picker.querySelector("img")!.getAttribute("src"))
+    fireEvent.click(picker)
+    dialog = within(screen.getByRole("dialog", { name }))
+    expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(4)
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0010" } })
+    expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(3)
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0020" } })
+    expect(dialog.getByRole("alert")).toHaveTextContent("00:20")
+    expect(dialog.getByRole("button", { name: "Add event" })).toBeDisabled()
+    fireEvent.click(dialog.getByRole("button", { name: "Cancel" }))
+    view.unmount()
+    render(<App />)
+    fireEvent.click(within(row()).getByRole("button", { name: /Change Limit gold miners timestamp/ }))
+    dialog = within(screen.getByRole("dialog", { name: `Edit ${name}` }))
+    expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(5)
+    expect(dialog.getByLabelText("Command time (mm:ss)")).toHaveValue("00:20")
+})
+
+test("gold limit suggestions clamp custom profile limits and edits cannot duplicate another limit's time", () => {
+    saveProfile("light", { ...initialGameProfile, map: { ...initialGameProfile.map, goldTravelTime: 14 } })
+    render(<App />)
+    const picker = screen.getByRole("button", { name: "Limit gold miners", exact: true })
+    const openLimit = () => {
+        fireEvent.click(picker)
+        return within(screen.getByRole("dialog", { name: "Limit gold miners" }))
+    }
+    let dialog = openLimit()
+    expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(5)
+    fireEvent.change(dialog.getByLabelText("Gold miner limit"), { target: { value: "3" } })
+    fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
+    dialog = openLimit()
+    expect(dialog.getByLabelText("Gold miner limit")).toHaveValue(5)
+    fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
+    fireEvent.click(screen.getByRole("button", { name: "Change Limit gold miners timestamp, action 2" }))
+    dialog = within(screen.getByRole("dialog", { name: "Edit Limit gold miners" }))
+    fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "0001" } })
+    expect(dialog.getByRole("alert")).toHaveTextContent("00:01")
+    expect(dialog.getByRole("button", { name: "Save event" })).toBeDisabled()
+})
 
 test.each(["Light", "Dark"])("%s worker events add, edit, cancel and restore drafts", faction => {
     const view = render(<App />)

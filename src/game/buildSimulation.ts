@@ -1,6 +1,7 @@
 import { matchesPreparation, matchesPreparationReuse, schedulePreparation, type PreparationReuse, type PreparationSchedule } from "./preparationScheduling"
 import { isConstruction, parseConstructionSettings } from "./constructionSettings"
 import { parseWorkerEvent, workerEventCommand } from "./workerEvents"
+import { alignTimeWithGoldMinerLimit, createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, goldMinerLimitTimeKey } from "./goldMinerLimit"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, foodUsedAt } from "./unitsKilled"
@@ -392,7 +393,7 @@ function simulateBuildOrderPass(
     }
     const { nextIndex, plan, spending, buildings, unitInstances, workerCompletions, timedEventsByIndex,
         preparationFailures, preparedWorkers } = passState
-    const collision = manaSpentCollision(buildOrder)
+    const collision = manaSpentCollision(buildOrder) ?? goldMinerLimitCollision(buildOrder)
     if (collision) throw new Error(collision)
     const pendingScrolls = buildOrder.flatMap<{ item: Extract<PlannerItem, { kind: "scroll" | "mana-spent" }>; index: number }>((item, index) => {
         if (item.kind === "mana-spent") {
@@ -414,12 +415,19 @@ function simulateBuildOrderPass(
         else createUnitKilledAction(unitKilledCommand(item), faction)
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime || a.index - b.index)
+    const pendingGoldLimits = buildOrder.flatMap((item, index) => {
+        if (item.kind !== "limit-gold-miners") return []
+        createGoldMinerLimit(goldMinerLimitCommand(item))
+        return [{ item, index }]
+    }).sort((a, b) => a.item.commandTime - b.item.commandTime)
+    const goldLimitTimes = new Map(pendingGoldLimits.map(({ item }) => [goldMinerLimitTimeKey(item.commandTime), item.commandTime]))
     const resolvedEvents = [...timedEventsByIndex.values()]
     const unitKilledPlan = resolvedEvents.filter(action => action.item.kind === "unit-is-killed")
     const lastFixedCommand = Math.max(0,
         pendingWorkerAndLossEvents[pendingWorkerAndLossEvents.length - 1]?.item.commandTime ?? 0,
         pendingResourcesCollected[pendingResourcesCollected.length - 1]?.item.commandTime ?? 0,
         pendingScrolls[pendingScrolls.length - 1]?.item.commandTime ?? 0,
+        pendingGoldLimits[pendingGoldLimits.length - 1]?.item.commandTime ?? 0,
     )
     // Timed commands are processed independently of their position among catalog rows.
     until = Math.max(until, lastFixedCommand, ...pendingScrolls.map(({ item }) => {
@@ -428,7 +436,7 @@ function simulateBuildOrderPass(
         return item.commandTime + scroll.startDelay + scroll.duration
     }))
     const scrollPlan = resolvedEvents.filter(action => isScrollAction(action.item) || action.item.kind === "mana-spent")
-    for (const pending of [pendingScrolls, pendingResourcesCollected, pendingWorkerAndLossEvents]) {
+    for (const pending of [pendingScrolls, pendingResourcesCollected, pendingWorkerAndLossEvents, pendingGoldLimits]) {
         while (pending.length && timedEventsByIndex.has(pending[0].index)) pending.shift()
     }
     const wellPlan: ScheduledAction[] = evaluateManaWells(buildOrder).map(({ item, index, blocked, blockedReason }) => {
@@ -450,24 +458,24 @@ function simulateBuildOrderPass(
         const interrupted = plan.find(action => action.workerId === workerId && action.finishTime! <= time && (action.workerReturnEndTime ?? action.workerReturnTime ?? 0) > time)
         if (interrupted) interrupted.workerReturnEndTime = time
     }
-    const saturation = Math.max(
-        1,
-        Math.ceil(
-            (2 * economy.goldTravelTime + economy.goldGatherTime) /
-                Math.max(0.001, economy.goldGatherTime),
-        ),
-    )
-
     let buildOrderPrefixLength = nextIndex
+    const nextRecruitTime = () => alignTimeWithGoldMinerLimit(workerCompletions[0] ?? Infinity, goldLimitTimes)
+    const nextQueuedEventTime = () => Math.min(pendingDepartures[0]?.time ?? Infinity, nextRecruitTime(),
+        pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity,
+        pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity, pendingGoldLimits[0]?.item.commandTime ?? Infinity)
     const advanceTo = (time: number) => {
         workerCompletions.sort((a, b) => a - b)
-        while (Math.min(pendingDepartures[0]?.time ?? Infinity, workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity) <= time) {
-            const eventTime = Math.min(pendingDepartures[0]?.time ?? Infinity, workerCompletions[0] ?? Infinity, pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity, pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity)
+        for (let eventTime = nextQueuedEventTime(); eventTime <= time; eventTime = nextQueuedEventTime()) {
             simulation.advanceTo(eventTime)
-            while (workerCompletions[0] === eventTime) {
+            if (pendingGoldLimits[0]?.item.commandTime === eventTime) {
+                const { item, index } = pendingGoldLimits.shift()!
+                simulation.applyGoldMinerLimit(item)
+                timedEventsByIndex.set(index, { item, cost: { gold: 0, wood: 0 }, blocked: false,
+                    commandTime: eventTime, startTime: eventTime, finishTime: eventTime, workerReturnTime: null, workerId: null })
+            }
+            while (nextRecruitTime() === eventTime) {
                 workerCompletions.shift()
-                const goldCount = simulation.workers.filter(({ assignment }) => assignment === "gold").length
-                simulation.addWorker(goldCount < saturation ? "gold" : "wood")
+                simulation.addRecruit()
             }
             while (pendingWorkerAndLossEvents[0]?.item.commandTime === eventTime) {
                 const { item, index } = pendingWorkerAndLossEvents.shift()!
@@ -480,7 +488,8 @@ function simulateBuildOrderPass(
                 }
                 const target = catalog.find(unit => unit.id === item.unitId)!
                 const isWorker = target.id === workerItem.id
-                const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.killed && unit.readyAt <= eventTime)
+                const instance = unitInstances.find(unit => unit.item.id === target.id && !unit.killed &&
+                    (isWorker ? alignTimeWithGoldMinerLimit(unit.readyAt, goldLimitTimes) : unit.readyAt) <= eventTime)
                 const worker = isWorker ? simulation.selectWorkerToKill(item.workerGroup) : undefined
                 const blocked = !instance || (isWorker && !worker)
                 if (!blocked) {
@@ -616,7 +625,7 @@ function simulateBuildOrderPass(
     // Catalog commands run after fixed events at the same timestamp. Save the
     // state between rows, before draining pending work for the projection.
     const captureAt = (index: number) => !pendingDepartures.length && !pendingScrolls.length &&
-        !pendingResourcesCollected.length && !pendingWorkerAndLossEvents.length
+        !pendingResourcesCollected.length && !pendingWorkerAndLossEvents.length && !pendingGoldLimits.length
         ? copyCheckpoint({ ...passState, nextIndex: index })
         : undefined
     let beforeTail: Checkpoint | undefined
@@ -798,7 +807,8 @@ function simulateBuildOrderPass(
                     pendingScrolls[0]?.item.commandTime ?? Infinity,
                     pendingResourcesCollected[0]?.item.commandTime ?? Infinity,
                     pendingWorkerAndLossEvents[0]?.item.commandTime ?? Infinity,
-                    ...workerCompletions,
+                    pendingGoldLimits[0]?.item.commandTime ?? Infinity,
+                    ...(goldLimitTimes.size ? workerCompletions.map(time => alignTimeWithGoldMinerLimit(time, goldLimitTimes)) : workerCompletions),
                     ...buildings.map(({ availableAt }) => availableAt),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime])),
                     ...plan.flatMap(({ finishTime }) => (finishTime === null ? [] : [finishTime + economy.orderDelay])),

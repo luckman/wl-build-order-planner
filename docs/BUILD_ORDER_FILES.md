@@ -534,6 +534,15 @@ Counts are positive integers within the supported worker limit; times and durati
 planner limits. Drafts, JSON files and share links use these same records. Worker identity,
 resource assignments and travel progress are derived by simulation, never stored.
 
+## Gold miner limit events
+
+`{ "type": "limit-gold-miners", "commandTime": 30, "limit": 3, "reassign": true }` sets the
+maximum number of workers assigned to gold for routing completed recruits. The limit is a whole
+number from zero through five. The optional `reassign` boolean defaults to true. Command times are
+seconds from 0 through 1799 and can include fractions. Two limit events must have different command
+times. Other event types may share the time. JSON files, share links, and browser drafts retain the
+same command fields. Builds without this event continue using the profile-derived limit.
+
 ## Per-order construction settings
 
 Construction/upgrade item records may include `construction: { outwardDuration: 0,

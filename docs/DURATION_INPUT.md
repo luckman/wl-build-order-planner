@@ -1,7 +1,7 @@
 # Default event time input
 
 Use `src/DurationInput.tsx` for command-time selection in planner event dialogs. Scroll, Resources
-collected, Mana spent, worker activity, mana-well, and Unit is killed dialogs use this control. Its
+collected, Mana spent, worker activity, Limit gold miners, mana-well, and Unit is killed dialogs use this control. Its
 styling lives in `src/duration-input.css`.
 
 ```tsx

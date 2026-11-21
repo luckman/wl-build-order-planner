@@ -1,6 +1,7 @@
 import { constructionCommand, parseConstructionSettings, parseConstructionTimeModifier, type ConstructionSettings } from "./constructionSettings"
 import type { WorkerCasualtyGroup } from "./gameData"
 import { createWorkerEvent, workerEventCommand, type WorkerEventCommand } from "./workerEvents"
+import { createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, type GoldMinerLimitCommand } from "./goldMinerLimit"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision, type ManaSpentCommand } from "./manaSpent"
 import { validateActionCount, validateEconomyDurations } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, type UnitKilledCommand } from "./unitsKilled"
@@ -11,11 +12,11 @@ import { economyFromProfile, STARTING_WORKER_COUNT, scrollLevelFields, initialGa
 export type { GameProfile } from "./gameProfile"
 import { type ScheduledAction } from "./buildSimulation"
 import { playerLevelFields, playerLevelTier } from "./playerLevels"
-import { createScrollAction, isScrollAction, scrollCommand, type ScrollCommand } from "./scrolls"
+import { createScrollAction, scrollCommand, type ScrollCommand } from "./scrolls"
 
 export const FILE_VERSION = 2
 // Bump when catalog values or simulation rules change; historical rules are not retained.
-export const GAME_RULES_VERSION = "2026-11-07.2"
+export const GAME_RULES_VERSION = "2026-11-21"
 export const MAX_FILE_BYTES = 1024 * 1024
 export type BuildOrderDocument = {
     format: "wl-build-order"
@@ -23,11 +24,24 @@ export type BuildOrderDocument = {
     gameRulesVersion: string
     faction: FactionId
     gameProfile: GameProfile
-    buildOrder: Array<OpeningAction | ((WorkerEventCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
+    buildOrder: Array<OpeningAction | ((WorkerEventCommand | GoldMinerLimitCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
         itemId: string; construction?: ConstructionSettings
     }) & {
         timings?: Pick<ScheduledAction, "commandTime" | "departureTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime">
     })>
+}
+
+export function buildOrderCommand(item: PlannerItem) {
+    switch (item.kind) {
+        case "worker-event": return workerEventCommand(item)
+        case "limit-gold-miners": return goldMinerLimitCommand(item)
+        case "mana-spent": return manaSpentCommand(item)
+        case "scroll": return scrollCommand(item)
+        case "resources-collected": return resourcesCollectedCommand(item)
+        case "mana-well": return manaWellCommand(item)
+        case "unit-is-killed": return unitKilledCommand(item)
+        default: return constructionCommand(item)
+    }
 }
 
 export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile, actions: ScheduledAction[], includeTimings = false,
@@ -37,7 +51,7 @@ export function serializeBuildOrder(faction: FactionId, gameProfile: GameProfile
         format: "wl-build-order", version: FILE_VERSION, gameRulesVersion: GAME_RULES_VERSION,
         faction, gameProfile,
         buildOrder: [opening, ...actions.map(({ item, commandTime, departureTime, startTime, finishTime, workerReturnTime, workerReturnEndTime }) => ({
-            ...(item.kind === "worker-event" ? workerEventCommand(item) : item.kind === "mana-spent" ? manaSpentCommand(item) : isScrollAction(item) ? scrollCommand(item) : item.kind === "resources-collected" ? resourcesCollectedCommand(item) : item.kind === "mana-well" ? manaWellCommand(item) : item.kind === "unit-is-killed" ? unitKilledCommand(item) : constructionCommand(item)),
+            ...buildOrderCommand(item),
             ...(includeTimings ? { timings: { commandTime, departureTime, startTime, finishTime, workerReturnTime, workerReturnEndTime } } : {}),
         }))],
     }
@@ -137,6 +151,12 @@ export function parseBuildOrder(text: string): {
                 count: number(action.count, `Action ${index + 1}.count`, true, true),
                 travelDuration: action.travelDuration === undefined ? 0 : number(action.travelDuration, `Action ${index + 1}.travelDuration`) }, faction)
         }
+        if (action.type === "limit-gold-miners") {
+            if (action.reassign !== undefined && typeof action.reassign !== "boolean")
+                throw new Error(`Action ${index + 1}.reassign must be true or false.`)
+            return createGoldMinerLimit({ type: action.type, commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
+                limit: resourceAmount(action.limit, "Gold miner limit"), reassign: action.reassign })
+        }
         if (action.type === "mana-spent") {
             return createManaSpentAction({ type: "mana-spent", commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
                 mana: resourceAmount(action.mana, `Action ${index + 1}.mana`) }, faction)
@@ -173,7 +193,7 @@ export function parseBuildOrder(text: string): {
         }
         return item
     })
-    const collision = manaSpentCollision(buildOrder)
+    const collision = manaSpentCollision(buildOrder) ?? goldMinerLimitCollision(buildOrder)
     if (collision) throw new Error(collision)
     return {
         faction: doc.faction, buildOrder, opening, gameProfile,

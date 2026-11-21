@@ -4,7 +4,7 @@ import { formatDuration, MAX_DURATION_SECONDS, parseDuration } from "./durationT
 
 /** Manual timestamp editor shared by scrolls and future fixed-time events. */
 export default function EventTimeDialog({ name, commandTime, onSave, onClose, title, submitLabel = "Save timestamp", wholeSeconds = false, validateTime, children }: {
-    children?: ReactNode
+    children?: ReactNode | ((commandTime: number | null) => ReactNode)
     title?: string; submitLabel?: string; wholeSeconds?: boolean; validateTime?: (time: number) => string | null
     name: string; commandTime: number
     onSave: (time: number) => void; onClose: () => void
@@ -34,7 +34,7 @@ export default function EventTimeDialog({ name, commandTime, onSave, onClose, ti
             <h2 id="event-time-dialog-title">{title ?? `Change ${name} timestamp`}</h2>
             <form onSubmit={event => { event.preventDefault(); if (valid) onSave(seconds!) }}>
                 <DurationInput wholeSeconds={wholeSeconds} label="Command time (mm:ss)" value={time} onChange={setTime} aria-invalid={!valid} />
-                {children}
+                {typeof children === "function" ? children(seconds) : children}
                 <p className="scroll-time-hint">The plan recalculates when saved and shows any timing conflicts.</p>
                 {!timeValid && <p role="alert">Enter a valid mm:ss time between 00:00 and 29:59.</p>}
                 {validationError && <p role="alert">{validationError}</p>}

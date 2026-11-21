@@ -70,6 +70,35 @@ test("empty orders import", () => {
     expect(parseBuildOrder(JSON.stringify(doc)).buildOrder).toEqual([])
 })
 
+test("gold limits round-trip and reject duplicate limit times including when another event shares the time", () => {
+    const doc = JSON.parse(sample("dark"))
+    const limit = { type: "limit-gold-miners", commandTime: 75.5, limit: 5, reassign: false }
+    doc.buildOrder.push(limit, { type: "resources-collected", commandTime: 75.5, gold: 10, wood: 0 })
+    const parsed = parseBuildOrder(JSON.stringify(doc))
+    const economy = economyFromProfile(parsed.gameProfile, parsed.opening)
+    const plan = simulateBuildOrder(parsed.buildOrder, economy, 10, 24, economy.foodPerFarm, "Citadel").plan
+    const saved = JSON.parse(serializeBuildOrder("dark", parsed.gameProfile, plan))
+    expect(saved.buildOrder[4]).toEqual(limit)
+    expect(parseBuildOrder(JSON.stringify(saved)).buildOrder).toEqual(parsed.buildOrder)
+    doc.buildOrder.push({ ...limit, limit: 0 })
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("already has an event at 01:15.5")
+})
+
+test.each([-1, 6, 1.25, "4"])("rejects a gold miner limit of %p", limit => {
+    const doc = JSON.parse(sample())
+    doc.buildOrder.push({ type: "limit-gold-miners", commandTime: 0, limit })
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(/limit.+(?:whole number|finite number)/)
+})
+
+test("gold limit conflicts recognize alternate floating-point representations of the same millisecond", () => {
+    const doc = JSON.parse(sample())
+    doc.buildOrder.push({ type: "limit-gold-miners", commandTime: 61.029, limit: 4 },
+        { type: "limit-gold-miners", commandTime: 61.028999999999996, limit: 5 })
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow("already has an event at 01:01.029")
+    doc.buildOrder[5].commandTime = 61.03
+    expect(parseBuildOrder(JSON.stringify(doc)).buildOrder).toHaveLength(5)
+})
+
 test.each([-50, 25, 150, "50", null, false])("rejects unsupported construction time modifier %p", timeModifier => {
     const doc = JSON.parse(sample())
     doc.buildOrder[1].construction = { timeModifier }

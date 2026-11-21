@@ -5,7 +5,7 @@ import { buildingLimit, newBuilding, plannedBuildings, requirementCount } from "
 export type WorkerCasualtyGroup = "gathering" | "idle"
 export type FactionId = "light" | "dark"
 export type ItemKind = "building" | "unit" | "hero" | "upgrade"
-export function isRecruitable(item: { kind: ItemKind | "worker-event" | "mana-spent" | "scroll" | "resources-collected" | "mana-well" | "unit-is-killed" }) {
+export function isRecruitable(item: Pick<PlannerItem, "kind">) {
     return item.kind === "unit" || item.kind === "hero"
 }
 export type BuildingType = "Economic" | "Production" | "Racial" | "Defensive"
@@ -25,7 +25,7 @@ export type IconId =
     | "lightWorkerIdle" | "lightWorkerActive" | "darkSlaveIdle" | "darkSlaveActive"
     | "manaWellIsCaptured" | "manaWellIsLost"
     | "lightManaSpent" | "darkManaSpent"
-    | "resourcesCollected"
+    | "resourcesCollected" | "limitGoldMiners"
     | "lightGoldRush" | "lightLumberGathering" | "darkWhip" | "darkLegionsCall"
     | "lightCastle"
     | "lightSawmill"
@@ -136,7 +136,7 @@ export type PlannerItem = {
     level?: number
     upgradeFrom?: string
     producerBuildingId?: string
-} & ({ kind: ItemKind } | { kind: "worker-event"; workerEvent: "make-idle" | "make-active"; commandTime: number; count: number; travelDuration: number } | { kind: "mana-spent"; commandTime: number; mana: number } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering" | "whip" | "legions-call"; commandTime: number; targetItemId?: string } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string; workerGroup?: WorkerCasualtyGroup })
+} & ({ kind: ItemKind } | { kind: "worker-event"; workerEvent: "make-idle" | "make-active"; commandTime: number; count: number; travelDuration: number } | { kind: "limit-gold-miners"; commandTime: number; goldLimit: number; reassign: boolean } | { kind: "mana-spent"; commandTime: number; mana: number } | { kind: "scroll"; scrollId: "gold-rush" | "lumber-gathering" | "whip" | "legions-call"; commandTime: number; targetItemId?: string } | { kind: "resources-collected"; commandTime: number; collectedGold: number; collectedWood: number } | { kind: "mana-well"; wellEvent: "mana-well-is-captured" | "mana-well-is-lost"; commandTime: number } | { kind: "unit-is-killed"; commandTime: number; unitId: string; workerGroup?: WorkerCasualtyGroup })
 
 export type Faction = {
     id: FactionId

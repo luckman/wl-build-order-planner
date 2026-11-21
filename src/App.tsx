@@ -4,6 +4,8 @@ import ConstructionDialog from "./ConstructionDialog"
 import { isConstruction, hasCustomConstruction, constructionDescription } from "./game/constructionSettings"
 import WorkerEventDialog from "./WorkerEventDialog"
 import { createWorkerEvent, workerEventIdentity, type WorkerEventCommand } from "./game/workerEvents"
+import GoldMinerLimitDialog from "./GoldMinerLimitDialog"
+import { createGoldMinerLimit, GOLD_MINER_LIMIT_NAME, profileGoldMinerLimit } from "./game/goldMinerLimit"
 import ManaSpentDialog from "./ManaSpentDialog"
 import { createManaSpentAction, manaSpentCollision, type ManaSpentCommand } from "./game/manaSpent"
 import Notification, { type NotificationMessage } from "./Notification"
@@ -63,6 +65,7 @@ const iconSources: Record<string, string> = {
     lightManaSpent: require("./icons/events/light-mana-spent.png"),
     darkManaSpent: require("./icons/events/dark-mana-spent.png"),
     resourcesCollected: require("./icons/events/resources-collected.png"),
+    limitGoldMiners: require("./icons/events/limit-gold-miners.png"),
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     darkWhip: require("./icons/scrolls/dark-whip.png"),
@@ -203,6 +206,7 @@ export default function App() {
     const [scrollDialogOpen, setScrollDialogOpen] = useState<ScrollId | null>(null)
     const [configuringConstruction, setConfiguringConstruction] = useState<PlannerItem | null>(null)
     const [workerEventDialogOpen, setWorkerEventDialogOpen] = useState<WorkerEventCommand["type"] | null>(null)
+    const [goldMinerLimitDialogOpen, setGoldMinerLimitDialogOpen] = useState(false)
     const [unitKilledDialogOpen, setUnitKilledDialogOpen] = useState(false)
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
     const [manaSpentDialogOpen, setManaSpentDialogOpen] = useState(false)
@@ -677,6 +681,11 @@ export default function App() {
                                                         <img src={iconSources[icon]} alt="" />
                                                     </button>
                                                 })}
+                                                <button className="action resource-card" aria-label={GOLD_MINER_LIMIT_NAME} title="Set how many workers can mine gold at a chosen timestamp"
+                                                    onClick={() => setGoldMinerLimitDialogOpen(true)}>
+                                                    <span className="action-name">{GOLD_MINER_LIMIT_NAME}</span>
+                                                    <img src={iconSources.limitGoldMiners} alt="" />
+                                                </button>
                                             </>}
                                         </div>}
                                     </section>
@@ -859,6 +868,7 @@ export default function App() {
                                             <b>{item.name}{item.kind === "worker-event" && item.workerEvent === "make-idle" && item.count > 1 ? ` (${item.count})` : ""}</b>
                                             {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}
                                             {item.kind === "worker-event" && item.workerEvent === "make-active" && <small>{item.count} workers · {item.travelDuration}s travel</small>}
+                                            {item.kind === "limit-gold-miners" && <small>Limit {item.goldLimit}</small>}
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}{item.workerGroup ? ` · ${item.workerGroup} worker` : ""}</small>}
                                             {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
@@ -948,6 +958,20 @@ export default function App() {
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
                             : [...current, action], () => {
                             setManaSpentDialogOpen(false); setEditingEventId(null); setDependencyError(null); setHoverTime(null)
+                        })
+                    }} />}
+                {(goldMinerLimitDialogOpen || editingEvent?.kind === "limit-gold-miners") && <GoldMinerLimitDialog
+                    key={editingEvent?.orderId ?? "new-gold-miner-limit"} defaultTime={defaultEventTime}
+                    items={buildOrder} profileLimit={profileGoldMinerLimit(economy)}
+                    action={editingEvent?.kind === "limit-gold-miners" ? editingEvent : undefined}
+                    validationError={editingEvent ? null : additionError}
+                    onClose={() => { setGoldMinerLimitDialogOpen(false); setEditingEventId(null) }}
+                    onSave={command => {
+                        const action = createGoldMinerLimit(command)
+                        setBuildOrder(current => editingEvent?.kind === "limit-gold-miners"
+                            ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
+                            : [...current, action], () => {
+                            setGoldMinerLimitDialogOpen(false); setEditingEventId(null); setHoverTime(null)
                         })
                     }} />}
                 {(workerEventDialogOpen || editingEvent?.kind === "worker-event") && <WorkerEventDialog

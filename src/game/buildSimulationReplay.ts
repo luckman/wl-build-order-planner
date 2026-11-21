@@ -1,4 +1,5 @@
 import type { PlannerItem } from "./gameData"
+import { timestampRoundoff } from "./goldMinerLimit"
 import type { PreparationSchedule } from "./preparationScheduling"
 import { isTimedEvent } from "./resourcesCollected"
 
@@ -32,7 +33,10 @@ export function replayBoundary(previous: ReplayOrder, current: ReplayOrder) {
     const fixedCount = commonPrefix(previous.fixed, current.fixed)
     // Include both the removed and the inserted effect. A checkpoint at the
     // boundary itself may have applied events before a same-time catalog row.
-    const fixedTime = Math.min(previous.fixed[fixedCount]?.time ?? Infinity, current.fixed[fixedCount]?.time ?? Infinity)
+    const changedTime = Math.min(previous.fixed[fixedCount]?.time ?? Infinity, current.fixed[fixedCount]?.time ?? Infinity)
+    // A recruit aligned to a limit command may previously have finished a few
+    // floating-point units before the authored time.
+    const fixedTime = Number.isFinite(changedTime) ? changedTime - timestampRoundoff(changedTime) : changedTime
     const rowMap = new Map<number, number>()
     for (const [before, after, count] of [
         [previous.catalog, current.catalog, catalogCount],

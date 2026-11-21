@@ -1,5 +1,6 @@
-import type { WorkerCasualtyGroup } from "./gameData"
+import type { PlannerItem, WorkerCasualtyGroup } from "./gameData"
 import type { WorkerEventAction } from "./workerEvents"
+import { alignTimeWithGoldMinerLimit, goldMinerLimitTimeKey, profileGoldMinerLimit, type GoldMinerLimitAction } from "./goldMinerLimit"
 import { growingWoodTravelTime } from "./gatheringRules"
 import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
 import type { PlayerBuildingLevels } from "./playerLevels"
@@ -102,7 +103,7 @@ export type WorkerAllocation = {
 }
 
 type WorkerStateAction = {
-    item: { id: string; kind: string; workerEvent?: "make-idle" | "make-active"; count?: number; travelDuration?: number }
+    item: PlannerItem
     commandTime: number | null
     finishTime: number | null
     workerReturnTime: number | null
@@ -119,6 +120,8 @@ export class WorkerEconomy {
     readonly eventBoundaries = new Set<number>()
     time = 0
     private steps = 0
+    private explicitGoldLimit: number | undefined
+    private readonly profileGoldLimit: number
     private mineWorker: number | null = null
     private delayedInitialWoodWorkerIds: number[] = []
     private sawmillCompletions: number[] = []
@@ -129,6 +132,7 @@ export class WorkerEconomy {
 
     constructor(private settings: EconomySettings, private constructionWhipWindows: WhipWindow[] = [], private recordBoundaries = false) {
         this.whip = whipEffect(settings)
+        this.profileGoldLimit = profileGoldMinerLimit(settings)
         validateEconomyDurations(settings, Math.max(settings.workerCount, settings.goldWorkers + settings.woodWorkers))
         for (const count of [settings.workerCount, settings.goldWorkers, settings.woodWorkers]) {
             if (!Number.isInteger(count) || count < 0 || count > MAX_PLAN_ACTIONS + 5) throw new Error("Unsupported worker count.")
@@ -183,6 +187,22 @@ export class WorkerEconomy {
             this.transition(worker, "outbound", outboundTravel)
         }
         return worker
+    }
+
+    applyGoldMinerLimit(action: GoldMinerLimitAction) {
+        this.explicitGoldLimit = action.goldLimit
+    }
+
+    get goldMinerLimit() {
+        return this.explicitGoldLimit ?? this.profileGoldLimit
+    }
+
+    get goldAssignments() {
+        return this.workers.filter(({ assignment }) => assignment === "gold").length
+    }
+
+    addRecruit() {
+        return this.addWorker(this.goldAssignments < this.goldMinerLimit ? "gold" : "wood")
     }
 
     /** Construction workers cannot be selected; wood gatherers are killed before gold miners. */
@@ -575,7 +595,11 @@ export function workerAllocationAt(
     time: number,
 ): WorkerAllocation {
     const simulation = new WorkerEconomy(settings)
+    const goldLimitTimes = new Map<number, number>()
     for (const action of actions) {
+        if (action.item.kind === "limit-gold-miners" && !action.blocked && action.commandTime !== null) {
+            goldLimitTimes.set(goldMinerLimitTimeKey(action.commandTime), action.commandTime)
+        }
         if (action.item.kind === "scroll" && !action.blocked && action.startTime != null && action.finishTime !== null) {
             simulation.scheduleScroll(action.item.id as ScrollId, action.startTime, action.finishTime)
         }
@@ -583,26 +607,25 @@ export function workerAllocationAt(
             simulation.scheduleSawmill(action.finishTime)
         }
     }
-    const saturation = Math.max(
-        1,
-        Math.ceil(
-            (2 * settings.goldTravelTime + settings.goldGatherTime) /
-                Math.max(0.001, settings.goldGatherTime),
-        ),
-    )
+    const allocationTime = alignTimeWithGoldMinerLimit(time, goldLimitTimes)
+    const eventPriority = { "limit-gold-miners": 0, worker: 1, "worker-event": 2, kill: 2, prepare: 3, "player-whip-preparation": 3, construction: 4 }
     const events = actions
         .flatMap((action) => {
             const events: Array<{
                 time: number
-                type: "prepare" | "worker" | "construction" | "kill" | "worker-event" | "player-whip-preparation"
+                type: keyof typeof eventPriority
                 action?: WorkerEventAction
+                goldMinerLimit?: GoldMinerLimitAction
                 workerId?: number
                 duration?: number
                 travelTime?: number
                 returnTravelTime?: number
             }> = []
             if (action.item.kind === "worker-event" && !action.blocked && action.commandTime !== null) {
-                events.push({ time: action.commandTime, type: "worker-event", action: action.item as WorkerEventAction })
+                events.push({ time: action.commandTime, type: "worker-event", action: action.item })
+            }
+            if (action.item.kind === "limit-gold-miners" && !action.blocked && action.commandTime !== null) {
+                events.push({ time: action.commandTime, type: "limit-gold-miners", goldMinerLimit: action.item })
             }
             if (action.item.id === "whip" && action.item.kind === "scroll" &&
                 !action.blocked && action.commandTime !== null) {
@@ -612,7 +635,7 @@ export function workerAllocationAt(
                 events.push({ time: action.commandTime, type: "kill", workerId: action.workerId })
             }
             if ((action.item.id === "worker" || action.item.id === "slave") && action.finishTime !== null) {
-                events.push({ time: action.finishTime, type: "worker" })
+                events.push({ time: alignTimeWithGoldMinerLimit(action.finishTime, goldLimitTimes), type: "worker" })
             }
             if (
                 (action.item.kind === "building" || action.item.kind === "upgrade") &&
@@ -634,16 +657,15 @@ export function workerAllocationAt(
             }
             return events
         })
-        .filter((event) => event.time <= time)
-        .sort((left, right) => left.time - right.time ||
-            ({ worker: 0, "worker-event": 1, kill: 1, prepare: 2, "player-whip-preparation": 2, construction: 3 }[left.type] -
-                { worker: 0, "worker-event": 1, kill: 1, prepare: 2, "player-whip-preparation": 2, construction: 3 }[right.type]))
+        .filter((event) => event.time <= allocationTime)
+        .sort((left, right) => left.time - right.time || eventPriority[left.type] - eventPriority[right.type])
 
     for (const event of events) {
         simulation.advanceTo(event.time)
-        if (event.type === "worker") {
-            const goldWorkers = simulation.workers.filter(({ assignment }) => assignment === "gold").length
-            simulation.addWorker(goldWorkers < saturation ? "gold" : "wood")
+        if (event.type === "limit-gold-miners") {
+            simulation.applyGoldMinerLimit(event.goldMinerLimit!)
+        } else if (event.type === "worker") {
+            simulation.addRecruit()
         } else if (event.type === "prepare") {
             simulation.prepareConstruction(simulation.workers[event.workerId!])
         } else if (event.type === "worker-event") {
@@ -660,7 +682,7 @@ export function workerAllocationAt(
             }
         }
     }
-    simulation.advanceTo(time)
+    simulation.advanceTo(allocationTime)
     const buildingOrTravelling = simulation.workers.filter(
         worker => worker.state !== "killed" && (isBuildingWorker(worker) || worker.state === "reactivation" || (worker.state === "idle" && worker.assignment !== "idle")),
     ).length

@@ -127,10 +127,11 @@ Each outbound or return travel leg keeps the duration chosen when it began. Sawm
 growth boundaries do not change travel already underway. Chopping durations and gold travel are
 unchanged. The rule applies to both factions.
 
-Newly recruited workers join gold until assigned gold workers reach
+Until the first **Limit gold miners** event, newly recruited workers join gold until assigned gold workers reach
 `ceil((2 * goldTravelTime + effectiveGoldGatherTime) / effectiveGoldGatherTime)`, then join wood.
-Workers temporarily constructing count toward their previous assignment. Worker losses remove their
-future deliveries and assignment; recruitment uses the resulting current allocation.
+The timed event sets an explicit limit of 0–5 that applies to recruits finishing at that time or later.
+The next event replaces the limit. The opening allocation takes effect as entered. Recruitment also
+counts gold-assigned builders and reactivating gold miners when checking for an open slot.
 
 ## Player progression and in-match upgrades
 
@@ -226,6 +227,7 @@ including blocked commands.
 | Mana well is captured / Mana well is lost (both factions) | Instantly adds/removes one owned well. A loss requires ownership at that timestamp. |
 | Unit is killed (both factions) | Removes a living unit and releases its food. For worker losses, choose Gathering or Idle. Recalculation keeps unavailable casualties as blocked entries with no effect. |
 | Make idle / Make active (both factions) | Pauses gathering or restores the saved assignments for a chosen number of workers. |
+| Limit gold miners (both factions) | Sets the gold assignment limit at a chosen time, before recruits finishing at the same time are assigned. |
 
 For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively.
 Levels are independent profile settings, editable for Light in Resources collection, and default to
