@@ -253,6 +253,7 @@ including blocked commands.
 | Unit is killed (both factions) | Removes a living unit and releases its food. For worker losses, choose Gathering or Idle. Recalculation keeps unavailable casualties as blocked entries with no effect. |
 | Make idle / Make active (both factions) | Pauses gathering or restores the saved assignments for a chosen number of workers. |
 | Limit gold miners (both factions) | Sets the gold assignment limit at a chosen time, before recruits finishing at the same time are assigned. |
+| Move gold miner to wood (both factions) | Redirects a chosen number of currently assigned gold miners to wood without changing the limit. |
 
 For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively.
 Levels are independent profile settings, editable for Light in Resources collection, and default to
@@ -295,6 +296,17 @@ gold miner limit in effect, former miners resume on wood if all gold slots are o
 gathering after the specified reactivation travel. The planner blocks the event if fewer workers
 are available than requested. Workers retain wood progress and cargo. Interrupted gold cargo is
 discarded. Whip affects reactivation travel, and construction can interrupt that trip.
+
+**Move gold miner to wood** selects from the gold assignments present at command time, including
+gold-assigned builders. Miners finish and deposit a load before moving. Empty-handed builders
+can move directly from the construction site at finish time. The [gold miner travel rules](#gold-miner-limits)
+apply to both routes. The existing gold limit stays in effect.
+
+The Build order shows the requested and completed counts. If too few original miners remain,
+the event ends with the completed moves intact and reports the shortfall and when it occurred.
+At a shared timestamp, the limit changes and completed recruits are assigned first. Earlier
+pending moves have priority, then new move, activity and casualty commands follow Build order.
+Automatic reassignment follows those commands.
 
 Gathering casualties include workers travelling to or from resources and workers inside the mine.
 Idle casualties require an available, deliberately idle worker. Builders are ineligible throughout

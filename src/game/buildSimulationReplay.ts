@@ -1,5 +1,5 @@
 import type { PlannerItem } from "./gameData"
-import { timestampRoundoff } from "./goldMinerLimit"
+import { alignTimeWithGoldMinerLimit, goldMinerLimitTimeKey, timestampRoundoff } from "./goldMinerLimit"
 import type { PreparationSchedule } from "./preparationScheduling"
 import { isTimedEvent } from "./resourcesCollected"
 
@@ -10,10 +10,17 @@ export function replayOrder(items: PlannerItem[]) {
     const catalog: ReplayRow[] = []
     const fixed: Array<ReplayRow & { time: number }> = []
     const catalogPositions = new Map<number, number>()
+    const authoredWorkerTimes = new Map<number, number>()
+    for (const item of items) {
+        if (item.kind === "limit-gold-miners" || item.kind === "manual-worker-move")
+            authoredWorkerTimes.set(goldMinerLimitTimeKey(item.commandTime), item.commandTime)
+    }
     for (const [index, item] of items.entries()) {
         const key = JSON.stringify(item)
         if (isTimedEvent(item) && "commandTime" in item) {
-            fixed.push({ index, key, time: item.commandTime })
+            const time = item.kind === "worker-event" || item.kind === "unit-is-killed"
+                ? alignTimeWithGoldMinerLimit(item.commandTime, authoredWorkerTimes) : item.commandTime
+            fixed.push({ index, key, time })
         } else {
             catalogPositions.set(index, catalog.length)
             catalog.push({ index, key })

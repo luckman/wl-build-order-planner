@@ -70,6 +70,22 @@ test("empty orders import", () => {
     expect(parseBuildOrder(JSON.stringify(doc)).buildOrder).toEqual([])
 })
 
+test("manual worker moves round-trip with same-time row order and recalculate progress", () => {
+    const doc = JSON.parse(sample())
+    const first = { type: "move-gold-miner-to-wood", commandTime: 1.5, count: 2 }
+    const idle = { type: "make-idle", commandTime: 1.5, count: 1 }
+    const second = { ...first, count: 1 }
+    doc.buildOrder.splice(1, Infinity, first, idle, second)
+    const parsed = parseBuildOrder(JSON.stringify(doc))
+    const settings = economyFromProfile(parsed.gameProfile, parsed.opening)
+    const plan = simulateBuildOrder(parsed.buildOrder, settings, 10, 24, settings.foodPerFarm, "Castle").plan
+    const saved = JSON.parse(serializeBuildOrder("light", parsed.gameProfile, plan))
+    expect(saved.buildOrder.slice(1)).toEqual([first, idle, second])
+    expect(parseBuildOrder(JSON.stringify(saved)).buildOrder).toEqual(parsed.buildOrder)
+    doc.buildOrder[1].count = 1.25
+    expect(() => parseBuildOrder(JSON.stringify(doc))).toThrow(/count/)
+})
+
 test("gold limits round-trip and reject duplicate limit times including when another event shares the time", () => {
     const doc = JSON.parse(sample("dark"))
     const limit = { type: "limit-gold-miners", commandTime: 75.5, limit: 5, reassign: false }

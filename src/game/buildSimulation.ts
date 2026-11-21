@@ -1,6 +1,7 @@
 import { matchesPreparation, matchesPreparationReuse, schedulePreparation, type PreparationReuse, type PreparationSchedule } from "./preparationScheduling"
 import { isConstruction, parseConstructionSettings } from "./constructionSettings"
 import { parseWorkerEvent, workerEventCommand } from "./workerEvents"
+import { createManualWorkerMove, manualWorkerMoveCommand, type ManualWorkerMoveResult } from "./manualWorkerMoves"
 import { alignTimeWithGoldMinerLimit, createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, goldMinerLimitTimeKey, timestampRoundoff } from "./goldMinerLimit"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision } from "./manaSpent"
 import { MAX_PLAN_ACTIONS, MAX_PLAN_SECONDS, validateActionCount, validatePlanTime } from "./plannerLimits"
@@ -36,6 +37,7 @@ export type ScheduledAction = {
     workerId: number | null
     foodReleased?: number
     manaCost?: number
+    manualMove?: ManualWorkerMoveResult
 }
 
 type BuildSimulation = {
@@ -80,7 +82,7 @@ function copyCheckpoint(checkpoint: Checkpoint): Checkpoint {
 function checkpointWeight(state: Checkpoint) {
     const { simulation } = state
     return simulation.deliveries.length + simulation.eventBoundaries.size + simulation.workers.length +
-        state.plan.length + state.unitInstances.length + state.timedEventsByIndex.size
+        state.plan.length + state.unitInstances.length + state.timedEventsByIndex.size + simulation.manualMoveCheckpointWeight
 }
 
 function restoreCheckpoint(checkpoint: Checkpoint, buildOrder: PlannerItem[], order: ReplayOrder, rowMap?: Map<number, number>) {
@@ -149,7 +151,8 @@ const simulationSources = new WeakMap<BuildSimulation, {
 }>()
 
 function projectSimulation(result: Pick<ReturnType<typeof simulateBuildOrderPass>, "plan" | "orderedPlan" | "projectDeliveries">): BuildSimulation {
-    const buildEnd = Math.max(0, ...result.orderedPlan.map(action => action.blocked ? 0 : action.finishTime!))
+    const buildEnd = Math.max(0, ...result.orderedPlan.map(action => action.item.kind === "manual-worker-move"
+        ? action.finishTime ?? action.commandTime ?? 0 : action.blocked ? 0 : action.finishTime!))
     const horizon = Math.min(MAX_PLAN_SECONDS, Math.max(buildEnd + RESOURCE_PROJECTION_SECONDS, timelineEnd(result.plan)))
     return { plan: result.plan, orderedPlan: result.orderedPlan, deliveries: result.projectDeliveries(horizon) }
 }
@@ -415,9 +418,18 @@ function simulateBuildOrderPass(
         return [{ item, index }]
     }).sort((a, b) => a.item.commandTime - b.item.commandTime)
     const goldLimitTimes = new Map(pendingGoldLimits.map(({ item }) => [goldMinerLimitTimeKey(item.commandTime), item.commandTime]))
+    const manualMoveTimes = new Set<number>()
+    for (const item of buildOrder) {
+        if (item.kind === "manual-worker-move") {
+            goldLimitTimes.set(goldMinerLimitTimeKey(item.commandTime), item.commandTime)
+            manualMoveTimes.add(item.commandTime)
+        }
+    }
+    const hasManualMoves = manualMoveTimes.size > 0
     const pendingWorkerAndLossEvents = buildOrder.flatMap((item, index) => {
-        if (item.kind !== "unit-is-killed" && item.kind !== "worker-event") return []
+        if (item.kind !== "unit-is-killed" && item.kind !== "worker-event" && item.kind !== "manual-worker-move") return []
         if (item.kind === "worker-event") parseWorkerEvent(workerEventCommand(item))
+        else if (item.kind === "manual-worker-move") createManualWorkerMove(manualWorkerMoveCommand(item))
         else createUnitKilledAction(unitKilledCommand(item), faction)
         return [{ item, index, time: alignTimeWithGoldMinerLimit(item.commandTime, goldLimitTimes) }]
     }).sort((a, b) => a.time - b.time || a.index - b.index)
@@ -466,7 +478,7 @@ function simulateBuildOrderPass(
         pendingScrolls[0]?.item.commandTime ?? Infinity, pendingResourcesCollected[0]?.item.commandTime ?? Infinity)
     const nextWorkerTransitionTime = () => {
         const transition = alignTimeWithGoldMinerLimit(simulation.nextEventTime, goldLimitTimes)
-        if (!simulation.hasExplicitGoldMinerLimit) return transition
+        if (!simulation.hasExplicitGoldMinerLimit && !hasManualMoves) return transition
         const command = nextWorkerCommandTime()
         return Number.isFinite(command) && Math.abs(command - transition) <= timestampRoundoff(command) ? command : transition
     }
@@ -481,8 +493,16 @@ function simulateBuildOrderPass(
             workerCompletions.shift()
             simulation.addRecruit()
         }
+        simulation.resolvePendingManualMoves()
         while (pendingWorkerAndLossEvents[0]?.time === eventTime) {
             const { item, index } = pendingWorkerAndLossEvents.shift()!
+            if (item.kind === "manual-worker-move") {
+                const blockedReason = simulation.startManualWorkerMove(item)
+                timedEventsByIndex.set(index, { item, blocked: blockedReason !== undefined, cost: { gold: 0, wood: 0 },
+                    commandTime: eventTime, startTime: blockedReason === undefined ? eventTime : null, finishTime: null,
+                    workerReturnTime: null, workerId: null, ...(blockedReason ? { blockedReason } : {}) })
+                continue
+            }
             if (item.kind === "worker-event") {
                 const blocked = !simulation.applyWorkerEvent(item)
                 timedEventsByIndex.set(index, { item, blocked, cost: { gold: 0, wood: 0 }, commandTime: eventTime,
@@ -517,8 +537,9 @@ function simulateBuildOrderPass(
             const pendingLimit = pendingGoldLimits[0]?.item
             const limitAtTime = pendingLimit?.commandTime === eventTime ? pendingLimit : undefined
             const workerCommandAtTime = nextRecruitTime() === eventTime || pendingWorkerAndLossEvents[0]?.time === eventTime
-            if (limitAtTime || (simulation.hasExplicitGoldMinerLimit && workerCommandAtTime)) {
-                simulation.advanceTo(eventTime, () => applyWorkerCommandsAt(eventTime), limitAtTime)
+            const manualMoveAtTime = manualMoveTimes.has(eventTime)
+            if (limitAtTime || ((simulation.hasExplicitGoldMinerLimit || simulation.hasPendingManualMoves || manualMoveAtTime) && workerCommandAtTime)) {
+                simulation.advanceTo(eventTime, () => applyWorkerCommandsAt(eventTime), limitAtTime, manualMoveAtTime)
             } else {
                 simulation.advanceTo(eventTime)
                 applyWorkerCommandsAt(eventTime)
@@ -894,10 +915,18 @@ function simulateBuildOrderPass(
         .sort((a, b) => (a.action.commandTime ?? Infinity) - (b.action.commandTime ?? Infinity) || a.index - b.index)
         .map(({ action }) => action)
     const projectDeliveries = (horizon: number) => {
-        // Scheduling may have searched beyond the output horizon for a blocked action.
-        if (simulation.time > horizon) return simulation.deliveries.filter(({ time }) => time <= horizon)
         if (simulation.time < horizon) advanceTo(horizon)
-        return simulation.deliveries
+        if (hasManualMoves) {
+            let moveIndex = 0
+            for (const action of orderedPlan) {
+                if (action.item.kind !== "manual-worker-move") continue
+                const result = simulation.manualWorkerMoveResult(moveIndex++)
+                action.manualMove = result
+                if (!result.reason) action.finishTime = result.endTime
+            }
+        }
+        // Scheduling may have searched beyond the output horizon for a blocked action.
+        return simulation.time > horizon ? simulation.deliveries.filter(({ time }) => time <= horizon) : simulation.deliveries
     }
     const candidateEventTimes = collectCandidatesThrough === undefined ? []
         : [...simulation.eventBoundaries, ...simulation.deliveries.map(({ time }) => time)]

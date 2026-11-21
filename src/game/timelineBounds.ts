@@ -7,7 +7,7 @@ export const TIMELINE_WINDOW_SECONDS = 120
 export function timelineBounds(action: ScheduledAction) {
     return isConstruction(action.item)
         ? { start: action.departureTime ?? action.commandTime!, end: action.workerReturnEndTime ?? action.workerReturnTime ?? action.finishTime! }
-        : { start: action.commandTime!, end: action.finishTime! }
+        : { start: action.commandTime!, end: action.finishTime ?? action.manualMove?.endTime ?? action.commandTime! }
 }
 
 export function timelineEnd(plan: ScheduledAction[]) {

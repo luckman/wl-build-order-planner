@@ -3,6 +3,9 @@ import { TIMELINE_WINDOW_SECONDS, timelineBounds, timelineEnd } from "./game/tim
 import ConstructionDialog from "./ConstructionDialog"
 import { isConstruction, hasCustomConstruction, constructionDescription } from "./game/constructionSettings"
 import WorkerEventDialog from "./WorkerEventDialog"
+import ManualWorkerMoveDialog from "./ManualWorkerMoveDialog"
+import { formatDuration } from "./durationTime"
+import { createManualWorkerMove, manualWorkerMoveIdentities, type ManualWorkerMoveType } from "./game/manualWorkerMoves"
 import { createWorkerEvent, workerEventIdentity, type WorkerEventCommand } from "./game/workerEvents"
 import GoldMinerLimitDialog from "./GoldMinerLimitDialog"
 import { createGoldMinerLimit, GOLD_MINER_LIMIT_NAME, OPENING_GOLD_LIMIT_WARNING, profileGoldMinerLimit } from "./game/goldMinerLimit"
@@ -66,6 +69,7 @@ const iconSources: Record<string, string> = {
     darkManaSpent: require("./icons/events/dark-mana-spent.png"),
     resourcesCollected: require("./icons/events/resources-collected.png"),
     limitGoldMiners: require("./icons/events/limit-gold-miners.png"),
+    moveGoldMinerToWood: require("./icons/events/move-gold-miner-to-wood.png"),
     lightLumberGathering: require("./icons/scrolls/light-lumber-gathering.png"),
     lightGoldRush: require("./icons/scrolls/light-gold-rush.png"),
     darkWhip: require("./icons/scrolls/dark-whip.png"),
@@ -176,7 +180,7 @@ function actionTimingTitle(action: ScheduledAction, globalDelay: number) {
 function createTimelineLanes(plan: ScheduledAction[]): TimelineLane[] {
     const availableLanes = new Map<string, Array<{ availableAt: number; events: TimelineEvent[] }>>()
     plan.map((action, index) => ({ action, index })).sort((a, b) => timelineBounds(a.action).start - timelineBounds(b.action).start).forEach(({ action, index }) => {
-        if (action.blocked || action.commandTime === null || action.finishTime === null) {
+        if (action.blocked || action.commandTime === null || (action.finishTime === null && action.item.kind !== "manual-worker-move")) {
             return
         }
         const group = isTimedEvent(action.item) ? "Scrolls and events"
@@ -206,6 +210,7 @@ export default function App() {
     const [scrollDialogOpen, setScrollDialogOpen] = useState<ScrollId | null>(null)
     const [configuringConstruction, setConfiguringConstruction] = useState<PlannerItem | null>(null)
     const [workerEventDialogOpen, setWorkerEventDialogOpen] = useState<WorkerEventCommand["type"] | null>(null)
+    const [manualWorkerMoveDialogOpen, setManualWorkerMoveDialogOpen] = useState<ManualWorkerMoveType | null>(null)
     const [goldMinerLimitDialogOpen, setGoldMinerLimitDialogOpen] = useState(false)
     const [unitKilledDialogOpen, setUnitKilledDialogOpen] = useState(false)
     const [wellDialogOpen, setWellDialogOpen] = useState<ManaWellEventType | null>(null)
@@ -698,6 +703,14 @@ export default function App() {
                                                     <span className="action-name">{GOLD_MINER_LIMIT_NAME}</span>
                                                     <img src={iconSources.limitGoldMiners} alt="" />
                                                 </button>
+                                                {(Object.keys(manualWorkerMoveIdentities) as ManualWorkerMoveType[]).map(type => {
+                                                    const { name, icon } = manualWorkerMoveIdentities[type]
+                                                    return <button key={type} className="action resource-card" aria-label={name}
+                                                        onClick={() => setManualWorkerMoveDialogOpen(type)}>
+                                                        <span className="action-name">{name}</span>
+                                                        <img src={iconSources[icon]} alt="" />
+                                                    </button>
+                                                })}
                                             </>}
                                         </div>}
                                     </section>
@@ -853,9 +866,10 @@ export default function App() {
                             <Droppable droppableId="build-order">
                             {provided => <ol className="sortable-order" ref={provided.innerRef} {...provided.droppableProps}>
                                 {displayPlan.map((action, index) => {
-                                    const { item, commandTime, finishTime, blocked, blockedReason } = action
+                                    const { item, commandTime, finishTime, blocked, blockedReason, manualMove } = action
                                     let timing = blockedReason
-                                    if (!blocked && commandTime !== null) {
+                                    if (manualMove && commandTime !== null) timing = `Command ${formatDuration(commandTime)}`
+                                    else if (!blocked && commandTime !== null) {
                                         timing = finishTime !== null && finishTime > commandTime
                                             ? `${formatTimeWithTenths(commandTime)} - ${formatTimeWithTenths(finishTime)}`
                                             : `Command ${formatTime(commandTime)}`
@@ -882,10 +896,14 @@ export default function App() {
                                             {isScrollAction(item) && item.targetItemId && <small>Target: {faction.items.find(target => target.id === item.targetItemId)?.name}</small>}
                                             {item.kind === "worker-event" && item.workerEvent === "make-active" && <small>{item.count} workers · {item.travelDuration}s travel</small>}
                                             {item.kind === "limit-gold-miners" && <small>Limit {item.goldLimit}</small>}
+                                            {item.kind === "manual-worker-move" && manualMove &&
+                                                <small>{manualMove.completed} of {item.count} moved{manualMove.endTime === null ? " · Waiting" : ""}</small>}
                                             {item.kind === "unit-is-killed" && <small>{faction.items.find(unit => unit.id === item.unitId)?.name}{item.workerGroup ? ` · ${item.workerGroup} worker` : ""}</small>}
                                             {item.kind === "mana-spent" && <small>{item.mana} mana</small>}
                                             {item.kind === "resources-collected" && <small>{item.collectedGold >= 0 ? "+" : ""}{item.collectedGold} gold · {item.collectedWood >= 0 ? "+" : ""}{item.collectedWood} wood</small>}
                                             <small>{timing}</small>
+                                            {manualMove?.reason && manualMove.endTime !== null &&
+                                                <small>Ended {formatDuration(manualMove.endTime)} · {manualMove.reason}</small>}
                                         </div>
                                         <button
                                             aria-label={`Remove ${item.name}`}
@@ -1001,6 +1019,20 @@ export default function App() {
                             ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
                             : [...current, action], () => {
                             setWorkerEventDialogOpen(null); setEditingEventId(null); setHoverTime(null)
+                        })
+                    }} />}
+                {(manualWorkerMoveDialogOpen || editingEvent?.kind === "manual-worker-move") && <ManualWorkerMoveDialog
+                    key={editingEvent?.orderId ?? manualWorkerMoveDialogOpen!} defaultTime={defaultEventTime}
+                    type={editingEvent?.kind === "manual-worker-move" ? editingEvent.move : manualWorkerMoveDialogOpen!}
+                    action={editingEvent?.kind === "manual-worker-move" ? editingEvent : undefined}
+                    validationError={editingEvent ? null : additionError}
+                    onClose={() => { setManualWorkerMoveDialogOpen(null); setEditingEventId(null) }}
+                    onSave={command => {
+                        const action = createManualWorkerMove(command)
+                        setBuildOrder(current => editingEvent?.kind === "manual-worker-move"
+                            ? current.map(item => item === editingEvent ? { ...action, orderId: editingEvent.orderId } : item)
+                            : [...current, action], () => {
+                            setManualWorkerMoveDialogOpen(null); setEditingEventId(null); setHoverTime(null)
                         })
                     }} />}
                 {(resourcesCollectedDialogOpen || editingEvent?.kind === "resources-collected") && <ResourcesCollectedDialog

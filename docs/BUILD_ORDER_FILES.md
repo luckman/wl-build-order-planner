@@ -534,6 +534,14 @@ Counts are positive integers within the supported worker limit; times and durati
 planner limits. Drafts, JSON files and share links use these same records. Worker identity,
 resource assignments and travel progress are derived by simulation, never stored.
 
+## Manual worker moves
+
+`{ "type": "move-gold-miner-to-wood", "commandTime": 20, "count": 2 }` requests that two
+current gold miners switch to wood. Count is a positive whole number. The command time uses the
+same fractional seconds and range as other worker events. Multiple manual moves and other worker
+commands can share a time. Their order in the build order is preserved. The planner recalculates
+progress and any shortfall when reopening a draft, JSON file or share link.
+
 ## Gold miner limit events
 
 `{ "type": "limit-gold-miners", "commandTime": 30, "limit": 3, "reassign": true }` sets the

@@ -2,6 +2,7 @@ import { constructionCommand, parseConstructionSettings, parseConstructionTimeMo
 import type { WorkerCasualtyGroup } from "./gameData"
 import { createWorkerEvent, workerEventCommand, type WorkerEventCommand } from "./workerEvents"
 import { createGoldMinerLimit, goldMinerLimitCollision, goldMinerLimitCommand, type GoldMinerLimitCommand } from "./goldMinerLimit"
+import { createManualWorkerMove, manualWorkerMoveCommand, manualWorkerMoveIdentities, type ManualWorkerMoveCommand, type ManualWorkerMoveType } from "./manualWorkerMoves"
 import { createManaSpentAction, manaSpentCommand, manaSpentCollision, type ManaSpentCommand } from "./manaSpent"
 import { validateActionCount, validateEconomyDurations } from "./plannerLimits"
 import { createUnitKilledAction, unitKilledCommand, type UnitKilledCommand } from "./unitsKilled"
@@ -24,7 +25,7 @@ export type BuildOrderDocument = {
     gameRulesVersion: string
     faction: FactionId
     gameProfile: GameProfile
-    buildOrder: Array<OpeningAction | ((WorkerEventCommand | GoldMinerLimitCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
+    buildOrder: Array<OpeningAction | ((WorkerEventCommand | ManualWorkerMoveCommand | GoldMinerLimitCommand | ScrollCommand | ManaSpentCommand | ResourcesCollectedCommand | ManaWellCommand | UnitKilledCommand | {
         itemId: string; construction?: ConstructionSettings
     }) & {
         timings?: Pick<ScheduledAction, "commandTime" | "departureTime" | "startTime" | "finishTime" | "workerReturnTime" | "workerReturnEndTime">
@@ -34,6 +35,7 @@ export type BuildOrderDocument = {
 export function buildOrderCommand(item: PlannerItem) {
     switch (item.kind) {
         case "worker-event": return workerEventCommand(item)
+        case "manual-worker-move": return manualWorkerMoveCommand(item)
         case "limit-gold-miners": return goldMinerLimitCommand(item)
         case "mana-spent": return manaSpentCommand(item)
         case "scroll": return scrollCommand(item)
@@ -150,6 +152,11 @@ export function parseBuildOrder(text: string): {
             return createWorkerEvent({ type: action.type, commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
                 count: number(action.count, `Action ${index + 1}.count`, true, true),
                 travelDuration: action.travelDuration === undefined ? 0 : number(action.travelDuration, `Action ${index + 1}.travelDuration`) }, faction)
+        }
+        if (typeof action.type === "string" && Object.prototype.hasOwnProperty.call(manualWorkerMoveIdentities, action.type)) {
+            return createManualWorkerMove({ type: action.type as ManualWorkerMoveType,
+                commandTime: number(action.commandTime, `Action ${index + 1}.commandTime`),
+                count: number(action.count, `Action ${index + 1}.count`, true, true) })
         }
         if (action.type === "limit-gold-miners") {
             if (action.reassign !== undefined && typeof action.reassign !== "boolean")

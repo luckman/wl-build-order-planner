@@ -1,6 +1,7 @@
 import type { PlannerItem, WorkerCasualtyGroup } from "./gameData"
 import type { WorkerEventAction } from "./workerEvents"
 import { alignTimeWithGoldMinerLimit, goldMinerLimitTimeKey, profileGoldMinerLimit, timestampRoundoff, type GoldMinerLimitAction } from "./goldMinerLimit"
+import { manualWorkerMoveIdentities, type ManualWorkerMoveAction, type ManualWorkerMoveResult } from "./manualWorkerMoves"
 import { growingWoodTravelTime } from "./gatheringRules"
 import { MAX_PLAN_ACTIONS, MAX_SIMULATION_STEPS, validateEconomyDurations, validatePlanTime } from "./plannerLimits"
 import type { PlayerBuildingLevels } from "./playerLevels"
@@ -86,6 +87,7 @@ export type GatheringWorker = {
     cargoGold: number
     cargoWood: number
     whipUntil: number
+    lastManualMoveAt?: number
     constructionDuration?: number
     constructionReturnDuration?: number
 }
@@ -103,6 +105,7 @@ export type WorkerAllocation = {
 }
 
 type HeldTransition = { worker: GatheringWorker; nextAt: number; state: "outbound" | "construction-return" }
+type PendingManualMove = { resultIndex: number; action: ManualWorkerMoveAction; workerIds: Set<number> }
 
 type WorkerStateAction = {
     item: PlannerItem
@@ -128,6 +131,9 @@ export class WorkerEconomy {
     private mineWorker: number | null = null
     private delayedInitialWoodWorkerIds: number[] = []
     private applyingWorkerCommands = false
+    private commandTransitions: HeldTransition[] = []
+    private pendingManualMoves: PendingManualMove[] = []
+    private manualMoveResults: ManualWorkerMoveResult[] = []
     private sawmillCompletions: number[] = []
     private lumberGatheringWindows: Array<{ startTime: number; finishTime: number; bonus: number }> = []
     private goldRushWindows: Array<{ startTime: number; finishTime: number; bonus: number }> = []
@@ -167,6 +173,8 @@ export class WorkerEconomy {
             lumberGatheringWindows: [...this.lumberGatheringWindows],
             goldRushWindows: [...this.goldRushWindows],
             whipStarts: [...this.whipStarts],
+            manualMoveResults: this.manualMoveResults.map(result => ({ ...result })),
+            pendingManualMoves: this.pendingManualMoves.map(move => ({ ...move, workerIds: new Set(move.workerIds) })),
         })
     }
 
@@ -223,22 +231,31 @@ export class WorkerEconomy {
     selectWorkerToKill(group: WorkerCasualtyGroup = "gathering") {
         const priority = (worker: GatheringWorker) => worker.assignment === "wood" || this.delayedInitialWoodWorkerIds.includes(worker.id)
             ? 0 : worker.assignment === "gold" ? 1 : 2
-        return this.workers.filter(worker => !isBuildingWorker(worker) && worker.state !== "killed" &&
+        return this.workers.filter(worker => this.canKillWorker(worker) &&
             (group === "idle" ? worker.assignment === "idle" && worker.state === "idle" : worker.assignment !== "idle"))
             .sort((a, b) => priority(a) - priority(b) || a.id - b.id)[0]
     }
 
     killWorker(workerId: number) {
         const worker = this.workers[workerId]
-        if (!worker || worker.state === "killed" || isBuildingWorker(worker)) return false
+        if (!worker || !this.canKillWorker(worker)) return false
         if (this.mineWorker === workerId) this.mineWorker = null
         this.delayedInitialWoodWorkerIds = this.delayedInitialWoodWorkerIds.filter(id => id !== workerId)
         worker.assignment = "idle"
         worker.cargoGold = 0
         worker.cargoWood = 0
         this.transition(worker, "killed", Infinity)
+        this.pruneManualMovePools()
         this.startMine()
         return true
+    }
+
+    private canKillWorker(worker: GatheringWorker) {
+        if (worker.state === "killed") return false
+        if (!isBuildingWorker(worker)) return true
+        // A finished, instantaneous return can be held briefly for a same-time move.
+        return worker.state === "construction-return" && this.commandTransitions.some(transition =>
+            transition.worker === worker && transition.state === "construction-return" && transition.nextAt === this.time)
     }
 
     scheduleSawmill(finishTime: number) {
@@ -376,7 +393,7 @@ export class WorkerEconomy {
         )
     }
 
-    advanceTo(time: number, commandsAtTime?: () => void, incomingGoldLimit?: GoldMinerLimitAction) {
+    advanceTo(time: number, commandsAtTime?: () => void, incomingGoldLimit?: GoldMinerLimitAction, incomingManualMove = false) {
         validatePlanTime(time, "Simulation time")
         const roundoff = commandsAtTime ? timestampRoundoff(time) : 0
         for (let next = this.nextEventTime; next <= time + roundoff; next = this.nextEventTime) {
@@ -390,28 +407,104 @@ export class WorkerEconomy {
             this.time = next
             const atCommand = next === time && commandsAtTime !== undefined
             const transitions: HeldTransition[] | undefined = !this.applyingWorkerCommands &&
-                (atCommand || this.hasExplicitGoldMinerLimit) ? [] : undefined
+                (atCommand || this.hasExplicitGoldMinerLimit || this.hasPendingManualMoves) ? [] : undefined
             do {
-                this.advanceWorkerEvents(transitions, atCommand ? incomingGoldLimit : undefined)
+                this.advanceWorkerEvents(transitions, atCommand ? incomingGoldLimit : undefined, atCommand && incomingManualMove)
             } while (transitions && this.nextEventTime === next)
 
             if (atCommand) {
                 const runCommands = commandsAtTime!
                 commandsAtTime = undefined
-                this.runWorkerCommands(runCommands)
+                this.runWorkerCommands(runCommands, transitions ?? [])
+            } else if (transitions && this.hasPendingManualMoves) {
+                this.runWorkerCommands(() => this.resolvePendingManualMoves(), transitions)
             }
             if (transitions) this.reassignAtTransitions(transitions)
         }
         this.time = time
         if (commandsAtTime) {
-            this.runWorkerCommands(commandsAtTime)
+            this.runWorkerCommands(commandsAtTime, [])
             this.reassignAtTransitions([])
         }
     }
 
-    private runWorkerCommands(commands: () => void) {
+    private runWorkerCommands(commands: () => void, transitions: HeldTransition[]) {
         this.applyingWorkerCommands = true
-        try { commands() } finally { this.applyingWorkerCommands = false }
+        this.commandTransitions = this.hasPendingManualMoves || transitions.length > 1
+            ? transitions.sort((a, b) => a.worker.id - b.worker.id) : transitions
+        try { commands() } finally {
+            this.commandTransitions = []
+            this.applyingWorkerCommands = false
+        }
+    }
+
+    get hasPendingManualMoves() {
+        return this.pendingManualMoves.length > 0
+    }
+
+    get manualMoveCheckpointWeight() {
+        return this.pendingManualMoves.reduce((weight, move) => weight + move.workerIds.size, this.manualMoveResults.length)
+    }
+
+    manualWorkerMoveResult(index: number) {
+        return { ...this.manualMoveResults[index] }
+    }
+
+    startManualWorkerMove(action: ManualWorkerMoveAction) {
+        const { source } = manualWorkerMoveIdentities[action.move]
+        const workerIds = new Set(this.workers.filter(worker => worker.assignment === source &&
+            worker.lastManualMoveAt !== this.time).map(worker => worker.id))
+        const resultIndex = this.manualMoveResults.length
+        const reason = workerIds.size < action.count
+            ? `Only ${workerIds.size} source workers available for ${action.count} requested.` : undefined
+        this.manualMoveResults.push(reason ? { completed: 0, endTime: this.time, reason } : { completed: 0, endTime: null })
+        if (!reason) {
+            const move = { resultIndex, action, workerIds }
+            this.pendingManualMoves.push(move)
+            this.resolveManualMove(move)
+        }
+        return reason
+    }
+
+    resolvePendingManualMoves() {
+        for (const move of this.pendingManualMoves) {
+            this.resolveManualMove(move)
+        }
+    }
+
+    private resolveManualMove(move: PendingManualMove) {
+        const result = this.manualMoveResults[move.resultIndex]
+        if (result.endTime !== null) return
+        const { destination } = manualWorkerMoveIdentities[move.action.move]
+        for (const transition of this.commandTransitions) {
+            const { worker, nextAt, state } = transition
+            if (!move.workerIds.has(worker.id) || worker.state !== state || worker.nextAt !== Infinity ||
+                worker.lastManualMoveAt === this.time) continue
+            worker.nextAt = nextAt
+            worker.lastManualMoveAt = this.time
+            move.workerIds.delete(worker.id)
+            result.completed++
+            if (result.completed === move.action.count) result.endTime = this.time
+            this.redirectGatherer(worker, destination)
+            if (result.endTime !== null) break
+        }
+    }
+
+    private pruneManualMovePools() {
+        if (!this.hasPendingManualMoves) return
+        for (const move of this.pendingManualMoves) {
+            const result = this.manualMoveResults[move.resultIndex]
+            if (result.endTime !== null) continue
+            const { source } = manualWorkerMoveIdentities[move.action.move]
+            for (const id of move.workerIds) {
+                if (this.workers[id].assignment !== source) move.workerIds.delete(id)
+            }
+            const outstanding = move.action.count - result.completed
+            if (move.workerIds.size >= outstanding) continue
+            result.endTime = this.time
+            result.reason = `Only ${move.workerIds.size} source workers remain for ${outstanding} outstanding.`
+        }
+        this.pendingManualMoves = this.pendingManualMoves.filter(move => this.manualMoveResults[move.resultIndex].endTime === null)
     }
 
     private reassignAtTransitions(transitions: HeldTransition[]) {
@@ -421,6 +514,7 @@ export class WorkerEconomy {
         for (const { worker, nextAt, state } of transitions.sort((a, b) => a.worker.id - b.worker.id)) {
             if (worker.state !== state || worker.nextAt !== Infinity) continue
             worker.nextAt = nextAt
+            if (worker.lastManualMoveAt === this.time) continue
             if (worker.assignment === "gold" && this.explicitGoldLimit !== undefined && this.goldAssignments > this.explicitGoldLimit) {
                 this.redirectGatherer(worker, "wood")
             } else {
@@ -438,7 +532,8 @@ export class WorkerEconomy {
         const openSlots = Math.max(0, this.goldMinerLimit - this.goldAssignments)
         const eligible = this.workers.flatMap(worker => {
             const ready = woodTransitions.has(worker.id)
-            if (worker.assignment !== "wood" || worker.cargoWood !== 0 || (!ready && worker.state !== "outbound")) return []
+            if (worker.assignment !== "wood" || worker.lastManualMoveAt === this.time ||
+                worker.cargoWood !== 0 || (!ready && worker.state !== "outbound")) return []
             const remainingTravel = ready ? 0 : (worker.nextAt - this.time) * this.rate(worker)
             return [{ worker, remainingTravel }]
         }).sort((left, right) => right.remainingTravel - left.remainingTravel || left.worker.id - right.worker.id)
@@ -455,6 +550,7 @@ export class WorkerEconomy {
         const destinationTravel = destination === "gold" ? this.settings.goldTravelTime : this.woodTravelAfterGold()
         worker.assignment = destination
         this.transition(worker, "outbound", Math.max(remainingTravel, returnTravel, destinationTravel))
+        this.pruneManualMovePools()
     }
 
     private woodTravelAfterGold() {
@@ -463,23 +559,24 @@ export class WorkerEconomy {
             : this.travel("wood")
     }
 
-    private canRedirectFinishedBuilder(worker: GatheringWorker, incomingGoldLimit: GoldMinerLimitAction | undefined) {
+    private canRedirectFinishedBuilder(worker: GatheringWorker, incomingGoldLimit: GoldMinerLimitAction | undefined, incomingManualMove: boolean) {
         if (worker.assignment === "gold") {
             const limit = incomingGoldLimit?.goldLimit ?? this.explicitGoldLimit
-            return worker.cargoGold === 0 && limit !== undefined && this.goldAssignments > limit
+            return worker.cargoGold === 0 && ((limit !== undefined && this.goldAssignments > limit) ||
+                incomingManualMove || this.pendingManualMoves.some(move => move.workerIds.has(worker.id)))
         }
         return worker.assignment === "wood" && worker.cargoWood === 0 &&
             (incomingGoldLimit ? this.canReassignWoodOnIncrease(incomingGoldLimit) : this.allowWoodReassignment)
     }
 
-    private advanceWorkerEvents(transitions: HeldTransition[] | undefined, incomingGoldLimit: GoldMinerLimitAction | undefined) {
+    private advanceWorkerEvents(transitions: HeldTransition[] | undefined, incomingGoldLimit: GoldMinerLimitAction | undefined, incomingManualMove: boolean) {
         if (++this.steps > MAX_SIMULATION_STEPS) throw new Error("Simulation work budget exceeded.")
         if (this.recordBoundaries) this.eventBoundaries.add(this.time)
         // A construction finishing exactly at activation is already returning
         // and can receive a fresh effect. The previous effect was cleared at start.
         for (const worker of this.workers.filter(worker => worker.state === "construction" && worker.nextAt === this.time)) {
             this.transition(worker, "construction-return", worker.constructionReturnDuration!)
-            if (transitions && this.canRedirectFinishedBuilder(worker, incomingGoldLimit)) {
+            if (transitions && this.canRedirectFinishedBuilder(worker, incomingGoldLimit, incomingManualMove)) {
                 transitions.push({ worker, nextAt: worker.nextAt, state: "construction-return" })
                 worker.nextAt = Infinity
             }
@@ -633,6 +730,7 @@ export class WorkerEconomy {
             }
         }
         this.expireWoodReassignmentAtLimit()
+        this.pruneManualMovePools()
         this.advanceTo(this.time)
         return true
     }
@@ -714,9 +812,14 @@ function replayWorkerEconomy(
 ) {
     const simulation = new WorkerEconomy(settings)
     const goldLimitTimes = new Map<number, number>()
+    const manualMoveTimes = new Set<number>()
     for (const action of actions) {
         if (action.item.kind === "limit-gold-miners" && !action.blocked && action.commandTime !== null) {
             goldLimitTimes.set(goldMinerLimitTimeKey(action.commandTime), action.commandTime)
+        }
+        if (action.item.kind === "manual-worker-move" && action.commandTime !== null) {
+            goldLimitTimes.set(goldMinerLimitTimeKey(action.commandTime), action.commandTime)
+            manualMoveTimes.add(action.commandTime)
         }
         if (action.item.kind === "scroll" && !action.blocked && action.startTime != null && action.finishTime !== null) {
             simulation.scheduleScroll(action.item.id as ScrollId, action.startTime, action.finishTime)
@@ -726,13 +829,15 @@ function replayWorkerEconomy(
         }
     }
     const allocationTime = alignTimeWithGoldMinerLimit(time, goldLimitTimes)
-    const eventPriority = { "limit-gold-miners": 0, worker: 1, "worker-event": 2, kill: 2, prepare: 3, "player-whip-preparation": 3, construction: 4 }
+    const eventPriority = { "limit-gold-miners": 0, worker: 1, "worker-event": 2, "manual-worker-move": 2,
+        kill: 2, prepare: 3, "player-whip-preparation": 3, construction: 4 }
     const events = actions
         .flatMap((action) => {
             const events: Array<{
                 time: number
                 type: keyof typeof eventPriority
                 action?: WorkerEventAction
+                manualMove?: ManualWorkerMoveAction
                 goldMinerLimit?: GoldMinerLimitAction
                 workerId?: number
                 duration?: number
@@ -742,6 +847,10 @@ function replayWorkerEconomy(
             if (action.item.kind === "worker-event" && action.commandTime !== null) {
                 events.push({ time: alignTimeWithGoldMinerLimit(action.commandTime, goldLimitTimes), type: "worker-event",
                     action: action.blocked ? undefined : action.item })
+            }
+            if (action.item.kind === "manual-worker-move" && action.commandTime !== null) {
+                events.push({ time: alignTimeWithGoldMinerLimit(action.commandTime, goldLimitTimes), type: "manual-worker-move",
+                    manualMove: action.item })
             }
             if (action.item.kind === "limit-gold-miners" && !action.blocked && action.commandTime !== null) {
                 events.push({ time: action.commandTime, type: "limit-gold-miners", goldMinerLimit: action.item })
@@ -789,6 +898,8 @@ function replayWorkerEconomy(
             simulation.prepareConstruction(simulation.workers[event.workerId!])
         } else if (event.type === "worker-event") {
             if (event.action) simulation.applyWorkerEvent(event.action)
+        } else if (event.type === "manual-worker-move") {
+            simulation.startManualWorkerMove(event.manualMove!)
         } else if (event.type === "kill") {
             if (event.workerId !== undefined) simulation.killWorker(event.workerId)
         } else if (event.type === "player-whip-preparation") {
@@ -804,13 +915,20 @@ function replayWorkerEconomy(
     for (let index = 0; index < events.length; ) {
         const { time } = events[index]
         const applyWorkerCommands = () => {
+            while (events[index]?.time === time && eventPriority[events[index].type] < eventPriority.kill) {
+                applyEvent(events[index++])
+            }
+            simulation.resolvePendingManualMoves()
             while (events[index]?.time === time && eventPriority[events[index].type] <= eventPriority.kill) {
                 applyEvent(events[index++])
             }
         }
         const { type } = events[index]
-        if (type === "limit-gold-miners" || (simulation.hasExplicitGoldMinerLimit && eventPriority[type] <= eventPriority.kill)) {
-            simulation.advanceTo(time, applyWorkerCommands, events[index].goldMinerLimit)
+        const manualMoveAtTime = manualMoveTimes.has(time)
+        if (type === "limit-gold-miners" ||
+            ((simulation.hasExplicitGoldMinerLimit || simulation.hasPendingManualMoves || manualMoveAtTime) &&
+                eventPriority[type] <= eventPriority.kill)) {
+            simulation.advanceTo(time, applyWorkerCommands, events[index].goldMinerLimit, manualMoveAtTime)
             while (events[index]?.time === time) {
                 simulation.advanceTo(time)
                 applyEvent(events[index++])
