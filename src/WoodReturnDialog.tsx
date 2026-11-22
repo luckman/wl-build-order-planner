@@ -12,7 +12,7 @@ export default function WoodReturnDialog({ action, defaultTime, woodCapacity, on
     const maxTarget = maxWoodReturnTarget(woodCapacity)
     return <EventTimeDialog name={WOOD_RETURN_NAME} title={action ? `Edit ${WOOD_RETURN_NAME}` : WOOD_RETURN_NAME}
         commandTime={action?.commandTime ?? defaultTime} submitLabel={action ? "Save event" : "Add event"}
-        onClose={onClose}
+        onClose={onClose} hint="At command time, the available woodcutter carrying the most wood is selected."
         validateTime={() => validationError ?? (mode === "target" ? woodReturnTargetError(Number(target), woodCapacity) : null)}
         onSave={commandTime => onSave({ type: "bring-wood-back-to-base", commandTime,
             ...(mode === "target" ? { mode, target: Number(target) } : { mode }) })}>
@@ -21,13 +21,17 @@ export default function WoodReturnDialog({ action, defaultTime, woodCapacity, on
                 <input type="radio" name="wood-return-mode" checked={mode === "immediate"} onChange={() => setMode("immediate")} />
                 Return immediately
             </label>
-            <label className="scroll-automatic">
-                <input type="radio" name="wood-return-mode" checked={mode === "target"} onChange={() => setMode("target")} />
-                Wait until X
-            </label>
+            <div className="wood-return-target-row">
+                <label className="scroll-automatic">
+                    <input type="radio" name="wood-return-mode" checked={mode === "target"} onChange={() => setMode("target")} />
+                    Wait for target
+                </label>
+                <div className="wood-return-target">
+                    <input aria-label="Wood target" type="number" min="1" max={maxTarget} step="1" value={target}
+                        disabled={mode !== "target"} onChange={event => setTarget(event.target.value)} />
+                    <small>{maxTarget > 0 ? `1–${maxTarget} wood` : "No valid target"}</small>
+                </div>
+            </div>
         </div>
-        {mode === "target" && <label>Wood target{maxTarget > 0 ? ` (1–${maxTarget})` : ""}
-            <input type="number" min="1" max={maxTarget} step="1" value={target} onChange={event => setTarget(event.target.value)} />
-        </label>}
     </EventTimeDialog>
 }

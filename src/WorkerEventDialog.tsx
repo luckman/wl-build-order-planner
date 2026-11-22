@@ -13,6 +13,8 @@ export default function WorkerEventDialog({ type, faction, action, defaultTime, 
     const command = (time: number): WorkerEventCommand => ({ type, commandTime: time, count: Number(count), travelDuration: Number(travel) })
     return <EventTimeDialog name={name} title={action ? `Edit ${name}` : name} commandTime={action?.commandTime ?? defaultTime}
         submitLabel={action ? "Save event" : "Add event"} onClose={onClose} onSave={time => onSave(command(time))}
+        hint={type === "make-idle" ? "Workers stop gathering immediately."
+            : "Workers return to their previous resource after reactivation travel. If the gold miner limit is full, former miners gather wood."}
         validateTime={time => {
             if (!count.trim() || !travel.trim()) return "Enter a count and travel duration."
             try { parseWorkerEvent(command(time)); return validationError ?? null } catch (error) { return (error as Error).message }

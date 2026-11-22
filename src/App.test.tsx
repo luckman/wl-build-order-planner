@@ -9,14 +9,24 @@ beforeEach(() => window.localStorage.clear())
 afterEach(() => window.localStorage.clear())
 
 test.each(["Light", "Dark"])("%s can add, edit, reopen, and remove a partial wood return", faction => {
-    const name = "Bring wood back to base"
+    const name = "Bring wood back"
     const { unmount } = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: faction }))
-    fireEvent.click(screen.getByRole("button", { name: faction === "Light" ? "Worker events" : "Slave events" }))
-    fireEvent.click(screen.getByRole("menuitem", { name }))
+    fireEvent.click(screen.getByRole("button", { name, exact: true }))
     const dialog = within(screen.getByRole("dialog", { name }))
     expect((dialog.getByRole("radio", { name: "Return immediately" }) as HTMLInputElement).checked).toBe(true)
-    expect(dialog.queryByRole("spinbutton")).toBeNull()
+    const target = dialog.getByRole("spinbutton", { name: "Wood target" }) as HTMLInputElement
+    expect(target.disabled).toBe(true)
+    expect(dialog.getByText("1–49 wood")).toBeTruthy()
+    expect(dialog.getByText("At command time, the available woodcutter carrying the most wood is selected.")).toBeTruthy()
+    fireEvent.click(dialog.getByRole("radio", { name: "Wait for target" }))
+    expect(target.disabled).toBe(false)
+    fireEvent.change(target, { target: { value: "12" } })
+    fireEvent.click(dialog.getByRole("radio", { name: "Return immediately" }))
+    expect(target.disabled).toBe(true)
+    fireEvent.click(dialog.getByRole("radio", { name: "Wait for target" }))
+    expect(target.value).toBe("12")
+    fireEvent.click(dialog.getByRole("radio", { name: "Return immediately" }))
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "00:08" } })
     fireEvent.click(dialog.getByRole("button", { name: "Add event" }))
     const remove = () => screen.getByRole("button", { name: `Remove ${name}` })
@@ -34,15 +44,14 @@ test.each(["Light", "Dark"])("%s can add, edit, reopen, and remove a partial woo
 })
 
 test.each(["Light", "Dark"])("%s can edit a saved target after the wood capacity shrinks", faction => {
-    const name = "Bring wood back to base"
+    const name = "Bring wood back"
     const { unmount } = render(<App />)
     fireEvent.click(screen.getByRole("button", { name: faction }))
     fireEvent.change(screen.getByLabelText("Sawmill level"), { target: { value: "5" } })
-    fireEvent.click(screen.getByRole("button", { name: faction === "Light" ? "Worker events" : "Slave events" }))
-    fireEvent.click(screen.getByRole("menuitem", { name }))
+    fireEvent.click(screen.getByRole("button", { name, exact: true }))
     const dialog = within(screen.getByRole("dialog", { name }))
     fireEvent.change(dialog.getByLabelText("Command time (mm:ss)"), { target: { value: "00:04" } })
-    fireEvent.click(dialog.getByRole("radio", { name: "Wait until X" }))
+    fireEvent.click(dialog.getByRole("radio", { name: "Wait for target" }))
     const input = dialog.getByRole("spinbutton", { name: /^Wood target/ }) as HTMLInputElement
     expect(input.max).toBe("50")
     fireEvent.change(input, { target: { value: "50.5" } })

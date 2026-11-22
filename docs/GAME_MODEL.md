@@ -255,7 +255,7 @@ including blocked commands.
 | Limit gold miners (both factions) | Sets the gold assignment limit at a chosen time, before recruits finishing at the same time are assigned. |
 | Move gold miner to wood (both factions) | Redirects a chosen number of currently assigned gold miners to wood without changing the limit. |
 | Move wood gatherer to gold (both factions) | Redirects a chosen number of currently assigned wood gatherers to available gold slots. |
-| Bring wood back to base (both factions) | Sends one actively chopping worker back with a partial load. |
+| Bring wood back (both factions) | Sends one actively chopping worker back with a partial load. |
 
 For both Light scrolls, levels 1–6 last 30, 30.3, 30.8, 31.5, 32.4, and 33.5 seconds respectively.
 Levels are independent profile settings, editable for Light in Resources collection, and default to
@@ -325,14 +325,14 @@ The latest order state reports idle workers separately from workers building or 
 
 ## Editing a plan
 
-In **Worker events** or **Slave events**, select **Bring wood back to base** and set the command
-time. **Return immediately** picks the worker who is chopping and holds the most wood. Equal loads
+In **Actions**, select **Bring wood back** after **Unit is killed** and set the command time.
+**Return immediately** picks the worker who is chopping and holds the most wood. Equal loads
 are resolved by the lowest worker ID. The worker needs at least one whole wood and returns with
 the whole portion of their load. Ordinary wood travel, Sawmill routing, and Whip still apply.
 Wood becomes available on deposit, and the worker then resumes gathering. Lumber Gathering adds
 its bonus only to full loads.
 
-Choose **Wait until X** to reserve the selected worker until they have gathered the requested
+Choose **Wait for target** to reserve the selected worker until they have gathered the requested
 amount. Set a whole target from one through one less than the profile's wood per trip. A worker
 already carrying enough wood leaves immediately with their whole load. Other wood return commands
 can use workers who are still chopping and have no pending return.

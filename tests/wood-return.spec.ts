@@ -4,16 +4,20 @@ import { selectFaction } from "./selectFaction"
 test("reordering a wood return among simultaneous worker commands recalculates its outcome", async ({ page }) => {
     await page.goto("http://localhost:2987")
     const actions = page.getByRole("button", { name: "Worker events", exact: true })
-    for (const name of ["Bring wood back to base", "Make Worker idle"]) {
-        await actions.click()
-        await page.getByRole("menuitem", { name, exact: true }).click()
+    const woodReturnCard = page.getByRole("button", { name: "Bring wood back", exact: true })
+    for (const name of ["Bring wood back", "Make Worker idle"]) {
+        if (name === "Bring wood back") await woodReturnCard.click()
+        else {
+            await actions.click()
+            await page.getByRole("menuitem", { name, exact: true }).click()
+        }
         const dialog = page.getByRole("dialog", { name, exact: true })
         await dialog.getByLabel("Command time (mm:ss)").fill("00:08")
         await dialog.getByRole("button", { name: "Add event" }).click()
     }
     const rows = page.locator(".sortable-order > li")
     await expect(rows.first()).toContainText("Worker made idle before depositing the wood.")
-    const handle = page.getByRole("button", { name: "Reorder Bring wood back to base, action 1" })
+    const handle = page.getByRole("button", { name: "Reorder Bring wood back, action 1" })
     await handle.focus()
     await handle.press("Space")
     await handle.press("ArrowDown")
@@ -31,10 +35,9 @@ test("Light and Dark share the axe-and-log icon across the picker, Build order, 
         await page.setViewportSize({ width: faction === "Light" ? 1440 : 390, height: 900 })
         await page.goto("http://localhost:2987")
         await selectFaction(page, faction)
-        const name = "Bring wood back to base"
-        await page.getByRole("button", { name: faction === "Light" ? "Worker events" : "Slave events", exact: true }).click()
-        const option = page.getByRole("menuitem", { name, exact: true })
-        const pickerIcon = option.locator("img")
+        const name = "Bring wood back"
+        const card = page.getByRole("region", { name: "heroes", exact: true }).getByRole("button", { name, exact: true })
+        const pickerIcon = card.locator("img")
         const source = (await pickerIcon.getAttribute("src"))!
         sharedSource ??= source
         expect(source).toBe(sharedSource)
@@ -42,8 +45,8 @@ test("Light and Dark share the axe-and-log icon across the picker, Build order, 
             const icon = image as HTMLImageElement
             return [icon.naturalWidth, icon.naturalHeight]
         })).toEqual([252, 252])
-        await option.screenshot({ path: testInfo.outputPath(`${faction}-picker.png`) })
-        await option.click()
+        await card.screenshot({ path: testInfo.outputPath(`${faction}-picker.png`) })
+        await card.click()
         const dialog = page.getByRole("dialog", { name, exact: true })
         await dialog.getByLabel("Command time (mm:ss)").fill("00:08")
         await dialog.getByRole("button", { name: "Add event" }).click()

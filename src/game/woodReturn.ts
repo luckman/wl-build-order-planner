@@ -2,7 +2,7 @@ import type { PlannerItem } from "./gameData"
 import { goldMinerLimitTimeKey } from "./goldMinerLimit"
 import { validateCommandTime } from "./plannerLimits"
 
-export const WOOD_RETURN_NAME = "Bring wood back to base"
+export const WOOD_RETURN_NAME = "Bring wood back"
 export const WOOD_RETURN_ICON = "bringWoodBackToBase"
 
 export type WoodReturnMode = { mode: "immediate"; target?: never } | { mode: "target"; target: number }

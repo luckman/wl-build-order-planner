@@ -12,6 +12,9 @@ export default function ManualWorkerMoveDialog({ type, action, defaultTime, onCl
     const command = (commandTime: number): ManualWorkerMoveCommand => ({ type, commandTime, count: Number(count) })
     return <EventTimeDialog name={name} title={action ? `Edit ${name}` : name} commandTime={action?.commandTime ?? defaultTime}
         submitLabel={action ? "Save event" : "Add event"} onClose={onClose} onSave={time => onSave(command(time))}
+        hint={type === "move-gold-miner-to-wood"
+            ? "Miners deliver their gold before moving to wood. The gold miner limit stays unchanged."
+            : "Workers travelling to the forest switch immediately. Others finish and deliver their wood first."}
         validateTime={time => {
             try { createManualWorkerMove(command(time)); return validationError ?? null } catch (error) { return (error as Error).message }
         }}>

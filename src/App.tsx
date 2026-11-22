@@ -712,6 +712,11 @@ export default function App() {
                                                     <span className="action-name">Unit is killed</span>
                                                     <img src={iconSources[factionId === "light" ? "lightUnitIsKilled" : "darkUnitIsKilled"]} alt="" />
                                                 </button>
+                                                <button className="action resource-card" aria-label={WOOD_RETURN_NAME} title="Send one gatherer back with a partial load of wood"
+                                                    onClick={() => setWoodReturnDialogOpen(true)}>
+                                                    <span className="action-name">{WOOD_RETURN_NAME}</span>
+                                                    <img src={iconSources[WOOD_RETURN_ICON]} alt="" />
+                                                </button>
                                                 <EventDropdown key={`point-${factionId}`} name="Control point events"
                                                     icon={pointCapturedLost} portalContainer={shell}
                                                     options={(["mana-well-is-captured", "mana-well-is-lost"] as const).map(type => ({
@@ -739,7 +744,6 @@ export default function App() {
                                                             icon: plannerIconSource("limitGoldMiners", factionId),
                                                             select: () => setGoldMinerLimitDialogOpen(true),
                                                         },
-                                                        { name: WOOD_RETURN_NAME, icon: iconSources[WOOD_RETURN_ICON], select: () => setWoodReturnDialogOpen(true) },
                                                     ]} />
                                             </>}
                                         </div>}

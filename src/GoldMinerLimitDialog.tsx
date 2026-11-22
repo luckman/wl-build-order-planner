@@ -37,6 +37,7 @@ export default function GoldMinerLimitDialog({ defaultTime, action, items, profi
     })
     return <EventTimeDialog name={GOLD_MINER_LIMIT_NAME} title={action ? `Edit ${GOLD_MINER_LIMIT_NAME}` : GOLD_MINER_LIMIT_NAME}
         commandTime={action?.commandTime ?? defaultTime} submitLabel={action ? "Save event" : "Add event"}
+        hint="When checked, existing workers switch between gold and wood to meet the limit. When unchecked, new gold slots are filled by recruits."
         onClose={onClose} onSave={time => {
             const next = command(time)
             onSave({ ...next, reassign: requiresReassignment(time, next.limit) ? true : next.reassign })
